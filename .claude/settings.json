@@ -7,6 +7,7 @@
       "Bash(mkdir:*)",
       "Bash(find:*)",
       "Bash(ls:*)",
+      "Bash(gh pr:*)",
       "Bash(cat:*)",
       "Bash(echo:*)",
       "Bash(chmod +x:*)",
