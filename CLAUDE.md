@@ -44,6 +44,7 @@ godot
 6. **Always run tests before claiming work is done.** SubagentStop hook validates.
 7. **Serial feature execution.** One feature in flight at a time. Human queues next feature idea while dark part runs.
 8. **Orchestrator never implements.** Main session coordinates only. All game code written by implementer sub-agent.
+9. **No AI-generated assets.** Never generate art, sprites, textures, sound effects, or music using AI/LLM tools. All assets must be ethically sourced: open source (CC0, MIT, public domain), hand-authored procedural geometry using Godot's built-in drawing nodes, or from free asset sites with clear permissive licensing. See `.claude/memory/game-design.md` Asset Policy section for details.
 
 ## Terminal States
 
