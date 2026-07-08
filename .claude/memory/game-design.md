@@ -18,6 +18,7 @@ Geometry-themed tower defense. All towers, enemies, and projectiles rendered as 
 - **Wave system.** Enemies spawn in waves. Increasing difficulty. Boss enemies at wave milestones.
 - **Resources.** Currency earned from kills. Spent on tower placement and upgrades.
 - **Lives.** Enemies that reach the end reduce lives. Game over at zero.
+- **Meta-progression.** Experience points (XP) earned from completing waves and levels. Persistent across sessions. Spent on a skill tree that grants permanent bonuses. Allows players to keep up with increasing difficulty over the course of the game.
 
 ## Planned Tower Types
 
@@ -45,6 +46,35 @@ Geometry-themed tower defense. All towers, enemies, and projectiles rendered as 
 - Every 5th wave: boss wave.
 - Between waves: brief preparation period.
 - Economy scales with wave number.
+
+## Meta-Progression System
+
+Incremental/idle-style progression across sessions. Playing earns XP. XP spent on permanent upgrades.
+
+### XP System
+
+- Earn XP from: completing waves, killing enemies, defeating bosses, clearing levels.
+- XP persists between sessions and game restarts. Saved locally.
+- Bonus XP for: no lives lost, fast clears, using fewer towers.
+
+### Skill Tree
+
+- XP spent on a skill tree to unlock permanent bonuses.
+- Skill tree is persistent across all games — not reset per level.
+- Tree organized into branches:
+
+| Branch | Theme | Example Upgrades |
+|--------|-------|-----------------|
+| Offense | Make towers stronger | +% damage, +% attack speed, +% range, +% pierce count |
+| Defense | Make enemies weaker | -% enemy HP, -% enemy speed, +% slow duration |
+| Economy | Earn more resources | +% gold per kill, cheaper tower placement, higher starting gold |
+| Utility | Quality of life | Faster build time, extra tower slots, shorter wave cooldown |
+
+### Philosophy
+
+- **Numbers go up.** Players should feel progressively stronger over time.
+- **Never a hard wall.** If the player fails a level, they can grind earlier levels for XP, buy upgrades, and come back stronger.
+- **Difficulty scales with progression.** Later levels assume the player has invested in the skill tree. Base stats are tuned for a fair but challenging experience with a partially-filled tree.
 
 ## Geometry Theme Rules
 
