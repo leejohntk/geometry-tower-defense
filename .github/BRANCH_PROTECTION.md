@@ -12,8 +12,8 @@ After pushing the initial scaffold, configure these on the `main` branch:
    - Require review from Code Owners: no (human is the sole approver)
 
 2. **Require status checks to pass before merging**
-   - `dotnet build` (if CI is set up)
-   - `dotnet test` (if CI is set up)
+   - `build` — `.github/workflows/ci.yml` runs `dotnet build` + `dotnet test` on every PR
+   - Free tier: 2,000 mins/month (public repos unlimited)
 
 3. **Require conversation resolution before merging** — yes
 
@@ -26,15 +26,22 @@ After pushing the initial scaffold, configure these on the `main` branch:
 
 7. **Allow deletions** — no
 
+### Status Checks via CI
+
+`.github/workflows/ci.yml` runs on every PR. The `build` job runs `dotnet build` + `dotnet test` on Ubuntu. After the workflow runs once, add `build` as a required status check in GitHub branch protection settings. Free on public repos (2,000 mins/month).
+
 ### Setup via GitHub CLI
 
 ```bash
-# After pushing initial commit to main
+# After CI workflow runs at least once on the repo
 gh api repos/$(gh repo view --json nameWithOwner -q .nameWithOwner)/branches/main/protection \
   --method PUT \
   --input - <<EOF
 {
-  "required_status_checks": null,
+  "required_status_checks": {
+    "strict": true,
+    "contexts": ["build"]
+  },
   "enforce_admins": true,
   "required_pull_request_reviews": {
     "required_approving_review_count": 1,
