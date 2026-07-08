@@ -13,10 +13,12 @@ Geometry-themed tower defense. All towers, enemies, and projectiles rendered as 
 
 ## Core Mechanics
 
+- **2D game.** Top-down or side-view perspective using Godot's Node2D. All gameplay on a single 2D plane.
 - **Grid-based placement.** Towers placed on a grid. Enemies follow predefined paths.
 - **Wave system.** Enemies spawn in waves. Increasing difficulty. Boss enemies at wave milestones.
 - **Resources.** Currency earned from kills. Spent on tower placement and upgrades.
 - **Lives.** Enemies that reach the end reduce lives. Game over at zero.
+- **Meta-progression.** Experience points (XP) earned from completing waves and levels. Persistent across sessions. Spent on a skill tree that grants permanent bonuses. Allows players to keep up with increasing difficulty over the course of the game.
 
 ## Planned Tower Types
 
@@ -45,9 +47,49 @@ Geometry-themed tower defense. All towers, enemies, and projectiles rendered as 
 - Between waves: brief preparation period.
 - Economy scales with wave number.
 
+## Meta-Progression System
+
+Incremental/idle-style progression across sessions. Playing earns XP. XP spent on permanent upgrades.
+
+### XP System
+
+- Earn XP from: completing waves, killing enemies, defeating bosses, clearing levels.
+- XP persists between sessions and game restarts. Saved locally.
+- Bonus XP for: no lives lost, fast clears, using fewer towers.
+
+### Skill Tree
+
+- XP spent on a skill tree to unlock permanent bonuses.
+- Skill tree is persistent across all games — not reset per level.
+- Tree organized into branches:
+
+| Branch | Theme | Example Upgrades |
+|--------|-------|-----------------|
+| Offense | Make towers stronger | +% damage, +% attack speed, +% range, +% pierce count |
+| Defense | Make enemies weaker | -% enemy HP, -% enemy speed, +% slow duration |
+| Economy | Earn more resources | +% gold per kill, cheaper tower placement, higher starting gold |
+| Utility | Quality of life | Faster build time, extra tower slots, shorter wave cooldown |
+
+### Philosophy
+
+- **Numbers go up.** Players should feel progressively stronger over time.
+- **Never a hard wall.** If the player fails a level, they can grind earlier levels for XP, buy upgrades, and come back stronger.
+- **Difficulty scales with progression.** Later levels assume the player has invested in the skill tree. Base stats are tuned for a fair but challenging experience with a partially-filled tree.
+
 ## Geometry Theme Rules
 
-- **No pixel art.** Clean vector-like geometric shapes.
-- **No organic shapes.** Pure geometry (circles, triangles, squares, hexagons, diamonds).
+- **Simple geometric shapes only.** No pixel art, no organic shapes, no detailed illustrations.
+- **Towers vs enemies visually distinct.** Towers use filled shapes with clean borders. Enemies use different shapes, sizes, or border styles so they are immediately distinguishable at a glance.
 - **Color coding.** Enemy types have distinct colors. Tower types have distinct colors.
 - **Clean UI.** Geometric HUD elements. Sans-serif fonts.
+- **2D plane.** All visuals flat on a single 2D plane. No 3D, no isometric perspective.
+
+## Asset Policy
+
+- **No AI/LLM-generated assets.** Art, sprites, textures, sound effects, and music must not be created by generative AI models trained on artists' work without consent.
+- **Ethical sourcing only.** Assets must come from:
+  - Open source repositories (licensed MIT, CC0, public domain, GPL-compatible)
+  - Free game asset sites with clear permissive licensing (e.g., OpenGameArt.org with CC0 or CC-BY)
+  - Hand-authored by the development team using Godot's built-in drawing tools or simple geometric shapes
+- **Geometric shapes as default.** Since the theme is geometric, most visual assets can be created procedurally in Godot using built-in nodes (ColorRect, Circle, Polygon2D, Line2D). No external sprite files needed for core gameplay elements.
+- **Sound.** Same policy as art. Free, openly licensed sound effects (CC0 preferred). Sources like freesound.org with CC0 license, or procedurally generated using Godot's AudioStreamGenerator.
