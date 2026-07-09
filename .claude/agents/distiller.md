@@ -40,7 +40,11 @@ The stop hook (`.claude/hooks/stop.sh`) tracks tool calls in `.claude/transcript
 ## Your Process
 
 1. **Check flag** — verify `.claude/transcripts/.distiller_needed` exists (or was requested manually).
-2. **Read recent session transcripts** — look in `.claude/transcripts/` for recent activity. The Claude Code harness stores actual session transcripts; check `~/.claude/projects/*/transcripts/` or the IDE's transcript directory for the full session log.
+2. **Gather data** — the orchestrator provides relevant session context. Supplement with:
+   - `git log --oneline` since last distillation (use `.claude/transcripts/.last_distillation` date if available)
+   - `git diff` patterns across recent commits
+   - Build/test failure output the orchestrator observed
+   - Any tool misuse or thrashing the orchestrator noticed
 3. **Detect patterns:**
    - Repeated errors (same class of build failure, same test pattern failure)
    - Thrashing (fix-then-break cycles on same file)
