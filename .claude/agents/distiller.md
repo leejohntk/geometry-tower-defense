@@ -33,17 +33,33 @@ hooks:
 
 You read session transcripts from `.claude/transcripts/` and detect patterns. You propose harness improvements. You can only modify harness files — never game code.
 
+## Trigger
+
+The stop hook (`.claude/hooks/stop.sh`) tracks tool calls in `.claude/transcripts/.tool_count`. When the counter reaches 12+ since last distillation, it creates `.claude/transcripts/.distiller_needed`. The orchestrator checks for this flag at session end or after long runs, and spawns you when it exists.
+
 ## Your Process
 
-1. **Read transcript** — the stop hook deposits transcripts in `.claude/transcripts/` when activity threshold is met.
-2. **Detect patterns:**
+1. **Check flag** — verify `.claude/transcripts/.distiller_needed` exists (or was requested manually).
+2. **Gather data** — the orchestrator provides relevant session context. Supplement with:
+   - `git log --oneline` since last distillation (use `.claude/transcripts/.last_distillation` date if available)
+   - `git diff` patterns across recent commits
+   - Build/test failure output the orchestrator observed
+   - Any tool misuse or thrashing the orchestrator noticed
+3. **Detect patterns:**
    - Repeated errors (same class of build failure, same test pattern failure)
    - Thrashing (fix-then-break cycles on same file)
    - Tool misuse (agent calling wrong MCP tool, wrong bash command)
    - Missed conventions (code that violates CLAUDE.md rules)
    - Missing guidance (areas where agents clearly needed but lacked instructions)
-3. **Propose improvements** — classify each by safety tier.
-4. **Apply or escalate** based on risk level.
+4. **Propose improvements** — classify each by safety tier.
+5. **Apply or escalate** based on risk level.
+6. **Reset counters** — after completing distillation (whether or not you found anything):
+   ```bash
+   echo "0" > .claude/transcripts/.tool_count
+   rm -f .claude/transcripts/.distiller_needed
+   date -u +%Y-%m-%dT%H:%M:%S > .claude/transcripts/.last_distillation
+   ```
+   This resets the threshold counter so the next distillation triggers after another 12 tool calls.
 
 ## Safety Tiers (from harness-safety.md)
 

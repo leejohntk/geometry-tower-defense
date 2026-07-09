@@ -17,8 +17,8 @@ Triggered automatically by stop hook when activity threshold met (12+ tool calls
 
 ## Process
 
-1. **Spawn distiller sub-agent** (Sonnet, `.claude/agents/distiller.md`).
-2. Pass the latest transcript files from `.claude/transcripts/`.
+1. **Check flag** — verify `.claude/transcripts/.distiller_needed` exists (or human invoked manually).
+2. **Spawn distiller sub-agent** (Sonnet, `.claude/agents/distiller.md`). Pass relevant session context: recent conversation patterns, build/test failures observed, tool misuse incidents, any thrashing you noticed.
 3. Distiller analyzes for patterns:
    - **Repeated errors:** Same build failure, same test pattern failure across sessions
    - **Thrashing:** Fix-then-break cycles on same file
