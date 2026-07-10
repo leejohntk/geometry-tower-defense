@@ -178,25 +178,50 @@ public partial class Main : Node2D
 
     public override void _Input(InputEvent @event)
     {
-        if (!_gameRunning || _gameManager == null || !_gameManager.IsPlacingTower)
+        if (!_gameRunning || _gameManager == null)
             return;
 
-        // Handle tower placement via mouse click
-        if (@event is InputEventMouseButton mouseButton &&
-            mouseButton.ButtonIndex == MouseButton.Left &&
-            mouseButton.Pressed)
+        if (_gameManager.IsPlacingTower)
         {
-            TryPlaceTowerAtMouse(mouseButton.Position);
+            // Handle tower placement via mouse click
+            if (@event is InputEventMouseButton mouseButton &&
+                mouseButton.ButtonIndex == MouseButton.Left &&
+                mouseButton.Pressed)
+            {
+                TryPlaceTowerAtMouse(mouseButton.Position);
+            }
+
+            // Cancel placement with right click
+            if (@event is InputEventMouseButton rightClick &&
+                rightClick.ButtonIndex == MouseButton.Right &&
+                rightClick.Pressed)
+            {
+                _gameManager.IsPlacingTower = false;
+                Input.SetDefaultCursorShape(Input.CursorShape.Arrow);
+                _gameHUD?.SetStartWaveEnabled(true);
+            }
+
+            return;
         }
 
-        // Cancel placement with right click
-        if (@event is InputEventMouseButton rightClick &&
-            rightClick.ButtonIndex == MouseButton.Right &&
-            rightClick.Pressed)
+        // Check if we clicked on an existing tower (not in placement mode)
+        if (@event is InputEventMouseButton click &&
+            click.ButtonIndex == MouseButton.Left &&
+            click.Pressed)
         {
-            _gameManager.IsPlacingTower = false;
-            Input.SetDefaultCursorShape(Input.CursorShape.Arrow);
-            _gameHUD?.SetStartWaveEnabled(true);
+            foreach (var tower in _gameManager.GetActiveTowers())
+            {
+                float towerSize = GameConstants.CellSize;
+                Rect2 towerRect = new Rect2(
+                    tower.Position - new Vector2(towerSize / 2f, towerSize / 2f),
+                    new Vector2(towerSize, towerSize)
+                );
+                if (towerRect.HasPoint(click.Position))
+                {
+                    tower.ToggleRange();
+                    break;
+                }
+            }
         }
     }
 

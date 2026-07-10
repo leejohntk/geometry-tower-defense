@@ -4,6 +4,7 @@ namespace GeometryTowerDefense;
 
 /// <summary>
 /// In-game HUD showing HP, coins, wave counter, tower placement button, and Start Wave button.
+/// Top bar for status info, right sidebar for action buttons.
 /// </summary>
 public partial class GameHUD : CanvasLayer
 {
@@ -20,22 +21,33 @@ public partial class GameHUD : CanvasLayer
     private Button? _placeTowerButton;
     private GameManager? _gameManager;
 
+    /// <summary>
+    /// Width of the right sidebar in pixels.
+    /// </summary>
+    private const float SidebarWidth = 180f;
+
+    /// <summary>
+    /// Height of the top bar in pixels.
+    /// </summary>
+    private const float TopBarHeight = 40f;
+
     public override void _Ready()
     {
-        // HUD background bar at the top
-        var hudBg = new ColorRect();
         var viewportSize = GetViewport().GetVisibleRect().Size;
-        hudBg.Size = new Vector2(viewportSize.X, 48);
-        hudBg.Color = new Color(0.05f, 0.05f, 0.1f, 0.85f);
-        hudBg.Position = new Vector2(0, 0);
-        AddChild(hudBg);
+
+        // Top bar background — full width, at top
+        var topBarBg = new ColorRect();
+        topBarBg.Size = new Vector2(viewportSize.X, TopBarHeight);
+        topBarBg.Color = new Color(0.05f, 0.05f, 0.1f, 0.85f);
+        topBarBg.Position = new Vector2(0, 0);
+        AddChild(topBarBg);
 
         float currentX = 16f;
 
         // HP display
         var hpIcon = new Label();
         hpIcon.Text = "[HP]";
-        hpIcon.Position = new Vector2(currentX, 8);
+        hpIcon.Position = new Vector2(currentX, 4);
         hpIcon.Size = new Vector2(40, 32);
         hpIcon.AddThemeColorOverride("font_color", new Color(1f, 0.3f, 0.3f));
         AddChild(hpIcon);
@@ -43,7 +55,7 @@ public partial class GameHUD : CanvasLayer
 
         _hpLabel = new Label();
         _hpLabel.Text = "3";
-        _hpLabel.Position = new Vector2(currentX, 8);
+        _hpLabel.Position = new Vector2(currentX, 4);
         _hpLabel.Size = new Vector2(40, 32);
         _hpLabel.AddThemeFontSizeOverride("font_size", 20);
         _hpLabel.AddThemeColorOverride("font_color", new Color(1f, 1f, 1f));
@@ -53,7 +65,7 @@ public partial class GameHUD : CanvasLayer
         // Coins display
         var coinIcon = new Label();
         coinIcon.Text = "[$]";
-        coinIcon.Position = new Vector2(currentX, 8);
+        coinIcon.Position = new Vector2(currentX, 4);
         coinIcon.Size = new Vector2(40, 32);
         coinIcon.AddThemeColorOverride("font_color", new Color(1f, 0.9f, 0.2f));
         AddChild(coinIcon);
@@ -61,7 +73,7 @@ public partial class GameHUD : CanvasLayer
 
         _coinsLabel = new Label();
         _coinsLabel.Text = "10";
-        _coinsLabel.Position = new Vector2(currentX, 8);
+        _coinsLabel.Position = new Vector2(currentX, 4);
         _coinsLabel.Size = new Vector2(40, 32);
         _coinsLabel.AddThemeFontSizeOverride("font_size", 20);
         _coinsLabel.AddThemeColorOverride("font_color", new Color(1f, 1f, 1f));
@@ -71,7 +83,7 @@ public partial class GameHUD : CanvasLayer
         // Wave display
         var waveIcon = new Label();
         waveIcon.Text = "Wave";
-        waveIcon.Position = new Vector2(currentX, 8);
+        waveIcon.Position = new Vector2(currentX, 4);
         waveIcon.Size = new Vector2(50, 32);
         waveIcon.AddThemeColorOverride("font_color", new Color(0.5f, 0.7f, 1f));
         AddChild(waveIcon);
@@ -79,28 +91,35 @@ public partial class GameHUD : CanvasLayer
 
         _waveLabel = new Label();
         _waveLabel.Text = "0/5";
-        _waveLabel.Position = new Vector2(currentX, 8);
+        _waveLabel.Position = new Vector2(currentX, 4);
         _waveLabel.Size = new Vector2(60, 32);
         _waveLabel.AddThemeFontSizeOverride("font_size", 20);
         _waveLabel.AddThemeColorOverride("font_color", new Color(1f, 1f, 1f));
         AddChild(_waveLabel);
-        currentX += 380f;
 
-        // Place Tower button
+        // Right sidebar background — full height, at right edge
+        var sidebarBg = new ColorRect();
+        sidebarBg.Size = new Vector2(SidebarWidth, viewportSize.Y);
+        sidebarBg.Color = new Color(0.05f, 0.05f, 0.1f, 0.85f);
+        sidebarBg.Position = new Vector2(viewportSize.X - SidebarWidth, 0);
+        AddChild(sidebarBg);
+
+        float sidebarCenterX = viewportSize.X - SidebarWidth / 2f;
+
+        // Place Tower button — in sidebar, near top
         _placeTowerButton = new Button();
         _placeTowerButton.Text = "Place Tower (10$)";
-        _placeTowerButton.Position = new Vector2(currentX, 4);
+        _placeTowerButton.Position = new Vector2(sidebarCenterX - 80, 20);
         _placeTowerButton.Size = new Vector2(160, 40);
-        _placeTowerButton.Disabled = true; // Initially check
+        _placeTowerButton.Disabled = true;
         _placeTowerButton.Pressed += OnPlaceTowerPressed;
         _placeTowerButton.AddThemeFontSizeOverride("font_size", 12);
         AddChild(_placeTowerButton);
-        currentX += 170f;
 
-        // Start Wave button
+        // Start Wave button — in sidebar, below Place Tower
         _startWaveButton = new Button();
         _startWaveButton.Text = "Start Wave";
-        _startWaveButton.Position = new Vector2(currentX, 4);
+        _startWaveButton.Position = new Vector2(sidebarCenterX - 70, 70);
         _startWaveButton.Size = new Vector2(140, 40);
         _startWaveButton.Pressed += OnStartWavePressed;
         _startWaveButton.AddThemeFontSizeOverride("font_size", 14);

@@ -20,19 +20,33 @@ public partial class GridManager : Node2D
 
     private void DrawGrid()
     {
-        // Draw path cells (row 10) with tan/brown background
-        for (int c = 0; c < GameConstants.GridCols; c++)
+        // Draw background for ALL cells — subtle dark tint so every tile is visible
+        for (int r = 0; r < GameConstants.GridRows; r++)
         {
-            var cell = new ColorRect();
-            cell.Size = new Vector2(GameConstants.CellSize, GameConstants.CellSize);
-            cell.Position = new Vector2(c * GameConstants.CellSize, GameConstants.PathRow * GameConstants.CellSize);
-            cell.Color = new Color(0.8f, 0.7f, 0.5f, 0.3f); // Light brown/tan
-            AddChild(cell);
+            for (int c = 0; c < GameConstants.GridCols; c++)
+            {
+                var cell = new ColorRect();
+                cell.Size = new Vector2(GameConstants.CellSize, GameConstants.CellSize);
+                cell.Position = new Vector2(c * GameConstants.CellSize, r * GameConstants.CellSize);
+
+                if (r == GameConstants.PathRow)
+                {
+                    // Path cells — tan/brown visible background
+                    cell.Color = new Color(0.8f, 0.7f, 0.5f, 0.3f);
+                }
+                else
+                {
+                    // Non-path cells — subtle dark tint
+                    cell.Color = new Color(0.1f, 0.1f, 0.15f, 0.3f);
+                }
+
+                AddChild(cell);
+            }
         }
 
-        // Draw grid lines
+        // Draw grid lines with improved visibility
         var lines = new Line2D();
-        lines.DefaultColor = new Color(0.4f, 0.4f, 0.4f, 0.5f);
+        lines.DefaultColor = new Color(0.5f, 0.5f, 0.5f, 0.6f);
         lines.Width = 1;
 
         // Vertical lines

@@ -25,7 +25,7 @@ public partial class TitleScreen : Control
         title.Text = "GEOMETRY\nTOWER DEFENSE";
         title.HorizontalAlignment = HorizontalAlignment.Center;
         title.VerticalAlignment = VerticalAlignment.Center;
-        title.Position = new Vector2(0, GetViewportRect().Size.Y / 2f - 120);
+        title.Position = new Vector2(0, GetViewportRect().Size.Y / 2f - 160);
         title.Size = new Vector2(GetViewportRect().Size.X, 120);
         title.AddThemeFontSizeOverride("font_size", 48);
         title.AddThemeColorOverride("font_color", new Color(0.8f, 0.85f, 1.0f));
@@ -35,7 +35,7 @@ public partial class TitleScreen : Control
         var subtitle = new Label();
         subtitle.Text = "A Geometric Tower Defense Game";
         subtitle.HorizontalAlignment = HorizontalAlignment.Center;
-        subtitle.Position = new Vector2(0, GetViewportRect().Size.Y / 2f - 40);
+        subtitle.Position = new Vector2(0, GetViewportRect().Size.Y / 2f - 20);
         subtitle.Size = new Vector2(GetViewportRect().Size.X, 30);
         subtitle.AddThemeFontSizeOverride("font_size", 16);
         subtitle.AddThemeColorOverride("font_color", new Color(0.6f, 0.6f, 0.8f));
@@ -46,7 +46,7 @@ public partial class TitleScreen : Control
         _startButton.Text = "START";
         _startButton.Position = new Vector2(
             GetViewportRect().Size.X / 2f - 100,
-            GetViewportRect().Size.Y / 2f + 20
+            GetViewportRect().Size.Y / 2f + 60
         );
         _startButton.Size = new Vector2(200, 50);
         _startButton.Pressed += OnStartPressed;
@@ -59,7 +59,7 @@ public partial class TitleScreen : Control
         var instructions = new Label();
         instructions.Text = "Place towers to defend your base.\nSurvive 5 waves to win!";
         instructions.HorizontalAlignment = HorizontalAlignment.Center;
-        instructions.Position = new Vector2(0, GetViewportRect().Size.Y / 2f + 90);
+        instructions.Position = new Vector2(0, GetViewportRect().Size.Y / 2f + 130);
         instructions.Size = new Vector2(GetViewportRect().Size.X, 50);
         instructions.AddThemeFontSizeOverride("font_size", 14);
         instructions.AddThemeColorOverride("font_color", new Color(0.5f, 0.5f, 0.7f));

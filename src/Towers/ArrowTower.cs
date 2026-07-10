@@ -6,6 +6,7 @@ namespace GeometryTowerDefense;
 /// <summary>
 /// Arrow Tower: upward-pointing blue triangle.
 /// Targets nearest enemy within 4-cell range, fires every 1.5s, deals 10 damage.
+/// Range is shown as a circular indicator only when toggled by the player.
 /// </summary>
 public partial class ArrowTower : Node2D
 {
@@ -16,6 +17,7 @@ public partial class ArrowTower : Node2D
     private float _fireCooldownTimer = 0f;
     private bool _canFire = true;
     private Area2D? _rangeArea;
+    private Control? _rangeIndicator;
 
     /// <summary>
     /// Grid row position of this tower.
@@ -78,19 +80,8 @@ public partial class ArrowTower : Node2D
         outlineBg.Color = new Color(0.05f, 0.1f, 0.4f);
         triangle.AddChild(outlineBg);
 
-        // Add range indicator (hidden by default, could show on hover)
-        var rangeCircle = new ColorRect();
-        rangeCircle.Size = new Vector2(
-            GameConstants.CellDistanceInPixels(GameConstants.ArrowTowerRange * 2),
-            GameConstants.CellDistanceInPixels(GameConstants.ArrowTowerRange * 2)
-        );
-        rangeCircle.Position = new Vector2(
-            -GameConstants.CellDistanceInPixels(GameConstants.ArrowTowerRange) + GameConstants.CellSize / 2f,
-            -GameConstants.CellDistanceInPixels(GameConstants.ArrowTowerRange) + GameConstants.CellSize / 2f
-        );
-        rangeCircle.Color = new Color(0.2f, 0.5f, 1.0f, 0.08f);
-        rangeCircle.Name = "RangeIndicator";
-        AddChild(rangeCircle);
+        // Range indicator is NOT shown by default — created on demand via ShowRange()
+        _rangeIndicator = null;
     }
 
     /// <summary>
@@ -140,6 +131,70 @@ public partial class ArrowTower : Node2D
 
         EmitSignal(SignalName.ProjectileFired, this, targetPos, target);
         return true;
+    }
+
+    /// <summary>
+    /// Show a circular range indicator centered on this tower.
+    /// No-op if already shown.
+    /// </summary>
+    public void ShowRange()
+    {
+        if (_rangeIndicator != null) return;
+
+        float rangePixels = GameConstants.CellDistanceInPixels(RangeCells);
+
+        _rangeIndicator = new Control();
+        _rangeIndicator.Name = "RangeIndicator";
+        _rangeIndicator.Size = new Vector2(rangePixels * 2, rangePixels * 2);
+        _rangeIndicator.Position = new Vector2(-rangePixels, -rangePixels);
+
+        _rangeIndicator.Draw += () =>
+        {
+            if (_rangeIndicator == null) return;
+
+            float radius = rangePixels;
+            Vector2 center = new Vector2(rangePixels, rangePixels);
+
+            // Filled semi-transparent circle
+            _rangeIndicator.DrawCircle(
+                center,
+                radius,
+                new Color(0.2f, 0.5f, 1.0f, 0.1f)
+            );
+
+            // Border circle
+            _rangeIndicator.DrawCircle(
+                center,
+                radius,
+                new Color(0.2f, 0.5f, 1.0f, 0.4f),
+                false,
+                2.0f
+            );
+        };
+
+        AddChild(_rangeIndicator);
+    }
+
+    /// <summary>
+    /// Hide and remove the circular range indicator.
+    /// No-op if already hidden.
+    /// </summary>
+    public void HideRange()
+    {
+        if (_rangeIndicator == null) return;
+        _rangeIndicator.QueueFree();
+        _rangeIndicator = null;
+    }
+
+    /// <summary>
+    /// Toggle the circular range indicator on or off.
+    /// </summary>
+    public void ToggleRange()
+    {
+        if (_rangeIndicator != null)
+            HideRange();
+        else
+            ShowRange();
     }
 
     public override void _Process(double delta)

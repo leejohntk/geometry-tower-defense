@@ -99,6 +99,11 @@ public partial class GameManager : Node2D
     public int ActiveEnemyCount => _activeEnemies.Count;
 
     /// <summary>
+    /// Returns a copy of the active towers list for read-only operations (e.g., hit testing).
+    /// </summary>
+    public List<ArrowTower> GetActiveTowers() => new(_activeTowers);
+
+    /// <summary>
     /// Called by Main to initialize a new game.
     /// Safe to call multiple times — second call returns early if already initialized.
     /// </summary>
