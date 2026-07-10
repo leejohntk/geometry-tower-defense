@@ -40,6 +40,15 @@ public static class GameConstants
     public static int PlayAreaWidth => GridCols * CellSize;
     public static int PlayAreaHeight => GridRows * CellSize;
 
+    // UI Layout — sidebars and panels that overlay the game world
+    public const float SidebarWidth = 180f;
+    public const float TopBarHeight = 40f;
+
+    /// <summary>
+    /// Total viewport width needed to fit both the play area and the sidebar side-by-side.
+    /// </summary>
+    public static int TotalViewportWidth => PlayAreaWidth + (int)SidebarWidth;
+
     // Cell center helpers
     public static float CellCenterX(int col) => col * CellSize + CellSize / 2f;
     public static float CellCenterY(int row) => row * CellSize + CellSize / 2f;

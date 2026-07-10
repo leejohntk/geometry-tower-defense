@@ -138,8 +138,10 @@ public partial class GridManager : Node2D
         spawnLabel.Scale = new Vector2(0.7f, 0.7f);
         AddChild(spawnLabel);
 
-        // House/base indicator on the right edge
-        float houseX = GameConstants.CellCenterX(GameConstants.GridCols - 1) + GameConstants.CellSize / 2f;
+        // House/base indicator on the right edge of the path
+        // Centered in the last cell so the entire house is within the grid bounds
+        // and not overlapped by the sidebar.
+        float houseX = GameConstants.CellCenterX(GameConstants.GridCols - 1);
         float houseY = GameConstants.CellCenterY(GameConstants.PathRow);
 
         // House body

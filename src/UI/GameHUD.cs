@@ -21,23 +21,13 @@ public partial class GameHUD : CanvasLayer
     private Button? _placeTowerButton;
     private GameManager? _gameManager;
 
-    /// <summary>
-    /// Width of the right sidebar in pixels.
-    /// </summary>
-    private const float SidebarWidth = 180f;
-
-    /// <summary>
-    /// Height of the top bar in pixels.
-    /// </summary>
-    private const float TopBarHeight = 40f;
-
     public override void _Ready()
     {
         var viewportSize = GetViewport().GetVisibleRect().Size;
 
-        // Top bar background — full width, at top
+        // Top bar background — spans the full viewport width, at top
         var topBarBg = new ColorRect();
-        topBarBg.Size = new Vector2(viewportSize.X, TopBarHeight);
+        topBarBg.Size = new Vector2(viewportSize.X, GameConstants.TopBarHeight);
         topBarBg.Color = new Color(0.05f, 0.05f, 0.1f, 0.85f);
         topBarBg.Position = new Vector2(0, 0);
         AddChild(topBarBg);
@@ -97,14 +87,26 @@ public partial class GameHUD : CanvasLayer
         _waveLabel.AddThemeColorOverride("font_color", new Color(1f, 1f, 1f));
         AddChild(_waveLabel);
 
-        // Right sidebar background — full height, at right edge
+        // The sidebar sits to the RIGHT of the play area (grid), not overlapping it.
+        // The viewport must be at least TotalViewportWidth wide for this to work.
+        // Sidebar X position = right edge of play area = PlayAreaWidth.
+        float sidebarX = GameConstants.PlayAreaWidth;
+
+        // Right sidebar background — full height, opaque, next to the play area
         var sidebarBg = new ColorRect();
-        sidebarBg.Size = new Vector2(SidebarWidth, viewportSize.Y);
-        sidebarBg.Color = new Color(0.05f, 0.05f, 0.1f, 0.85f);
-        sidebarBg.Position = new Vector2(viewportSize.X - SidebarWidth, 0);
+        sidebarBg.Size = new Vector2(GameConstants.SidebarWidth, viewportSize.Y);
+        sidebarBg.Color = new Color(0.05f, 0.05f, 0.1f, 1.0f);
+        sidebarBg.Position = new Vector2(sidebarX, 0);
         AddChild(sidebarBg);
 
-        float sidebarCenterX = viewportSize.X - SidebarWidth / 2f;
+        // Vertical separator line between the play area and sidebar
+        var sidebarBorder = new ColorRect();
+        sidebarBorder.Size = new Vector2(2, viewportSize.Y);
+        sidebarBorder.Color = new Color(0.3f, 0.3f, 0.5f, 0.8f);
+        sidebarBorder.Position = new Vector2(sidebarX, 0);
+        AddChild(sidebarBorder);
+
+        float sidebarCenterX = sidebarX + GameConstants.SidebarWidth / 2f;
 
         // Place Tower button — in sidebar, near top
         _placeTowerButton = new Button();

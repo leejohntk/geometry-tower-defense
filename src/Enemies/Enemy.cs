@@ -47,10 +47,12 @@ public partial class Enemy : Node2D
         _currentHP = GameConstants.EnemyHP;
         _speed = GameConstants.EnemySpeed;
 
-        // Draw the enemy as a red circle using a ColorRect with custom drawing
-        // We use a Control-based approach for the circle shape
+        // Draw the enemy as a red circle using a Control with custom drawing.
+        // Offset the container so the circle drawn at (radius, radius) centers on the Enemy's origin.
+        float radius = GameConstants.EnemyDiameter / 2f;
         var circleContainer = new Control();
         circleContainer.Name = "CircleContainer";
+        circleContainer.Position = new Vector2(-radius, -radius);
         circleContainer.Size = new Vector2(GameConstants.EnemyDiameter, GameConstants.EnemyDiameter);
         AddChild(circleContainer);
 

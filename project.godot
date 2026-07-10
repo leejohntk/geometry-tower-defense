@@ -18,7 +18,7 @@ config/icon=""
 
 [display]
 
-window/size/viewport_width=1280
+window/size/viewport_width=1460
 window/size/viewport_height=800
 window/size/mode=0
 window/size/always_on_top=false
