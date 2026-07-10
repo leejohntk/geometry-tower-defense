@@ -110,6 +110,7 @@ public partial class Main : Node2D
         {
             // Cancel placement
             _gameManager.IsPlacingTower = false;
+            _gameManager.Grid?.HidePlacementPreview();
             _gameHUD?.SetStartWaveEnabled(true);
             // Reset cursor
             Input.SetDefaultCursorShape(Input.CursorShape.Arrow);
@@ -183,6 +184,12 @@ public partial class Main : Node2D
 
         if (_gameManager.IsPlacingTower)
         {
+            // Track mouse for placement preview (shows ghost + highlight + range)
+            if (@event is InputEventMouseMotion mouseMotion)
+            {
+                UpdateTowerPlacementPreview(mouseMotion.Position);
+            }
+
             // Handle tower placement via mouse click
             if (@event is InputEventMouseButton mouseButton &&
                 mouseButton.ButtonIndex == MouseButton.Left &&
@@ -197,6 +204,7 @@ public partial class Main : Node2D
                 rightClick.Pressed)
             {
                 _gameManager.IsPlacingTower = false;
+                _gameManager.Grid?.HidePlacementPreview();
                 Input.SetDefaultCursorShape(Input.CursorShape.Arrow);
                 _gameHUD?.SetStartWaveEnabled(true);
             }
@@ -225,17 +233,43 @@ public partial class Main : Node2D
         }
     }
 
+    /// <summary>
+    /// Update the tower placement preview (ghost + highlight + range) at the cell under the mouse.
+    /// Hides the preview if the mouse is outside the grid bounds.
+    /// </summary>
+    private void UpdateTowerPlacementPreview(Vector2 mousePos)
+    {
+        if (_gameManager?.Grid == null) return;
+
+        Vector2I gridPos = _gameManager.Grid.PixelToGrid(mousePos);
+        int row = gridPos.Y;
+        int col = gridPos.X;
+
+        if (_gameManager.Grid.IsInBounds(row, col))
+        {
+            bool enoughCoins = _gameManager.Coins >= GameConstants.ArrowTowerCost;
+            bool canPlace = enoughCoins && _gameManager.Grid.CanPlaceTower(row, col);
+            _gameManager.Grid.ShowPlacementPreview(row, col, canPlace);
+        }
+        else
+        {
+            _gameManager.Grid.HidePlacementPreview();
+        }
+    }
+
     private void TryPlaceTowerAtMouse(Vector2 mousePos)
     {
         if (_gameManager?.Grid == null) return;
 
         Vector2I gridPos = _gameManager.Grid.PixelToGrid(mousePos);
 
-        // Offset by the gameplay area position (no offset since GameManager is at 0,0)
         bool placed = _gameManager.PlaceTower(gridPos.Y, gridPos.X);
 
         if (placed)
         {
+            // Hide preview momentarily — next mouse motion will re-show
+            _gameManager.Grid.HidePlacementPreview();
+
             // Stay in placement mode - player can place multiple towers
             // Re-check if we can still place (might have run out of coins)
             if (_gameManager.Coins < GameConstants.ArrowTowerCost)

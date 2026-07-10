@@ -54,9 +54,9 @@ public partial class ArrowTower : Node2D
         // Draw the tower as a blue upward-pointing triangle
         var trianglePoints = new Vector2[]
         {
-            new Vector2(GameConstants.CellSize / 2f, 4),                        // Top center
-            new Vector2(4, GameConstants.CellSize - 4),                         // Bottom left
-            new Vector2(GameConstants.CellSize - 4, GameConstants.CellSize - 4) // Bottom right
+            new Vector2(0, -(GameConstants.CellSize / 2f - 4)),                            // Top center
+            new Vector2(-(GameConstants.CellSize / 2f - 4), GameConstants.CellSize / 2f - 4), // Bottom left
+            new Vector2(GameConstants.CellSize / 2f - 4, GameConstants.CellSize / 2f - 4)     // Bottom right
         };
 
         var triangle = new Polygon2D();
@@ -73,9 +73,9 @@ public partial class ArrowTower : Node2D
         var outlineBg = new Polygon2D();
         outlineBg.Polygon = new Vector2[]
         {
-            new Vector2(GameConstants.CellSize / 2f, 2),
-            new Vector2(2, GameConstants.CellSize - 2),
-            new Vector2(GameConstants.CellSize - 2, GameConstants.CellSize - 2)
+            new Vector2(0, -(GameConstants.CellSize / 2f - 2)),                            // Top center
+            new Vector2(-(GameConstants.CellSize / 2f - 2), GameConstants.CellSize / 2f - 2), // Bottom left
+            new Vector2(GameConstants.CellSize / 2f - 2, GameConstants.CellSize / 2f - 2)     // Bottom right
         };
         outlineBg.Color = new Color(0.05f, 0.1f, 0.4f);
         triangle.AddChild(outlineBg);

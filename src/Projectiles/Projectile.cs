@@ -47,9 +47,9 @@ public partial class Projectile : Node2D
         // Draw the projectile as a small yellow triangle
         var arrowPoints = new Vector2[]
         {
-            new Vector2(GameConstants.ProjectileSize / 2f, 0),
-            new Vector2(0, GameConstants.ProjectileSize),
-            new Vector2(GameConstants.ProjectileSize, GameConstants.ProjectileSize)
+            new Vector2(0, -(GameConstants.ProjectileSize / 2f)),               // Tip (points upward, centered)
+            new Vector2(-(GameConstants.ProjectileSize / 2f), GameConstants.ProjectileSize / 2f), // Bottom left
+            new Vector2(GameConstants.ProjectileSize / 2f, GameConstants.ProjectileSize / 2f)     // Bottom right
         };
 
         var arrow = new Polygon2D();
@@ -61,9 +61,9 @@ public partial class Projectile : Node2D
         var outline = new Polygon2D();
         outline.Polygon = new Vector2[]
         {
-            new Vector2(GameConstants.ProjectileSize / 2f, -1),
-            new Vector2(-1, GameConstants.ProjectileSize),
-            new Vector2(GameConstants.ProjectileSize + 1, GameConstants.ProjectileSize)
+            new Vector2(0, -(GameConstants.ProjectileSize / 2f + 1)),               // Tip
+            new Vector2(-(GameConstants.ProjectileSize / 2f + 1), GameConstants.ProjectileSize / 2f), // Bottom left
+            new Vector2(GameConstants.ProjectileSize / 2f + 1, GameConstants.ProjectileSize / 2f)     // Bottom right
         };
         outline.Color = new Color(0.8f, 0.5f, 0.05f);
         arrow.AddChild(outline);
