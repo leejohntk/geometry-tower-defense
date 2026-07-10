@@ -12,9 +12,16 @@ config_version=5
 
 config/name="geometry-tower-defense"
 config/version="0.1.0"
-run/main_scene=""
+run/main_scene="res://src/Main.tscn"
 config/features=PackedStringArray("4.7", "C#")
 config/icon=""
+
+[display]
+
+window/size/viewport_width=1280
+window/size/viewport_height=800
+window/size/mode=0
+window/size/always_on_top=false
 
 [dotnet]
 

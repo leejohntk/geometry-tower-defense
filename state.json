@@ -1,0 +1,8 @@
+{
+  "feature": "first-level",
+  "status": "implementing",
+  "branch": "feature/first-level",
+  "spec": ".claude/templates/spec-first-level.md",
+  "holdouts": ".claude/holdouts/first-level/scenarios.md",
+  "started": "2026-07-10"
+}
