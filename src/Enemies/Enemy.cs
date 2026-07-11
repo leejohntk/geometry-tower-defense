@@ -64,7 +64,9 @@ public partial class Enemy : Node2D
     /// </summary>
     public void SetPath(List<Vector2> waypoints)
     {
-        _waypoints = waypoints;
+        // Copy waypoints — each enemy owns its own list so pool reuse
+        // (ResetForPool → _waypoints.Clear) never clears the shared cache.
+        _waypoints = new List<Vector2>(waypoints);
         _currentWaypointIndex = 0;
 
         if (_waypoints.Count > 0)
