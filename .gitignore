@@ -27,3 +27,9 @@ mono_crash.*.json
 
 # State manifest (session state, not project code)
 .claude/state.json
+
+# Agent worktrees (transient, session-specific)
+.claude/worktrees/
+
+# GdUnit4 test adapter (auto-generated)
+gdunit4_testadapter/
