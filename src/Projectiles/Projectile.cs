@@ -107,6 +107,10 @@ public partial class Projectile : Node2D
 
     /// <summary>
     /// Called by GameManager when this projectile hits an enemy.
+    /// Applies damage synchronously, then emits the signal for lifecycle management.
+    /// Damage is applied here (not in the signal handler) to avoid a race condition
+    /// where two projectiles hitting the same enemy in one frame could both deal
+    /// damage if signal delivery is deferred or batched.
     /// </summary>
     public void HitEnemy(Enemy enemy)
     {
@@ -114,8 +118,17 @@ public partial class Projectile : Node2D
             return;
 
         _hasHit = true;
+
+        // Apply damage synchronously — do not rely on signal timing.
+        // This ensures that when two projectiles hit the same enemy in one frame,
+        // the second hit correctly sees the enemy as dead.
+        if (!enemy.IsDead)
+        {
+            enemy.TakeDamage(GameConstants.ArrowTowerDamage);
+        }
+
+        // Signal for lifecycle management (pool release, list cleanup).
         EmitSignal(SignalName.EnemyHit, this, enemy);
-        // GameManager.OnProjectileHitEnemy handles pool release
     }
 
     /// <summary>

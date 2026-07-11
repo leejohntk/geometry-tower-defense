@@ -344,10 +344,8 @@ public partial class GameManager : Node2D
         projectile.EnemyHit -= OnProjectileHitEnemy;
         projectile.Dissipated -= OnProjectileDissipated;
 
-        if (!enemy.IsDead)
-        {
-            enemy.TakeDamage(GameConstants.ArrowTowerDamage);
-        }
+        // Damage is already applied synchronously in Projectile.HitEnemy.
+        // This handler only manages lifecycle (pool release, list cleanup).
 
         _projectilePool?.Release(projectile);
     }
