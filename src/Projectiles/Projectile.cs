@@ -111,10 +111,18 @@ public partial class Projectile : Node2D
     /// Damage is applied here (not in the signal handler) to avoid a race condition
     /// where two projectiles hitting the same enemy in one frame could both deal
     /// damage if signal delivery is deferred or batched.
+    ///
+    /// If the enemy is already dead (from another projectile hitting it first this frame),
+    /// returns immediately without consuming this projectile, so it continues flying past.
     /// </summary>
     public void HitEnemy(Enemy enemy)
     {
         if (_hasHit)
+            return;
+
+        // If the enemy is already dead (from another projectile this frame),
+        // don't consume this projectile — let it fly past and dissipate naturally.
+        if (enemy.IsDead)
             return;
 
         _hasHit = true;
@@ -122,10 +130,7 @@ public partial class Projectile : Node2D
         // Apply damage synchronously — do not rely on signal timing.
         // This ensures that when two projectiles hit the same enemy in one frame,
         // the second hit correctly sees the enemy as dead.
-        if (!enemy.IsDead)
-        {
-            enemy.TakeDamage(GameConstants.ArrowTowerDamage);
-        }
+        enemy.TakeDamage(GameConstants.ArrowTowerDamage);
 
         // Signal for lifecycle management (pool release, list cleanup).
         EmitSignal(SignalName.EnemyHit, this, enemy);
