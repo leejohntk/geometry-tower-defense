@@ -21,28 +21,19 @@ jobs:
 
       - name: Setup Godot
         run: |
-          wget -q https://github.com/godotengine/godot-builds/releases/download/4.7-stable/Godot_v4.7-stable_mono_linux_x86_64.zip
-          unzip -q Godot_v4.7-stable_mono_linux_x86_64.zip
-          # Mono build extracts as directory — move binary and GodotSharp assemblies
-          BIN=$(find Godot_v4.7-stable_mono_linux_x86_64 -type f -name 'Godot_v4*' | head -1)
-          chmod +x "$BIN"
-          sudo mv "$BIN" /usr/local/bin/godot-real
-          # Move GodotSharp API assemblies (required by mono runtime)
-          if [ -d Godot_v4.7-stable_mono_linux_x86_64/GodotSharp ]; then
-            sudo mv Godot_v4.7-stable_mono_linux_x86_64/GodotSharp /usr/local/bin/GodotSharp
-          fi
-          echo '#!/bin/bash' | sudo tee /usr/local/bin/godot
-          echo 'exec /usr/local/bin/godot-real --headless "$@"' | sudo tee -a /usr/local/bin/godot
+          URL="https://github.com/godotengine/godot-builds/releases/download/4.7-stable"
+          ZIP="Godot_v4.7-stable_mono_linux_x86_64.zip"
+          DIR="Godot_v4.7-stable_mono_linux_x86_64"
+          wget -q "$URL/$ZIP"
+          unzip -q "$ZIP"
+          sudo mv "$DIR"/GodotSharp /usr/local/bin/GodotSharp
+          sudo mv "$DIR"/Godot_v4* /usr/local/bin/godot-real
+          sudo chmod +x /usr/local/bin/godot-real
+          printf '#!/bin/bash\nexec /usr/local/bin/godot-real --headless "$@"\n' | sudo tee /usr/local/bin/godot
           sudo chmod +x /usr/local/bin/godot
 
-      - name: Initialize Godot project
-        run: timeout 30 godot --headless --build-solutions || true
-
-      - name: Restore
-        run: dotnet restore
-
       - name: Build
-        run: dotnet build --no-restore
+        run: dotnet build
 
       - name: Test
-        run: GODOT_BIN=/usr/local/bin/godot dotnet test --verbosity normal
+        run: dotnet test
