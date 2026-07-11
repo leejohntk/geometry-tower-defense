@@ -43,7 +43,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash /Users/john.lee/Desktop/geometry-tower-defense/.claude/hooks/session-start.sh"
+            "command": "bash .claude/hooks/session-start.sh"
           }
         ]
       }
@@ -54,7 +54,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash /Users/john.lee/Desktop/geometry-tower-defense/.claude/hooks/pre-tool-use.sh"
+            "command": "bash .claude/hooks/pre-tool-use.sh"
           }
         ]
       }
@@ -65,7 +65,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash /Users/john.lee/Desktop/geometry-tower-defense/.claude/hooks/post-tool-use.sh" 
+            "command": "bash .claude/hooks/post-tool-use.sh"
           }
         ]
       },
@@ -74,7 +74,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash /Users/john.lee/Desktop/geometry-tower-defense/.claude/hooks/normalize-godot-output.sh" 
+            "command": "bash .claude/hooks/normalize-godot-output.sh"
           }
         ]
       }
@@ -85,7 +85,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash /Users/john.lee/Desktop/geometry-tower-defense/.claude/hooks/stop.sh" 
+            "command": "bash .claude/hooks/stop.sh"
           }
         ]
       }
