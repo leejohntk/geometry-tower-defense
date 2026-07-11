@@ -13,6 +13,7 @@ public partial class Main : Node2D
     private ResultScreen? _gameOverScreen;
     private ResultScreen? _victoryScreen;
     private bool _gameRunning = false;
+    private ArrowTower? _selectedTower = null;
 
     public override void _Ready()
     {
@@ -92,6 +93,9 @@ public partial class Main : Node2D
             _gameRunning = true;
         }
 
+        // Ensure no stale tower selection carries over
+        _selectedTower = null;
+
         // Hide overlays
         if (_gameOverScreen != null)
             _gameOverScreen.Visible = false;
@@ -150,6 +154,10 @@ public partial class Main : Node2D
             _gameManager.IsPlacingTower = true;
             _gameHUD?.SetStartWaveEnabled(false); // Disable wave start during placement
             Input.SetDefaultCursorShape(Input.CursorShape.Cross);
+
+            // Hide any tower range that was showing
+            _selectedTower?.HideRange();
+            _selectedTower = null;
         }
     }
 
@@ -200,6 +208,7 @@ public partial class Main : Node2D
             _titleScreen.Visible = true;
 
         _gameRunning = false;
+        _selectedTower = null;
     }
 
     public override void _Input(InputEvent @event)
@@ -237,11 +246,13 @@ public partial class Main : Node2D
             return;
         }
 
-        // Check if we clicked on an existing tower (not in placement mode)
+        // Handle tower selection / range display (not in placement mode)
         if (@event is InputEventMouseButton click &&
             click.ButtonIndex == MouseButton.Left &&
             click.Pressed)
         {
+            // Find which tower (if any) was clicked
+            ArrowTower? clickedTower = null;
             foreach (var tower in _gameManager.GetActiveTowers())
             {
                 float towerSize = GameConstants.CellSize;
@@ -251,9 +262,32 @@ public partial class Main : Node2D
                 );
                 if (towerRect.HasPoint(click.Position))
                 {
-                    tower.ToggleRange();
+                    clickedTower = tower;
                     break;
                 }
+            }
+
+            if (clickedTower != null)
+            {
+                if (_selectedTower == clickedTower)
+                {
+                    // Clicked the same tower again — toggle range off
+                    clickedTower.HideRange();
+                    _selectedTower = null;
+                }
+                else
+                {
+                    // Clicked a different tower — hide previous, show new
+                    _selectedTower?.HideRange();
+                    clickedTower.ShowRange();
+                    _selectedTower = clickedTower;
+                }
+            }
+            else
+            {
+                // Clicked on empty space — hide range for the selected tower
+                _selectedTower?.HideRange();
+                _selectedTower = null;
             }
         }
     }
