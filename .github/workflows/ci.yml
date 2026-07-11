@@ -24,7 +24,10 @@ jobs:
           wget -q https://github.com/godotengine/godot-builds/releases/download/4.7-stable/Godot_v4.7-stable_linux.x86_64.zip
           unzip -q Godot_v4.7-stable_linux.x86_64.zip
           chmod +x Godot_v4.7-stable_linux.x86_64
-          sudo mv Godot_v4.7-stable_linux.x86_64 /usr/local/bin/godot
+          sudo mv Godot_v4.7-stable_linux.x86_64 /usr/local/bin/godot-real
+          echo '#!/bin/bash' | sudo tee /usr/local/bin/godot
+          echo 'exec /usr/local/bin/godot-real --headless "$@"' | sudo tee -a /usr/local/bin/godot
+          sudo chmod +x /usr/local/bin/godot
 
       - name: Restore
         run: dotnet restore
