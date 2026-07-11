@@ -1,33 +1,31 @@
 #!/usr/bin/env bash
 # PreToolUse hook — deterministic enforcement for Bash commands
-# Blocks: push to main/master, force push, rm -rf, sudo
-# Returns JSON: {"decision": "allow"} or {"decision": "deny", "reason": "..."}
+# Returns JSON in hookSpecificOutput format (Claude Code v2+)
 
-COMMAND="$1"
+INPUT=$(cat)
 
-# Block push to main
+COMMAND=""
+if echo "$INPUT" | grep -q '"command"'; then
+    COMMAND=$(echo "$INPUT" | grep -o '"command"\s*:\s*"[^"]*"' | head -1 | sed 's/.*"command"\s*:\s*"//;s/"$//')
+fi
+if [ -z "$COMMAND" ] && [ -n "$1" ]; then
+    COMMAND="$1"
+fi
+
+DENY_REASON=""
+
 if echo "$COMMAND" | grep -qE 'git push.*(origin|upstream)\s+(main|master)'; then
-    echo '{"decision": "deny", "reason": "Push to main/master is blocked. Use feature branches + PR. See .claude/rules/no-push-to-main.md"}'
-    exit 0
+    DENY_REASON="Push to main/master is blocked. Use feature branches + PR."
+elif echo "$COMMAND" | grep -qE 'git push.*(-f|--force)'; then
+    DENY_REASON="Force push is blocked."
+elif echo "$COMMAND" | grep -qE '\brm\s+-rf\b'; then
+    DENY_REASON="rm -rf is blocked. Use targeted file removal."
+elif echo "$COMMAND" | grep -qE '\bsudo\b'; then
+    DENY_REASON="sudo is blocked."
 fi
 
-# Block force push
-if echo "$COMMAND" | grep -qE 'git push.*(-f|--force)'; then
-    echo '{"decision": "deny", "reason": "Force push is blocked. Use git push --force-with-lease only with explicit human approval."}'
-    exit 0
+if [ -n "$DENY_REASON" ]; then
+    printf '{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "%s" }}\n' "$DENY_REASON"
+else
+    echo '{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "allow"}}'
 fi
-
-# Block rm -rf (belt-and-suspenders — also in user-level settings)
-if echo "$COMMAND" | grep -qE '\brm\s+-rf\b'; then
-    echo '{"decision": "deny", "reason": "rm -rf is blocked. Use targeted file removal."}'
-    exit 0
-fi
-
-# Block sudo (belt-and-suspenders — also in user-level settings)
-if echo "$COMMAND" | grep -qE '\bsudo\b'; then
-    echo '{"decision": "deny", "reason": "sudo is blocked. Run privileged commands directly as the user."}'
-    exit 0
-fi
-
-# Allow everything else
-echo '{"decision": "allow"}'
