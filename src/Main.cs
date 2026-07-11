@@ -99,6 +99,27 @@ public partial class Main : Node2D
             _victoryScreen.Visible = false;
     }
 
+    /// <summary>
+    /// Update the start wave button enabled state based on current game conditions.
+    /// Button is disabled when a wave is active OR when in tower placement mode.
+    /// </summary>
+    private void UpdateStartWaveButtonState()
+    {
+        if (_gameHUD == null || _gameManager == null)
+            return;
+
+        // Disabled during tower placement mode
+        if (_gameManager.IsPlacingTower)
+        {
+            _gameHUD.SetStartWaveEnabled(false);
+            return;
+        }
+
+        // Disabled while a wave is active
+        bool waveActive = _gameManager.WaveManager?.IsWaveActive ?? false;
+        _gameHUD.SetStartWaveEnabled(!waveActive);
+    }
+
     private void OnStartWavePressed()
     {
         if (!_gameRunning || _gameManager == null) return;
@@ -119,7 +140,7 @@ public partial class Main : Node2D
             // Cancel placement
             _gameManager.IsPlacingTower = false;
             _gameManager.Grid?.HidePlacementPreview();
-            _gameHUD?.SetStartWaveEnabled(true);
+            UpdateStartWaveButtonState();
             // Reset cursor
             Input.SetDefaultCursorShape(Input.CursorShape.Arrow);
         }
@@ -148,13 +169,9 @@ public partial class Main : Node2D
 
     private void OnWaveChangedForUI(int waveNumber)
     {
-        if (_gameHUD == null) return;
-
         if (waveNumber > 0)
         {
-            // Check if wave is still active (if not, it just completed)
-            bool waveActive = _gameManager?.WaveManager?.IsWaveActive ?? false;
-            _gameHUD.SetStartWaveEnabled(!waveActive);
+            UpdateStartWaveButtonState();
         }
     }
 
@@ -214,7 +231,7 @@ public partial class Main : Node2D
                 _gameManager.IsPlacingTower = false;
                 _gameManager.Grid?.HidePlacementPreview();
                 Input.SetDefaultCursorShape(Input.CursorShape.Arrow);
-                _gameHUD?.SetStartWaveEnabled(true);
+                UpdateStartWaveButtonState();
             }
 
             return;
@@ -284,7 +301,7 @@ public partial class Main : Node2D
             {
                 _gameManager.IsPlacingTower = false;
                 Input.SetDefaultCursorShape(Input.CursorShape.Arrow);
-                _gameHUD?.SetStartWaveEnabled(true);
+                UpdateStartWaveButtonState();
             }
         }
     }
