@@ -19,6 +19,9 @@ public partial class GridManager : Node2D
     private Polygon2D? _previewTower;
     private Control? _previewRange;
 
+    // Cached path waypoints (immutable, computed once)
+    private List<Vector2>? _cachedWaypoints;
+
     public override void _Ready()
     {
         // Draw the grid background and lines via _Draw()
@@ -269,20 +272,22 @@ public partial class GridManager : Node2D
     /// </summary>
     public List<Vector2> GetPathWaypoints()
     {
-        var waypoints = new List<Vector2>();
+        if (_cachedWaypoints != null)
+            return _cachedWaypoints;
+
+        _cachedWaypoints = new List<Vector2>();
         for (int c = 0; c < GameConstants.GridCols; c++)
         {
-            waypoints.Add(new Vector2(
+            _cachedWaypoints.Add(new Vector2(
                 GameConstants.CellCenterX(c),
                 GameConstants.CellCenterY(GameConstants.PathRow)
             ));
         }
-        // Add an extra waypoint past the grid for enemies to reach as "end"
-        waypoints.Add(new Vector2(
+        _cachedWaypoints.Add(new Vector2(
             GameConstants.CellCenterX(GameConstants.GridCols - 1) + GameConstants.CellSize,
             GameConstants.CellCenterY(GameConstants.PathRow)
         ));
-        return waypoints;
+        return _cachedWaypoints;
     }
 
     // === Coordinate Conversion ===
@@ -297,15 +302,4 @@ public partial class GridManager : Node2D
         return new Vector2I(col, row);
     }
 
-    // === Range ===
-
-    /// <summary>
-    /// Returns true if the given row/col is within rangeCells of the given tower position.
-    /// </summary>
-    public bool IsInRange(int towerRow, int towerCol, int targetRow, int targetCol, int rangeCells)
-    {
-        float dx = targetCol - towerCol;
-        float dy = targetRow - towerRow;
-        return dx * dx + dy * dy <= rangeCells * rangeCells;
-    }
 }

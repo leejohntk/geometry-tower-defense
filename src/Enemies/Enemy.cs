@@ -9,11 +9,9 @@ namespace GeometryTowerDefense;
 /// </summary>
 public partial class Enemy : Node2D
 {
-    // Signal emitted when enemy reaches the end of the path (house)
     [Signal]
     public delegate void ReachedEndEventHandler(Enemy enemy);
 
-    // Signal emitted when enemy is destroyed (HP <= 0)
     [Signal]
     public delegate void DestroyedEventHandler(Enemy enemy);
 
@@ -23,24 +21,7 @@ public partial class Enemy : Node2D
     private float _speed;
     private bool _isDead = false;
 
-    // Visual nodes
-    private Panel? _hpBar;
-    private Control? _hpBarContainer;
-
-    /// <summary>
-    /// Current HP of this enemy.
-    /// </summary>
-    public float CurrentHP => _currentHP;
-
-    /// <summary>
-    /// True if this enemy has been destroyed or reached end.
-    /// </summary>
     public bool IsDead => _isDead;
-
-    /// <summary>
-    /// True if this enemy has reached the end of the path.
-    /// </summary>
-    public bool HasReachedEnd { get; private set; } = false;
 
     public override void _Ready()
     {
@@ -104,13 +85,8 @@ public partial class Enemy : Node2D
     {
         if (_currentWaypointIndex >= _waypoints.Count)
         {
-            // Reached end of path
-            if (!HasReachedEnd)
-            {
-                HasReachedEnd = true;
-                _isDead = true;
-                EmitSignal(SignalName.ReachedEnd, this);
-            }
+            _isDead = true;
+            EmitSignal(SignalName.ReachedEnd, this);
             return;
         }
 
@@ -142,7 +118,6 @@ public partial class Enemy : Node2D
         _currentHP = GameConstants.EnemyHP;
         _speed = GameConstants.EnemySpeed;
         _isDead = false;
-        HasReachedEnd = false;
         Position = Vector2.Zero;
     }
 

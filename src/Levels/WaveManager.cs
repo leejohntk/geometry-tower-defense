@@ -1,5 +1,4 @@
 using Godot;
-using System.Collections.Generic;
 
 namespace GeometryTowerDefense;
 
@@ -51,11 +50,6 @@ public partial class WaveManager : Node
     /// True if a wave is currently in progress (spawning or enemies alive).
     /// </summary>
     public bool IsWaveActive => _currentWave > 0 && (_isSpawning || _enemiesAliveThisWave > 0);
-
-    /// <summary>
-    /// True if enemies are currently being spawned.
-    /// </summary>
-    public bool IsSpawning => _isSpawning;
 
     /// <summary>
     /// Number of enemies still alive in the current wave.

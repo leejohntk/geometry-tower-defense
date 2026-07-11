@@ -3,36 +3,45 @@ using Godot;
 namespace GeometryTowerDefense;
 
 /// <summary>
-/// Game over overlay with red tint and return-to-title button.
+/// Result overlay shown at end of game (game over or victory).
+/// Parameterized with overlay color, title text, and subtitle text.
 /// </summary>
-public partial class GameOverScreen : Control
+public partial class ResultScreen : Control
 {
     [Signal]
     public delegate void ReturnToTitleEventHandler();
 
+    private readonly Color _overlayColor;
+    private readonly string _titleText;
+    private readonly string _subtitleText;
+
+    public ResultScreen(Color overlayColor, string titleText, string subtitleText)
+    {
+        _overlayColor = overlayColor;
+        _titleText = titleText;
+        _subtitleText = subtitleText;
+    }
+
     public override void _Ready()
     {
-        // Red overlay
         var overlay = new ColorRect();
         overlay.Size = GetViewportRect().Size;
-        overlay.Color = new Color(0.8f, 0.05f, 0.05f, 0.6f);
-        overlay.MouseFilter = MouseFilterEnum.Pass; // Block clicks through
+        overlay.Color = _overlayColor;
+        overlay.MouseFilter = MouseFilterEnum.Pass;
         AddChild(overlay);
 
-        // GAME OVER text
-        var gameOverLabel = new Label();
-        gameOverLabel.Text = "GAME OVER";
-        gameOverLabel.HorizontalAlignment = HorizontalAlignment.Center;
-        gameOverLabel.VerticalAlignment = VerticalAlignment.Center;
-        gameOverLabel.Position = new Vector2(0, GetViewportRect().Size.Y / 2f - 80);
-        gameOverLabel.Size = new Vector2(GetViewportRect().Size.X, 100);
-        gameOverLabel.AddThemeFontSizeOverride("font_size", 64);
-        gameOverLabel.AddThemeColorOverride("font_color", new Color(1f, 1f, 1f));
-        AddChild(gameOverLabel);
+        var titleLabel = new Label();
+        titleLabel.Text = _titleText;
+        titleLabel.HorizontalAlignment = HorizontalAlignment.Center;
+        titleLabel.VerticalAlignment = VerticalAlignment.Center;
+        titleLabel.Position = new Vector2(0, GetViewportRect().Size.Y / 2f - 80);
+        titleLabel.Size = new Vector2(GetViewportRect().Size.X, 100);
+        titleLabel.AddThemeFontSizeOverride("font_size", 64);
+        titleLabel.AddThemeColorOverride("font_color", new Color(1f, 1f, 1f));
+        AddChild(titleLabel);
 
-        // Subtitle
         var subtitle = new Label();
-        subtitle.Text = "The enemies reached your base...";
+        subtitle.Text = _subtitleText;
         subtitle.HorizontalAlignment = HorizontalAlignment.Center;
         subtitle.Position = new Vector2(0, GetViewportRect().Size.Y / 2f);
         subtitle.Size = new Vector2(GetViewportRect().Size.X, 40);
@@ -40,7 +49,6 @@ public partial class GameOverScreen : Control
         subtitle.AddThemeColorOverride("font_color", new Color(0.9f, 0.9f, 0.9f));
         AddChild(subtitle);
 
-        // Return to Title button
         var returnButton = new Button();
         returnButton.Text = "Return to Title";
         returnButton.Position = new Vector2(

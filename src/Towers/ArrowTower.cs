@@ -1,5 +1,4 @@
 using Godot;
-using System.Collections.Generic;
 
 namespace GeometryTowerDefense;
 
@@ -10,13 +9,7 @@ namespace GeometryTowerDefense;
 /// </summary>
 public partial class ArrowTower : Node2D
 {
-    // Signal emitted when this tower fires a projectile
-    [Signal]
-    public delegate void ProjectileFiredEventHandler(ArrowTower tower, Vector2 targetPosition, Enemy targetEnemy);
-
     private float _fireCooldownTimer = 0f;
-    private bool _canFire = true;
-    private Area2D? _rangeArea;
     private Control? _rangeIndicator;
 
     /// <summary>
@@ -64,12 +57,7 @@ public partial class ArrowTower : Node2D
         triangle.Color = new Color(0.2f, 0.5f, 1.0f); // Blue fill
         AddChild(triangle);
 
-        // Draw outline
-        var outline = new Polygon2D();
-        outline.Polygon = trianglePoints;
-        outline.Color = new Color(0.1f, 0.2f, 0.6f); // Dark blue outline
-        outline.Offset = new Vector2(0, 0);
-        // We layer a slightly smaller one behind for outline effect
+        // Draw outline (slightly smaller behind for outline effect)
         var outlineBg = new Polygon2D();
         outlineBg.Polygon = new Vector2[]
         {
@@ -121,15 +109,13 @@ public partial class ArrowTower : Node2D
     {
         targetPos = Vector2.Zero;
 
-        if (!_canFire) return false;
+        if (_fireCooldownTimer > 0f) return false;
         if (target == null || target.IsDead) return false;
         if (!IsTargetInRange(target)) return false;
 
-        _canFire = false;
         _fireCooldownTimer = FireRate;
         targetPos = target.Position;
 
-        EmitSignal(SignalName.ProjectileFired, this, targetPos, target);
         return true;
     }
 
@@ -199,14 +185,11 @@ public partial class ArrowTower : Node2D
 
     public override void _Process(double delta)
     {
-        if (!_canFire)
+        if (_fireCooldownTimer > 0f)
         {
             _fireCooldownTimer -= (float)delta;
-            if (_fireCooldownTimer <= 0f)
-            {
-                _canFire = true;
+            if (_fireCooldownTimer < 0f)
                 _fireCooldownTimer = 0f;
-            }
         }
     }
 }

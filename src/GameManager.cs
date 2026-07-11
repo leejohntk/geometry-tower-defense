@@ -3,6 +3,8 @@ using System.Collections.Generic;
 
 namespace GeometryTowerDefense;
 
+public enum GameState { Playing, GameOver, Victory }
+
 /// <summary>
 /// Central game state manager. Orchestrates grid, enemies, towers, projectiles, economy, and waves.
 /// </summary>
@@ -46,8 +48,7 @@ public partial class GameManager : Node2D
     // Player state
     private int _hp;
     private int _coins;
-    private bool _isGameOver = false;
-    private bool _isVictory = false;
+    private GameState _state = GameState.Playing;
     private bool _isPlacingTower = false;
 
     // Guard against double initialization
@@ -65,14 +66,19 @@ public partial class GameManager : Node2D
     public int Coins => _coins;
 
     /// <summary>
+    /// Current game state.
+    /// </summary>
+    public GameState State => _state;
+
+    /// <summary>
     /// True if game is over (HP <= 0).
     /// </summary>
-    public bool IsGameOver => _isGameOver;
+    public bool IsGameOver => _state == GameState.GameOver;
 
     /// <summary>
     /// True if player has won (all waves cleared).
     /// </summary>
-    public bool IsVictory => _isVictory;
+    public bool IsVictory => _state == GameState.Victory;
 
     /// <summary>
     /// The active WaveManager.
@@ -99,9 +105,9 @@ public partial class GameManager : Node2D
     public int ActiveEnemyCount => _activeEnemies.Count;
 
     /// <summary>
-    /// Returns a copy of the active towers list for read-only operations (e.g., hit testing).
+    /// Returns active towers as a read-only list (no allocation).
     /// </summary>
-    public List<ArrowTower> GetActiveTowers() => new(_activeTowers);
+    public System.Collections.Generic.IReadOnlyList<ArrowTower> GetActiveTowers() => _activeTowers;
 
     /// <summary>
     /// Called by Main to initialize a new game.
@@ -116,8 +122,7 @@ public partial class GameManager : Node2D
 
         _hp = GameConstants.StartingHP;
         _coins = GameConstants.StartingCoins;
-        _isGameOver = false;
-        _isVictory = false;
+        _state = GameState.Playing;
 
         // Create object pools once (persist across game restarts)
         if (!_poolsCreated)
@@ -163,7 +168,7 @@ public partial class GameManager : Node2D
 
     public override void _Process(double delta)
     {
-        if (_isGameOver || _isVictory)
+        if (_state != GameState.Playing)
             return;
 
         // Update targeting for all towers
@@ -181,6 +186,9 @@ public partial class GameManager : Node2D
     /// </summary>
     private void UpdateTowerTargeting()
     {
+        float rangePixels = GameConstants.CellDistanceInPixels(GameConstants.ArrowTowerRange);
+        float rangeSq = rangePixels * rangePixels;
+
         foreach (var tower in _activeTowers)
         {
             Enemy? nearest = null;
@@ -191,14 +199,11 @@ public partial class GameManager : Node2D
             {
                 if (enemy.IsDead) continue;
 
-                if (tower.IsTargetInRange(enemy))
+                float distSq = enemy.Position.DistanceSquaredTo(towerPos);
+                if (distSq <= rangeSq && distSq < nearestDistSq)
                 {
-                    float distSq = enemy.Position.DistanceSquaredTo(towerPos);
-                    if (distSq < nearestDistSq)
-                    {
-                        nearestDistSq = distSq;
-                        nearest = enemy;
-                    }
+                    nearestDistSq = distSq;
+                    nearest = enemy;
                 }
             }
 
@@ -283,7 +288,7 @@ public partial class GameManager : Node2D
         enemy.Destroyed -= OnEnemyDestroyed;
 
         // Don't process more HP loss if game is already over
-        if (_isGameOver)
+        if (_state == GameState.GameOver)
         {
             _waveManager?.NotifyEnemyReachedEnd();
             _enemyPool?.Release(enemy);
@@ -295,7 +300,7 @@ public partial class GameManager : Node2D
         if (_hp <= 0)
         {
             _hp = 0;
-            _isGameOver = true;
+            _state = GameState.GameOver;
         }
 
         EmitSignal(SignalName.HpChanged, _hp);
@@ -303,7 +308,7 @@ public partial class GameManager : Node2D
         // Notify wave manager (enemy removed from wave count)
         _waveManager?.NotifyEnemyReachedEnd();
 
-        if (_isGameOver)
+        if (_state == GameState.GameOver)
         {
             EmitSignal(SignalName.GameOver);
         }
@@ -370,7 +375,7 @@ public partial class GameManager : Node2D
 
     private void OnAllWavesCompleted()
     {
-        _isVictory = true;
+        _state = GameState.Victory;
         EmitSignal(SignalName.Victory);
     }
 
@@ -379,7 +384,7 @@ public partial class GameManager : Node2D
     /// </summary>
     public bool StartNextWave()
     {
-        if (_isGameOver || _isVictory)
+        if (_state != GameState.Playing)
             return false;
 
         return _waveManager?.StartNextWave() ?? false;
@@ -393,7 +398,7 @@ public partial class GameManager : Node2D
     /// </summary>
     public bool PlaceTower(int row, int col)
     {
-        if (_isGameOver || _isVictory)
+        if (_state != GameState.Playing)
             return false;
 
         if (_coins < GameConstants.ArrowTowerCost)
@@ -470,8 +475,7 @@ public partial class GameManager : Node2D
             _waveManager = null;
         }
 
-        _isGameOver = false;
-        _isVictory = false;
+        _state = GameState.Playing;
         _initialized = false;
         // Do NOT call Initialize() — Main.StartNewGame() is the sole caller
     }

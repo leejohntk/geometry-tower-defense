@@ -10,8 +10,8 @@ public partial class Main : Node2D
     private TitleScreen? _titleScreen;
     private GameManager? _gameManager;
     private GameHUD? _gameHUD;
-    private GameOverScreen? _gameOverScreen;
-    private VictoryScreen? _victoryScreen;
+    private ResultScreen? _gameOverScreen;
+    private ResultScreen? _victoryScreen;
     private bool _gameRunning = false;
 
     public override void _Ready()
@@ -40,14 +40,22 @@ public partial class Main : Node2D
         AddChild(_gameHUD);
 
         // Create game over screen (hidden initially)
-        _gameOverScreen = new GameOverScreen();
+        _gameOverScreen = new ResultScreen(
+            new Color(0.8f, 0.05f, 0.05f, 0.6f),
+            "GAME OVER",
+            "The enemies reached your base..."
+        );
         _gameOverScreen.Name = "GameOverScreen";
         _gameOverScreen.ReturnToTitle += OnReturnToTitle;
         _gameOverScreen.Visible = false;
         AddChild(_gameOverScreen);
 
         // Create victory screen (hidden initially)
-        _victoryScreen = new VictoryScreen();
+        _victoryScreen = new ResultScreen(
+            new Color(0.9f, 0.7f, 0.1f, 0.5f),
+            "VICTORY",
+            "You defended your base! All waves cleared!"
+        );
         _victoryScreen.Name = "VictoryScreen";
         _victoryScreen.ReturnToTitle += OnReturnToTitle;
         _victoryScreen.Visible = false;
