@@ -39,4 +39,4 @@ jobs:
         run: dotnet build --no-restore
 
       - name: Test
-        run: GODOT_BIN=/usr/local/bin/godot dotnet test --no-build --verbosity normal
+        run: GODOT_BIN=/usr/local/bin/godot dotnet test --verbosity normal
