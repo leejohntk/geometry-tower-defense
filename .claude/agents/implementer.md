@@ -5,22 +5,26 @@ tools: Read, Write, Edit, Bash, Glob, Grep, mcp__godot__*
 model: sonnet
 hooks:
   PreToolUse:
-    - matcher: "Write"
+    - matcher: "Write|Read|Bash|Grep|Glob"
       hooks:
         - type: "command"
           command: |
-            # Block writes to holdouts directory
-            FILE="$1"
-            if echo "$FILE" | grep -q ".claude/holdouts/"; then
-              echo '{"decision": "deny", "reason": "Implementer must not write to holdouts directory"}'
-              exit 1
+            # Block all access to holdouts directory (reads AND writes).
+            # Output uses hookSpecificOutput.permissionDecision (Claude Code v2+).
+            INPUT="${1:-}"
+            if [ ! -t 0 ]; then INPUT="$INPUT$(cat 2>/dev/null || true)"; fi
+            if echo "$INPUT" | grep -q ".claude/holdouts/"; then
+              printf '{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "Implementer must not access holdouts directory"}}\n'
+            else
+              printf '{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "allow"}}\n'
             fi
-            echo '{"decision": "allow"}'
   SubagentStop:
     - matcher: ""
       hooks:
         - type: "command"
           command: |
+            # GdUnit4's dotnet test needs the Godot engine path.
+            export GODOT_BIN="${GODOT_BIN:-/opt/homebrew/bin/godot}"
             # Validate build was run and passed before reporting done
             dotnet build > /tmp/gtd-dotnet-build-$$.log 2>&1
             BUILD_EXIT=$?
