@@ -40,7 +40,10 @@ public static class GameConstants
     public const int SwarmEnemyDiameter = 24;
     public const float SwarmEnemySpeed = 2f;
     public const int SwarmClusterSize = 3;
-    public const float SwarmClusterSpacing = 16f;
+    // Radius of the invisible circle the swarm members orbit their path anchor.
+    // At 20px, adjacent members sit ~34.6px apart (clearing the 24px diameter with
+    // ~10px of gap) and the central hole has ~8px of clear radius.
+    public const float SwarmClusterRadius = 20f;
     public const int SwarmCoinDropPerKill = 1;
 
     // Projectile

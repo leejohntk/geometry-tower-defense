@@ -26,6 +26,11 @@ public partial class Enemy : Node2D
 
     private List<Vector2> _waypoints = new();
     private int _currentWaypointIndex = 0;
+    // The path anchor is the point on the waypoint path that this enemy follows.
+    // Position is always anchor + FormationOffset, so a formation offset survives
+    // waypoint arrival snaps and stays constant for the entire path.
+    private Vector2 _anchorPosition = Vector2.Zero;
+    private Vector2 _formationOffset = Vector2.Zero;
     private float _currentHP;
     private float _maxHP;
     private float _speed;
@@ -56,6 +61,12 @@ public partial class Enemy : Node2D
     /// Rendered diameter in pixels.
     /// </summary>
     public float Diameter => _diameter;
+
+    /// <summary>
+    /// Constant offset from the path anchor applied to Position every tick.
+    /// Zero for basic enemies; non-zero for swarm cluster members.
+    /// </summary>
+    public Vector2 FormationOffset => _formationOffset;
 
     public override void _Ready()
     {
@@ -136,6 +147,19 @@ public partial class Enemy : Node2D
     }
 
     /// <summary>
+    /// Sets the formation offset applied to this enemy relative to its path anchor.
+    /// Set before SetPath so the initial anchor placement already includes the offset.
+    /// </summary>
+    public void SetFormationOffset(Vector2 offset)
+    {
+        _formationOffset = offset;
+
+        // If a path is already active, keep Position consistent with the new offset.
+        if (_waypoints.Count > 0)
+            Position = _anchorPosition + _formationOffset;
+    }
+
+    /// <summary>
     /// Sets the path waypoints for this enemy to follow.
     /// The cached waypoint list is treated as read-only and shared across enemies;
     /// ResetForPool reassigns (never clears) so it can't mutate the shared cache.
@@ -147,7 +171,8 @@ public partial class Enemy : Node2D
 
         if (_waypoints.Count > 0)
         {
-            Position = _waypoints[0];
+            _anchorPosition = _waypoints[0];
+            Position = _anchorPosition + _formationOffset;
         }
     }
 
@@ -169,14 +194,15 @@ public partial class Enemy : Node2D
         }
 
         Vector2 target = _waypoints[_currentWaypointIndex];
-        Vector2 toTarget = target - Position;
+        Vector2 toTarget = target - _anchorPosition;
         float distanceToWaypoint = toTarget.Length();
         float moveDistance = _speed * GameConstants.CellSize * delta;
 
         if (moveDistance >= distanceToWaypoint)
         {
-            // Arrived at waypoint, move to next
-            Position = target;
+            // Anchor arrives at waypoint; the formation offset survives because
+            // Position is recomputed from the anchor below, not snapped to target.
+            _anchorPosition = target;
             _currentWaypointIndex++;
         }
         else
@@ -185,8 +211,10 @@ public partial class Enemy : Node2D
             Vector2 direction = distanceToWaypoint > 0.0001f
                 ? toTarget / distanceToWaypoint
                 : Vector2.Zero;
-            Position += direction * moveDistance;
+            _anchorPosition += direction * moveDistance;
         }
+
+        Position = _anchorPosition + _formationOffset;
     }
 
     /// <summary>
@@ -200,6 +228,10 @@ public partial class Enemy : Node2D
         // be a shared cached path reference owned by GridManager.
         _waypoints = new List<Vector2>();
         _currentWaypointIndex = 0;
+        // Clear formation state so a pooled swarm member can't leak its offset
+        // into a later basic-enemy reuse.
+        _formationOffset = Vector2.Zero;
+        _anchorPosition = Vector2.Zero;
         _currentHP = _maxHP > 0 ? _maxHP : GameConstants.EnemyHP;
         _isDead = false;
         Position = Vector2.Zero;

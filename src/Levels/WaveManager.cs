@@ -153,17 +153,29 @@ public partial class WaveManager : Node
         }
         else
         {
-            foreach (var offset in SwarmClusterOffsets)
+            foreach (var offset in GenerateClusterOffsets(GameConstants.SwarmClusterSize, GameConstants.SwarmClusterRadius))
                 SpawnEnemy(EnemyKind.Swarm, offset);
         }
     }
 
-    private static readonly Vector2[] SwarmClusterOffsets =
+    /// <summary>
+    /// Generates cluster-member offsets arranged evenly around a circle of the given
+    /// radius. The ring layout leaves a hollow center and spaces adjacent members
+    /// far enough apart to avoid overlapping swarm circles.
+    /// </summary>
+    public static IReadOnlyList<Vector2> GenerateClusterOffsets(int clusterSize, float radius)
     {
-        new Vector2(-8, -8),
-        new Vector2(8, -8),
-        new Vector2(0, 8)
-    };
+        var offsets = new Vector2[clusterSize];
+        float angleStep = Mathf.Tau / clusterSize;
+
+        for (int i = 0; i < clusterSize; i++)
+        {
+            float angle = angleStep * i;
+            offsets[i] = new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * radius;
+        }
+
+        return offsets;
+    }
 
     private void SpawnEnemy(EnemyKind kind, Vector2 offset)
     {
@@ -172,15 +184,13 @@ public partial class WaveManager : Node
         enemy.ResetForPool();
         enemy.Configure(kind);
 
+        // Set the formation offset before the spawn signal: GameManager.OnEnemySpawned
+        // calls SetPath inside the handler, which places the enemy at anchor + offset.
+        enemy.SetFormationOffset(offset);
+
         _enemiesAliveThisWave++;
 
-        // Emit first: GameManager.OnEnemySpawned calls SetPath, which places the
-        // enemy at the first path waypoint. Apply the cluster offset afterward so it
-        // is not overwritten (swarm members must land ~16px apart).
         EmitSignal(SignalName.EnemySpawned, enemy);
-
-        if (offset != Vector2.Zero)
-            enemy.Position += offset;
     }
 
     /// <summary>
