@@ -54,27 +54,6 @@ public class GameConstantsTest
     }
 
     [TestCase]
-    public void WaveConstants_AreCorrect()
-    {
-        AssertThat(GameConstants.TotalWaves).IsEqual(5);
-        AssertThat(GameConstants.WaveEnemyCounts.Length).IsEqual(5);
-        AssertThat(GameConstants.WaveEnemyCounts[0]).IsEqual(3);
-        AssertThat(GameConstants.WaveEnemyCounts[1]).IsEqual(5);
-        AssertThat(GameConstants.WaveEnemyCounts[2]).IsEqual(7);
-        AssertThat(GameConstants.WaveEnemyCounts[3]).IsEqual(9);
-        AssertThat(GameConstants.WaveEnemyCounts[4]).IsEqual(12);
-    }
-
-    [TestCase]
-    public void WaveEnemyTotal_Is36()
-    {
-        int total = 0;
-        foreach (int count in GameConstants.WaveEnemyCounts)
-            total += count;
-        AssertThat(total).IsEqual(36);
-    }
-
-    [TestCase]
     public void CellCenterX_CalculatesCorrectly()
     {
         int half = GameConstants.CellSize / 2;

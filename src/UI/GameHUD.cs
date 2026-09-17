@@ -3,7 +3,7 @@ using Godot;
 namespace GeometryTowerDefense;
 
 /// <summary>
-/// In-game HUD showing HP, coins, wave counter, tower placement button, and Start Wave button.
+/// In-game HUD showing HP, coins, wave counter, tower placement buttons, and Start Wave button.
 /// Top bar for status info, right sidebar for action buttons.
 /// </summary>
 public partial class GameHUD : CanvasLayer
@@ -12,14 +12,17 @@ public partial class GameHUD : CanvasLayer
     public delegate void StartWavePressedEventHandler();
 
     [Signal]
-    public delegate void PlaceTowerPressedEventHandler();
+    public delegate void PlaceTowerPressedEventHandler(int towerType);
 
     private Label? _hpLabel;
     private Label? _coinsLabel;
     private Label? _waveLabel;
     private Button? _startWaveButton;
-    private Button? _placeTowerButton;
+    private Button? _placeArrowButton;
+    private Button? _placeCannonButton;
     private GameManager? _gameManager;
+    private bool _allowCannon = false;
+    private int _totalWaves = 0;
 
     public override void _Ready()
     {
@@ -88,8 +91,6 @@ public partial class GameHUD : CanvasLayer
         AddChild(_waveLabel);
 
         // The sidebar sits to the RIGHT of the play area (grid), not overlapping it.
-        // The viewport must be at least TotalViewportWidth wide for this to work.
-        // Sidebar X position = right edge of play area = PlayAreaWidth.
         float sidebarX = GameConstants.PlayAreaWidth;
 
         // Right sidebar background — full height, opaque, next to the play area
@@ -108,24 +109,46 @@ public partial class GameHUD : CanvasLayer
 
         float sidebarCenterX = sidebarX + GameConstants.SidebarWidth / 2f;
 
-        // Place Tower button — in sidebar, near top
-        _placeTowerButton = new Button();
-        _placeTowerButton.Text = "Place Tower (10$)";
-        _placeTowerButton.Position = new Vector2(sidebarCenterX - 80, 20);
-        _placeTowerButton.Size = new Vector2(160, 40);
-        _placeTowerButton.Disabled = true;
-        _placeTowerButton.Pressed += OnPlaceTowerPressed;
-        _placeTowerButton.AddThemeFontSizeOverride("font_size", 12);
-        AddChild(_placeTowerButton);
+        // Place Arrow button
+        _placeArrowButton = new Button();
+        _placeArrowButton.Text = $"Place Arrow ({GameConstants.ArrowTowerCost}$)";
+        _placeArrowButton.Position = new Vector2(sidebarCenterX - 80, 20);
+        _placeArrowButton.Size = new Vector2(160, 40);
+        _placeArrowButton.Disabled = true;
+        _placeArrowButton.Pressed += () => EmitSignal(SignalName.PlaceTowerPressed, (int)TowerType.Arrow);
+        _placeArrowButton.AddThemeFontSizeOverride("font_size", 12);
+        AddChild(_placeArrowButton);
 
-        // Start Wave button — in sidebar, below Place Tower
+        // Place Cannon button (hidden for levels that don't allow it)
+        _placeCannonButton = new Button();
+        _placeCannonButton.Text = $"Place Cannon ({GameConstants.CannonTowerCost}$)";
+        _placeCannonButton.Position = new Vector2(sidebarCenterX - 80, 70);
+        _placeCannonButton.Size = new Vector2(160, 40);
+        _placeCannonButton.Disabled = true;
+        _placeCannonButton.Visible = false;
+        _placeCannonButton.Pressed += () => EmitSignal(SignalName.PlaceTowerPressed, (int)TowerType.Cannon);
+        _placeCannonButton.AddThemeFontSizeOverride("font_size", 12);
+        AddChild(_placeCannonButton);
+
+        // Start Wave button — in sidebar, below the tower buttons
         _startWaveButton = new Button();
         _startWaveButton.Text = "Start Wave";
-        _startWaveButton.Position = new Vector2(sidebarCenterX - 70, 70);
+        _startWaveButton.Position = new Vector2(sidebarCenterX - 70, 130);
         _startWaveButton.Size = new Vector2(140, 40);
         _startWaveButton.Pressed += OnStartWavePressed;
         _startWaveButton.AddThemeFontSizeOverride("font_size", 14);
         AddChild(_startWaveButton);
+    }
+
+    /// <summary>
+    /// Configure level-specific HUD visibility (e.g., hide the Cannon button in Level 1).
+    /// </summary>
+    public void ConfigureForLevel(LevelDefinition level)
+    {
+        _allowCannon = level.AllowCannonTower;
+        _totalWaves = level.Waves.Count;
+        if (_placeCannonButton != null)
+            _placeCannonButton.Visible = _allowCannon;
     }
 
     /// <summary>
@@ -165,6 +188,8 @@ public partial class GameHUD : CanvasLayer
     {
         if (_coinsLabel != null)
             _coinsLabel.Text = coins.ToString();
+
+        UpdateTowerButtonStates();
     }
 
     private void OnHpChanged(int hp)
@@ -176,25 +201,39 @@ public partial class GameHUD : CanvasLayer
     private void OnWaveChanged(int waveNumber)
     {
         if (_waveLabel != null)
-            _waveLabel.Text = $"{waveNumber}/{GameConstants.TotalWaves}";
+        {
+            _waveLabel.Text = $"{waveNumber}/{_totalWaves}";
+        }
     }
 
     private void OnGameOver()
     {
         _startWaveButton?.SetDeferred("disabled", true);
-        _placeTowerButton?.SetDeferred("disabled", true);
+        _placeArrowButton?.SetDeferred("disabled", true);
+        _placeCannonButton?.SetDeferred("disabled", true);
     }
 
     private void OnVictory()
     {
         _startWaveButton?.SetDeferred("disabled", true);
-        _placeTowerButton?.SetDeferred("disabled", true);
+        _placeArrowButton?.SetDeferred("disabled", true);
+        _placeCannonButton?.SetDeferred("disabled", true);
     }
 
     private void OnTowerPlacementStateChanged(bool canPlace)
     {
-        if (_placeTowerButton != null)
-            _placeTowerButton.Disabled = !canPlace;
+        UpdateTowerButtonStates();
+    }
+
+    private void UpdateTowerButtonStates()
+    {
+        int coins = _gameManager?.Coins ?? 0;
+
+        if (_placeArrowButton != null)
+            _placeArrowButton.Disabled = coins < GameConstants.ArrowTowerCost;
+
+        if (_placeCannonButton != null)
+            _placeCannonButton.Disabled = !_allowCannon || coins < GameConstants.CannonTowerCost;
     }
 
     /// <summary>
@@ -209,10 +248,5 @@ public partial class GameHUD : CanvasLayer
     private void OnStartWavePressed()
     {
         EmitSignal(SignalName.StartWavePressed);
-    }
-
-    private void OnPlaceTowerPressed()
-    {
-        EmitSignal(SignalName.PlaceTowerPressed);
     }
 }

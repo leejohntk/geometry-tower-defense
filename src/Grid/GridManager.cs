@@ -6,21 +6,42 @@ namespace GeometryTowerDefense;
 /// <summary>
 /// Manages the 20x20 grid: cell occupancy, path detection, coordinate conversion.
 /// The game coordinate system uses column (x) and row (y) where (0,0) is top-left.
-/// Row 10 is the horizontal path from left to right.
-/// Grid is drawn via _Draw() with individual line segments (not a single Line2D polyline).
+/// The path is defined per-level as a list of cells (not a single row).
+/// Grid is drawn via _Draw() with individual line segments.
 /// </summary>
 public partial class GridManager : Node2D
 {
     // Grid state: true = occupied by tower
     private readonly bool[,] _occupied = new bool[GameConstants.GridRows, GameConstants.GridCols];
 
+    // Path cells (col, row) for the active level
+    private readonly HashSet<Vector2I> _pathCells = new();
+
+    private LevelDefinition? _level;
+
     // Placement preview nodes
     private ColorRect? _previewHighlight;
     private Polygon2D? _previewTower;
+    private Control? _previewTowerCircle;
     private Control? _previewRange;
+    private float _previewRangePixels = GameConstants.CellDistanceInPixels(GameConstants.ArrowTowerRange);
 
-    // Cached path waypoints (immutable, computed once)
+    // Cached path waypoints (immutable, computed once per level)
     private List<Vector2>? _cachedWaypoints;
+
+    /// <summary>
+    /// Configure this grid for a specific level's path. Must be called before AddChild.
+    /// </summary>
+    public void Configure(LevelDefinition level)
+    {
+        _level = level;
+
+        _pathCells.Clear();
+        foreach (var cell in level.PathCells)
+            _pathCells.Add(cell);
+
+        _cachedWaypoints = null;
+    }
 
     public override void _Ready()
     {
@@ -45,7 +66,7 @@ public partial class GridManager : Node2D
             {
                 Vector2 pos = new Vector2(c * cs, r * cs);
                 Vector2 size = new Vector2(cs, cs);
-                Color color = r == GameConstants.PathRow
+                Color color = _pathCells.Contains(new Vector2I(c, r))
                     ? new Color(0.8f, 0.7f, 0.5f, 0.3f)  // Tan path background
                     : new Color(0.1f, 0.1f, 0.15f, 0.3f); // Dark tint non-path
                 DrawRect(new Rect2(pos, size), color);
@@ -84,7 +105,7 @@ public partial class GridManager : Node2D
         _previewHighlight.ZIndex = previewZ;
         AddChild(_previewHighlight);
 
-        // Ghost tower (semi-transparent blue triangle)
+        // Ghost tower for Arrow (semi-transparent blue triangle)
         var triPoints = new Vector2[]
         {
             new Vector2(0, -(GameConstants.CellSize / 2f - 4)),                            // Top center
@@ -98,16 +119,33 @@ public partial class GridManager : Node2D
         _previewTower.ZIndex = previewZ + 1;
         AddChild(_previewTower);
 
+        // Ghost tower for Cannon (semi-transparent dark green circle)
+        _previewTowerCircle = new Control();
+        _previewTowerCircle.Size = new Vector2(GameConstants.CellSize, GameConstants.CellSize);
+        _previewTowerCircle.MouseFilter = Control.MouseFilterEnum.Ignore;
+        _previewTowerCircle.Visible = false;
+        _previewTowerCircle.ZIndex = previewZ + 1;
+        _previewTowerCircle.Draw += () =>
+        {
+            if (!IsInstanceValid(_previewTowerCircle)) return;
+
+            float radius = GameConstants.CellSize / 2f - 4;
+            Vector2 center = new Vector2(GameConstants.CellSize / 2f, GameConstants.CellSize / 2f);
+            _previewTowerCircle.DrawCircle(center, radius, new Color(0.3f, 0.6f, 0.4f, 0.45f));
+            _previewTowerCircle.DrawCircle(center, radius, new Color(0.1f, 0.25f, 0.15f, 0.6f), false, 2.0f);
+        };
+        AddChild(_previewTowerCircle);
+
         // Range preview circle (shown on valid placements)
-        float rangePx = GameConstants.CellDistanceInPixels(GameConstants.ArrowTowerRange);
         _previewRange = new Control();
-        _previewRange.Size = new Vector2(rangePx * 2, rangePx * 2);
         _previewRange.MouseFilter = Control.MouseFilterEnum.Ignore;
         _previewRange.Visible = false;
         _previewRange.ZIndex = previewZ - 1;
         _previewRange.Draw += () =>
         {
             if (!IsInstanceValid(_previewRange)) return;
+
+            float rangePx = _previewRangePixels;
             _previewRange.DrawCircle(
                 new Vector2(rangePx, rangePx), rangePx,
                 new Color(0.2f, 0.5f, 1.0f, 0.12f)
@@ -123,10 +161,13 @@ public partial class GridManager : Node2D
 
     private void CreateSpawnAndBaseIndicators()
     {
-        // Spawn zone indicator on left edge (col 0)
+        Vector2I spawnCell = _level?.SpawnCell ?? new Vector2I(0, GameConstants.PathRow);
+        Vector2I baseCell = _level?.BaseCell ?? new Vector2I(GameConstants.GridCols - 1, GameConstants.PathRow);
+
+        // Spawn zone indicator on the spawn cell
         var spawnZone = new ColorRect();
         spawnZone.Size = new Vector2(GameConstants.CellSize, GameConstants.CellSize);
-        spawnZone.Position = new Vector2(0, GameConstants.PathRow * GameConstants.CellSize);
+        spawnZone.Position = new Vector2(spawnCell.X * GameConstants.CellSize, spawnCell.Y * GameConstants.CellSize);
         spawnZone.Color = new Color(1f, 0.2f, 0.2f, 0.15f);
         AddChild(spawnZone);
 
@@ -134,18 +175,16 @@ public partial class GridManager : Node2D
         var spawnLabel = new Label();
         spawnLabel.Text = "SPAWN";
         spawnLabel.Position = new Vector2(
-            GameConstants.CellCenterX(0) - 25,
-            GameConstants.CellCenterY(GameConstants.PathRow) - 8
+            GameConstants.CellCenterX(spawnCell.X) - 25,
+            GameConstants.CellCenterY(spawnCell.Y) - 8
         );
         spawnLabel.AddThemeColorOverride("font_color", new Color(1f, 0.5f, 0.5f, 0.6f));
         spawnLabel.Scale = new Vector2(0.7f, 0.7f);
         AddChild(spawnLabel);
 
-        // House/base indicator on the right edge of the path
-        // Centered in the last cell so the entire house is within the grid bounds
-        // and not overlapped by the sidebar.
-        float houseX = GameConstants.CellCenterX(GameConstants.GridCols - 1);
-        float houseY = GameConstants.CellCenterY(GameConstants.PathRow);
+        // House/base indicator on the base cell
+        float houseX = GameConstants.CellCenterX(baseCell.X);
+        float houseY = GameConstants.CellCenterY(baseCell.Y);
 
         // House body
         var houseBody = new ColorRect();
@@ -178,13 +217,13 @@ public partial class GridManager : Node2D
     // === Placement Preview ===
 
     /// <summary>
-    /// Show the placement preview at the given grid position.
+    /// Show the placement preview at the given grid position for the given tower type.
     /// Green highlight + tower ghost + range circle for valid cells,
     /// red highlight (no tower) for invalid cells.
     /// </summary>
-    public void ShowPlacementPreview(int row, int col, bool canPlace)
+    public void ShowPlacementPreview(int row, int col, bool canPlace, TowerType towerType)
     {
-        if (_previewHighlight == null || _previewTower == null || _previewRange == null)
+        if (_previewHighlight == null || _previewTower == null || _previewTowerCircle == null || _previewRange == null)
             return;
 
         Vector2 cellPos = new Vector2(col * GameConstants.CellSize, row * GameConstants.CellSize);
@@ -200,12 +239,19 @@ public partial class GridManager : Node2D
             : new Color(1.0f, 0.0f, 0.0f, 0.3f);   // red
         _previewHighlight.Visible = true;
 
-        // Tower ghost — only on valid spots
+        // Tower ghost — only on valid spots, shape depends on tower type
         _previewTower.Position = center;
-        _previewTower.Visible = canPlace;
+        _previewTower.Visible = canPlace && towerType == TowerType.Arrow;
+
+        _previewTowerCircle.Position = cellPos;
+        _previewTowerCircle.Visible = canPlace && towerType == TowerType.Cannon;
+        if (canPlace && towerType == TowerType.Cannon)
+            _previewTowerCircle.QueueRedraw();
 
         // Range indicator — only on valid spots
-        float rangePx = GameConstants.CellDistanceInPixels(GameConstants.ArrowTowerRange);
+        float rangePx = GameConstants.CellDistanceInPixels(GameConstants.TowerRange(towerType));
+        _previewRangePixels = rangePx;
+        _previewRange.Size = new Vector2(rangePx * 2, rangePx * 2);
         _previewRange.Position = new Vector2(center.X - rangePx, center.Y - rangePx);
         _previewRange.Visible = canPlace;
         if (canPlace)
@@ -221,6 +267,8 @@ public partial class GridManager : Node2D
             _previewHighlight.Visible = false;
         if (_previewTower != null)
             _previewTower.Visible = false;
+        if (_previewTowerCircle != null)
+            _previewTowerCircle.Visible = false;
         if (_previewRange != null)
             _previewRange.Visible = false;
     }
@@ -228,11 +276,11 @@ public partial class GridManager : Node2D
     // === Grid Queries ===
 
     /// <summary>
-    /// Returns true if the given grid position is on the path row.
+    /// Returns true if the given grid position is a path cell.
     /// </summary>
     public bool IsOnPath(int row, int col)
     {
-        return row == GameConstants.PathRow;
+        return _pathCells.Contains(new Vector2I(col, row));
     }
 
     /// <summary>
@@ -267,8 +315,8 @@ public partial class GridManager : Node2D
     // === Path ===
 
     /// <summary>
-    /// Gets a list of grid cell center positions along the path row.
-    /// Enemies follow these waypoints from left (col 0) to right (col 19).
+    /// Gets a list of grid cell center positions along the level's path.
+    /// Enemies follow these waypoints from spawn to base, then one cell past the base.
     /// </summary>
     public List<Vector2> GetPathWaypoints()
     {
@@ -276,17 +324,34 @@ public partial class GridManager : Node2D
             return _cachedWaypoints;
 
         _cachedWaypoints = new List<Vector2>();
-        for (int c = 0; c < GameConstants.GridCols; c++)
+
+        if (_level == null || _level.PathCells.Count == 0)
+            return _cachedWaypoints;
+
+        foreach (var cell in _level.PathCells)
         {
             _cachedWaypoints.Add(new Vector2(
-                GameConstants.CellCenterX(c),
-                GameConstants.CellCenterY(GameConstants.PathRow)
+                GameConstants.CellCenterX(cell.X),
+                GameConstants.CellCenterY(cell.Y)
             ));
         }
+
+        // A single-cell path has no previous cell to derive an exit direction from,
+        // so skip the past-base waypoint.
+        if (_level.PathCells.Count < 2)
+            return _cachedWaypoints;
+
+        // Add a final waypoint one cell past the last path cell so enemies walk off-grid.
+        var last = _level.PathCells[^1];
+        var prev = _level.PathCells[^2];
+        int dc = System.Math.Sign(last.X - prev.X);
+        int dr = System.Math.Sign(last.Y - prev.Y);
+
         _cachedWaypoints.Add(new Vector2(
-            GameConstants.CellCenterX(GameConstants.GridCols - 1) + GameConstants.CellSize,
-            GameConstants.CellCenterY(GameConstants.PathRow)
+            GameConstants.CellCenterX(last.X) + dc * GameConstants.CellSize,
+            GameConstants.CellCenterY(last.Y) + dr * GameConstants.CellSize
         ));
+
         return _cachedWaypoints;
     }
 
@@ -301,5 +366,4 @@ public partial class GridManager : Node2D
         int row = Mathf.FloorToInt(pixelPos.Y / GameConstants.CellSize);
         return new Vector2I(col, row);
     }
-
 }
