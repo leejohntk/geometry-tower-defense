@@ -11,6 +11,17 @@ hooks:
           command: |
             echo '{"decision": "deny", "reason": "Reviewer is read-only. Cannot write or edit files."}'
             exit 1
+    - matcher: "Read|Bash|Grep|Glob"
+      hooks:
+        - type: "command"
+          command: |
+            # Block all access to holdouts directory
+            INPUT="$1"
+            if echo "$INPUT" | grep -q ".claude/holdouts/"; then
+              echo '{"decision": "deny", "reason": "Reviewer must not access holdouts directory"}'
+              exit 1
+            fi
+            echo '{"decision": "allow"}'
   SubagentStop:
     - matcher: ""
       hooks:

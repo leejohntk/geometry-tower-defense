@@ -5,14 +5,14 @@ tools: Read, Write, Edit, Bash, Glob, Grep, mcp__godot__*
 model: sonnet
 hooks:
   PreToolUse:
-    - matcher: "Write"
+    - matcher: "Write|Read|Bash|Grep|Glob"
       hooks:
         - type: "command"
           command: |
-            # Block writes to holdouts directory
-            FILE="$1"
-            if echo "$FILE" | grep -q ".claude/holdouts/"; then
-              echo '{"decision": "deny", "reason": "Implementer must not write to holdouts directory"}'
+            # Block all access to holdouts directory (reads AND writes)
+            INPUT="$1"
+            if echo "$INPUT" | grep -q ".claude/holdouts/"; then
+              echo '{"decision": "deny", "reason": "Implementer must not access holdouts directory"}'
               exit 1
             fi
             echo '{"decision": "allow"}'
@@ -21,6 +21,8 @@ hooks:
       hooks:
         - type: "command"
           command: |
+            # GdUnit4's dotnet test needs the Godot engine path.
+            export GODOT_BIN="${GODOT_BIN:-/opt/homebrew/bin/godot}"
             # Validate build was run and passed before reporting done
             dotnet build > /tmp/gtd-dotnet-build-$$.log 2>&1
             BUILD_EXIT=$?
