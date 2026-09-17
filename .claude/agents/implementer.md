@@ -9,13 +9,15 @@ hooks:
       hooks:
         - type: "command"
           command: |
-            # Block all access to holdouts directory (reads AND writes)
-            INPUT="$1"
+            # Block all access to holdouts directory (reads AND writes).
+            # Output uses hookSpecificOutput.permissionDecision (Claude Code v2+).
+            INPUT="${1:-}"
+            if [ ! -t 0 ]; then INPUT="$INPUT$(cat 2>/dev/null || true)"; fi
             if echo "$INPUT" | grep -q ".claude/holdouts/"; then
-              echo '{"decision": "deny", "reason": "Implementer must not access holdouts directory"}'
-              exit 1
+              printf '{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "Implementer must not access holdouts directory"}}\n'
+            else
+              printf '{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "allow"}}\n'
             fi
-            echo '{"decision": "allow"}'
   SubagentStop:
     - matcher: ""
       hooks:
