@@ -33,7 +33,7 @@ public static class GameConstants
     public const float CannonTowerFireRate = 2.5f;
     public const int CannonTowerDamage = 15;   // AoE damage
     public const int CannonTowerAoeRadius = 64; // 1 cell, in pixels
-    public const int CannonTowerCost = 15;
+    public const int CannonTowerCost = 10;
 
     // Swarm Enemy
     public const int SwarmEnemyHP = 3;

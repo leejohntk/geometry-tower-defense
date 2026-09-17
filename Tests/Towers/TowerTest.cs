@@ -32,7 +32,7 @@ public class TowerTest
         AssertThat(tower.RangeCells).IsEqual(4);
         AssertThat(tower.Damage).IsEqual(15);
         AssertThat(tower.FireRate).IsEqual(2.5f);
-        AssertThat(tower.Cost).IsEqual(15);
+        AssertThat(tower.Cost).IsEqual(10);
     }
 
     [TestCase]

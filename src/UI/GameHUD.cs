@@ -110,7 +110,7 @@ public partial class GameHUD : CanvasLayer
 
         // Place Arrow button
         _placeArrowButton = new Button();
-        _placeArrowButton.Text = "Place Arrow (10$)";
+        _placeArrowButton.Text = $"Place Arrow ({GameConstants.ArrowTowerCost}$)";
         _placeArrowButton.Position = new Vector2(sidebarCenterX - 80, 20);
         _placeArrowButton.Size = new Vector2(160, 40);
         _placeArrowButton.Disabled = true;
@@ -120,7 +120,7 @@ public partial class GameHUD : CanvasLayer
 
         // Place Cannon button (hidden for levels that don't allow it)
         _placeCannonButton = new Button();
-        _placeCannonButton.Text = "Place Cannon (15$)";
+        _placeCannonButton.Text = $"Place Cannon ({GameConstants.CannonTowerCost}$)";
         _placeCannonButton.Position = new Vector2(sidebarCenterX - 80, 70);
         _placeCannonButton.Size = new Vector2(160, 40);
         _placeCannonButton.Disabled = true;
