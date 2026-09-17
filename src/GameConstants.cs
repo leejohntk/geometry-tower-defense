@@ -46,6 +46,9 @@ public static class GameConstants
     // At 20px, adjacent members sit ~34.6px apart (clearing the 24px diameter with
     // ~10px of gap) and the central hole has ~8px of clear radius.
     public const float SwarmClusterRadius = 20f;
+    // Orbit speed of swarm members around their path anchor (radians/sec).
+    // At 2.5 rad/s each member completes a full revolution in ~2.5 seconds.
+    public const float SwarmClusterRotationSpeed = 2.5f;
     public const int SwarmCoinDropPerKill = 1;
 
     // Projectile

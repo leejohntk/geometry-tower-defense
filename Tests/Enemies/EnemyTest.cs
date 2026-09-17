@@ -81,7 +81,7 @@ public class EnemyTest
         var enemy = new Enemy();
         enemy.Configure(EnemyKind.Swarm);
         var offset = new Vector2(20, 0);
-        enemy.SetFormationOffset(offset);
+        enemy.SetFormationOffset(offset, 0f); // static offset: persistence only, no orbit
 
         var waypoints = new List<Vector2>
         {
@@ -116,7 +116,7 @@ public class EnemyTest
     {
         var enemy = new Enemy();
         enemy.Configure(EnemyKind.Swarm);
-        enemy.SetFormationOffset(new Vector2(20, 0));
+        enemy.SetFormationOffset(new Vector2(20, 0), 0f);
         enemy.SetPath(new List<Vector2> { new Vector2(32, 32), new Vector2(96, 32) });
 
         AssertThat(enemy.Position).IsEqual(new Vector2(52, 32));
@@ -129,5 +129,51 @@ public class EnemyTest
         enemy.Configure(EnemyKind.Basic);
         enemy.SetPath(new List<Vector2> { new Vector2(32, 32), new Vector2(96, 32) });
         AssertThat(enemy.Position).IsEqual(new Vector2(32, 32));
+    }
+
+    [TestCase]
+    public void SwarmFormation_OffsetRotatesOverTime()
+    {
+        var enemy = new Enemy();
+        enemy.Configure(EnemyKind.Swarm);
+        enemy.SetFormationOffset(new Vector2(20, 0), GameConstants.SwarmClusterRotationSpeed);
+        enemy.SetPath(new List<Vector2> { new Vector2(32, 32), new Vector2(96, 32) });
+
+        float angleBefore = Mathf.Atan2(enemy.FormationOffset.Y, enemy.FormationOffset.X);
+
+        // One process tick rotates the offset by SwarmClusterRotationSpeed * delta.
+        enemy._Process(0.1);
+
+        float angleAfter = Mathf.Atan2(enemy.FormationOffset.Y, enemy.FormationOffset.X);
+        AssertThat(angleAfter).IsNotEqual(angleBefore);
+        AssertThat(Mathf.Abs(angleAfter - angleBefore) > 0.01f).IsTrue();
+    }
+
+    [TestCase]
+    public void BasicEnemy_OffsetStaysZero_NoRotation()
+    {
+        var enemy = new Enemy();
+        enemy.Configure(EnemyKind.Basic);
+        enemy.SetFormationOffset(Vector2.Zero, 0f);
+        enemy.SetPath(new List<Vector2> { new Vector2(32, 32), new Vector2(96, 32) });
+
+        enemy._Process(0.1);
+        enemy._Process(0.1);
+
+        AssertThat(enemy.FormationOffset).IsEqual(Vector2.Zero);
+        AssertThat(enemy.FormationAngularSpeed).IsEqual(0f);
+    }
+
+    [TestCase]
+    public void ResetForPool_ClearsFormationAngularSpeed()
+    {
+        var enemy = new Enemy();
+        enemy.Configure(EnemyKind.Swarm);
+        enemy.SetFormationOffset(new Vector2(20, 0), GameConstants.SwarmClusterRotationSpeed);
+
+        AssertThat(enemy.FormationAngularSpeed).IsEqual(GameConstants.SwarmClusterRotationSpeed);
+
+        enemy.ResetForPool();
+        AssertThat(enemy.FormationAngularSpeed).IsEqual(0f);
     }
 }

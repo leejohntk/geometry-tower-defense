@@ -31,6 +31,7 @@ public partial class Enemy : Node2D
     // waypoint arrival snaps and stays constant for the entire path.
     private Vector2 _anchorPosition = Vector2.Zero;
     private Vector2 _formationOffset = Vector2.Zero;
+    private float _formationAngularSpeed = 0f;
     private float _currentHP;
     private float _maxHP;
     private float _speed;
@@ -67,6 +68,12 @@ public partial class Enemy : Node2D
     /// Zero for basic enemies; non-zero for swarm cluster members.
     /// </summary>
     public Vector2 FormationOffset => _formationOffset;
+
+    /// <summary>
+    /// Angular speed (radians/sec) at which FormationOffset orbits the anchor.
+    /// Zero for basic enemies; non-zero for swarm cluster members.
+    /// </summary>
+    public float FormationAngularSpeed => _formationAngularSpeed;
 
     public override void _Ready()
     {
@@ -147,12 +154,14 @@ public partial class Enemy : Node2D
     }
 
     /// <summary>
-    /// Sets the formation offset applied to this enemy relative to its path anchor.
+    /// Sets the formation offset applied to this enemy relative to its path anchor,
+    /// plus the angular speed at which that offset orbits the anchor.
     /// Set before SetPath so the initial anchor placement already includes the offset.
     /// </summary>
-    public void SetFormationOffset(Vector2 offset)
+    public void SetFormationOffset(Vector2 offset, float angularSpeed)
     {
         _formationOffset = offset;
+        _formationAngularSpeed = angularSpeed;
 
         // If a path is already active, keep Position consistent with the new offset.
         if (_waypoints.Count > 0)
@@ -194,6 +203,13 @@ public partial class Enemy : Node2D
         }
 
         Vector2 target = _waypoints[_currentWaypointIndex];
+
+        // Rotate the formation offset so swarm members orbit their anchor like
+        // electrons around an atom. Basic enemies have zero angular speed, so the
+        // offset (always zero for them) never changes.
+        if (_formationAngularSpeed != 0f)
+            _formationOffset = _formationOffset.Rotated(_formationAngularSpeed * delta);
+
         Vector2 toTarget = target - _anchorPosition;
         float distanceToWaypoint = toTarget.Length();
         float moveDistance = _speed * GameConstants.CellSize * delta;
@@ -231,6 +247,7 @@ public partial class Enemy : Node2D
         // Clear formation state so a pooled swarm member can't leak its offset
         // into a later basic-enemy reuse.
         _formationOffset = Vector2.Zero;
+        _formationAngularSpeed = 0f;
         _anchorPosition = Vector2.Zero;
         _currentHP = _maxHP > 0 ? _maxHP : GameConstants.EnemyHP;
         _isDead = false;

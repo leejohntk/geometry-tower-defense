@@ -186,7 +186,11 @@ public partial class WaveManager : Node
 
         // Set the formation offset before the spawn signal: GameManager.OnEnemySpawned
         // calls SetPath inside the handler, which places the enemy at anchor + offset.
-        enemy.SetFormationOffset(offset);
+        // Swarm members orbit their anchor; basic enemies stay fixed (zero angular speed).
+        float angularSpeed = kind == EnemyKind.Swarm
+            ? GameConstants.SwarmClusterRotationSpeed
+            : 0f;
+        enemy.SetFormationOffset(offset, angularSpeed);
 
         _enemiesAliveThisWave++;
 
