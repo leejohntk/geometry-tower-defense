@@ -1,3 +1,5 @@
+using Godot;
+
 namespace GeometryTowerDefense;
 
 /// <summary>
@@ -49,6 +51,14 @@ public static class GameConstants
     // Projectile
     public const float ProjectileSpeed = 8f;
     public const int ProjectileSize = 12;
+
+    // Cannon Explosion Effect — brief expanding circle at the projectile impact point.
+    // The visual expands to exactly CannonTowerAoeRadius so the player sees the true
+    // damage extent; GameManager drives both the damage and the visual from the same constant.
+    public const float CannonExplosionDuration = 0.4f;      // seconds
+    public const float CannonExplosionStrokeWidth = 2.0f;   // outline ring width, pixels
+    public static readonly Color CannonExplosionFillColor = new Color(0.3f, 0.6f, 0.4f);    // matches cannon range color
+    public static readonly Color CannonExplosionOutlineColor = new Color(0.1f, 0.25f, 0.15f); // matches cannon tower outline
 
     // Waves
     public const int TotalWaves = 5;

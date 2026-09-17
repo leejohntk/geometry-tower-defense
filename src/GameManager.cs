@@ -38,11 +38,13 @@ public partial class GameManager : Node2D
     private readonly List<Enemy> _activeEnemies = new();
     private readonly List<Tower> _activeTowers = new();
     private readonly List<Projectile> _activeProjectiles = new();
+    private readonly List<ExplosionEffect> _activeExplosionEffects = new();
 
     // Object pools
     private ObjectPool<Enemy>? _enemyPool;
     private ObjectPool<ArrowProjectile>? _arrowProjectilePool;
     private ObjectPool<CannonProjectile>? _cannonProjectilePool;
+    private ObjectPool<ExplosionEffect>? _explosionEffectPool;
 
     // Cached list for collision detection (avoids per-frame allocation)
     private readonly List<(Projectile, Enemy)> _projectileCollisionPairs = new();
@@ -179,6 +181,9 @@ public partial class GameManager : Node2D
         // Separate pools for arrow and cannon projectiles.
         _arrowProjectilePool = new ObjectPool<ArrowProjectile>(8, this);
         _cannonProjectilePool = new ObjectPool<CannonProjectile>(8, this);
+
+        // Explosion effects are spawned per cannonball impact.
+        _explosionEffectPool = new ObjectPool<ExplosionEffect>(8, this);
     }
 
     public override void _Process(double delta)
@@ -383,8 +388,9 @@ public partial class GameManager : Node2D
     }
 
     /// <summary>
-    /// Applies cannonball AoE damage. Uses a snapshot to avoid modifying the active
-    /// enemy list while iterating it (TakeDamage emits Destroyed, which mutates the list).
+    /// Applies cannonball AoE damage and spawns the explosion visual at the same impact point.
+    /// Uses a snapshot to avoid modifying the active enemy list while iterating it
+    /// (TakeDamage emits Destroyed, which mutates the list).
     /// </summary>
     private void OnCannonExploded(CannonProjectile projectile, Vector2 impactPosition)
     {
@@ -402,6 +408,28 @@ public partial class GameManager : Node2D
             if (!enemy.IsDead)
                 enemy.TakeDamage(projectile.ExplosionDamage);
         }
+
+        SpawnExplosionEffect(impactPosition, radius);
+    }
+
+    /// <summary>
+    /// Spawns a pooled explosion effect at the impact point, sized to the cannon's AoE radius.
+    /// The same radius value drives both the damage loop above and this visual, so the shown
+    /// extent can never drift from the real damage extent.
+    /// </summary>
+    private void SpawnExplosionEffect(Vector2 impactPosition, float radius)
+    {
+        var effect = _explosionEffectPool!.Acquire();
+        effect.Finished += OnExplosionEffectFinished;
+        _activeExplosionEffects.Add(effect);
+        effect.Play(impactPosition, radius);
+    }
+
+    private void OnExplosionEffectFinished(ExplosionEffect effect)
+    {
+        _activeExplosionEffects.Remove(effect);
+        effect.Finished -= OnExplosionEffectFinished;
+        _explosionEffectPool?.Release(effect);
     }
 
     private void ReleaseProjectile(Projectile projectile)
@@ -515,6 +543,17 @@ public partial class GameManager : Node2D
             }
         }
         _activeProjectiles.Clear();
+
+        // Release in-flight explosion effects back to pool (pools persist across restarts)
+        foreach (var effect in _activeExplosionEffects)
+        {
+            if (IsInstanceValid(effect))
+            {
+                effect.Finished -= OnExplosionEffectFinished;
+                _explosionEffectPool?.Release(effect);
+            }
+        }
+        _activeExplosionEffects.Clear();
 
         // Free towers (not pooled)
         foreach (var tower in _activeTowers)
