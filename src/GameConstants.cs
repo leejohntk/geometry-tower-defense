@@ -63,9 +63,6 @@ public static class GameConstants
     public static readonly Color CannonExplosionFillColor = new Color(0.3f, 0.6f, 0.4f);    // matches cannon range color
     public static readonly Color CannonExplosionOutlineColor = new Color(0.1f, 0.25f, 0.15f); // matches cannon tower outline
 
-    // Waves
-    public const int TotalWaves = 5;
-
     // World pixel dimensions
     public static int PlayAreaWidth => GridCols * CellSize;
     public static int PlayAreaHeight => GridRows * CellSize;

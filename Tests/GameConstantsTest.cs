@@ -54,12 +54,6 @@ public class GameConstantsTest
     }
 
     [TestCase]
-    public void WaveConstants_AreCorrect()
-    {
-        AssertThat(GameConstants.TotalWaves).IsEqual(5);
-    }
-
-    [TestCase]
     public void CellCenterX_CalculatesCorrectly()
     {
         int half = GameConstants.CellSize / 2;

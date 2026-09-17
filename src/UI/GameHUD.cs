@@ -22,6 +22,7 @@ public partial class GameHUD : CanvasLayer
     private Button? _placeCannonButton;
     private GameManager? _gameManager;
     private bool _allowCannon = false;
+    private int _totalWaves = 0;
 
     public override void _Ready()
     {
@@ -145,6 +146,7 @@ public partial class GameHUD : CanvasLayer
     public void ConfigureForLevel(LevelDefinition level)
     {
         _allowCannon = level.AllowCannonTower;
+        _totalWaves = level.Waves.Count;
         if (_placeCannonButton != null)
             _placeCannonButton.Visible = _allowCannon;
     }
@@ -200,8 +202,7 @@ public partial class GameHUD : CanvasLayer
     {
         if (_waveLabel != null)
         {
-            int totalWaves = _gameManager?.Level?.Waves.Count ?? GameConstants.TotalWaves;
-            _waveLabel.Text = $"{waveNumber}/{totalWaves}";
+            _waveLabel.Text = $"{waveNumber}/{_totalWaves}";
         }
     }
 
