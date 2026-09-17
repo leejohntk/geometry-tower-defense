@@ -32,24 +32,28 @@ public partial class GameManager : Node2D
     // Core subsystems
     private GridManager? _gridManager;
     private WaveManager? _waveManager;
+    private LevelDefinition? _level;
 
     // Active game objects
     private readonly List<Enemy> _activeEnemies = new();
-    private readonly List<ArrowTower> _activeTowers = new();
+    private readonly List<Tower> _activeTowers = new();
     private readonly List<Projectile> _activeProjectiles = new();
 
     // Object pools
     private ObjectPool<Enemy>? _enemyPool;
-    private ObjectPool<Projectile>? _projectilePool;
+    private ObjectPool<ArrowProjectile>? _arrowProjectilePool;
+    private ObjectPool<CannonProjectile>? _cannonProjectilePool;
 
     // Cached list for collision detection (avoids per-frame allocation)
     private readonly List<(Projectile, Enemy)> _projectileCollisionPairs = new();
+
+    // Cached snapshot for AoE explosion damage (avoids collection-modified exceptions)
+    private readonly List<Enemy> _aoeSnapshot = new();
 
     // Player state
     private int _hp;
     private int _coins;
     private GameState _state = GameState.Playing;
-    private bool _isPlacingTower = false;
 
     // Guard against double initialization
     private bool _initialized = false;
@@ -91,13 +95,19 @@ public partial class GameManager : Node2D
     public GridManager? Grid => _gridManager;
 
     /// <summary>
+    /// The active level definition.
+    /// </summary>
+    public LevelDefinition? Level => _level;
+
+    /// <summary>
+    /// The tower type currently selected for placement (null = not placing).
+    /// </summary>
+    public TowerType? PlacingTowerType { get; set; } = null;
+
+    /// <summary>
     /// Whether the player is in tower placement mode.
     /// </summary>
-    public bool IsPlacingTower
-    {
-        get => _isPlacingTower;
-        set => _isPlacingTower = value;
-    }
+    public bool IsPlacingTower => PlacingTowerType.HasValue;
 
     /// <summary>
     /// Number of active (alive) enemies.
@@ -107,22 +117,24 @@ public partial class GameManager : Node2D
     /// <summary>
     /// Returns active towers as a read-only list (no allocation).
     /// </summary>
-    public System.Collections.Generic.IReadOnlyList<ArrowTower> GetActiveTowers() => _activeTowers;
+    public System.Collections.Generic.IReadOnlyList<Tower> GetActiveTowers() => _activeTowers;
 
     /// <summary>
-    /// Called by Main to initialize a new game.
+    /// Called by Main to initialize a new game for the given level.
     /// Safe to call multiple times — second call returns early if already initialized.
     /// </summary>
-    public void Initialize()
+    public void Initialize(LevelDefinition level)
     {
         if (_initialized)
             return;
 
         _initialized = true;
+        _level = level;
 
         _hp = GameConstants.StartingHP;
         _coins = GameConstants.StartingCoins;
         _state = GameState.Playing;
+        PlacingTowerType = null;
 
         // Create object pools once (persist across game restarts)
         if (!_poolsCreated)
@@ -133,11 +145,13 @@ public partial class GameManager : Node2D
 
         // Create grid
         _gridManager = new GridManager();
+        _gridManager.Configure(level);
         AddChild(_gridManager);
 
         // Create wave manager
         _waveManager = new WaveManager();
         _waveManager.SetEnemyPool(_enemyPool!);
+        _waveManager.SetLevel(level);
         AddChild(_waveManager);
         _waveManager.InitTimer();
 
@@ -159,11 +173,12 @@ public partial class GameManager : Node2D
     /// </summary>
     private void InitializePools()
     {
-        // Pre-allocate 24 enemies (enough for all waves: max wave is 12)
+        // Enough enemies for Level 2's largest wave (15) plus a buffer.
         _enemyPool = new ObjectPool<Enemy>(24, this);
 
-        // Pre-allocate 8 projectiles (enough for concurrent flying arrows)
-        _projectilePool = new ObjectPool<Projectile>(8, this);
+        // Separate pools for arrow and cannon projectiles.
+        _arrowProjectilePool = new ObjectPool<ArrowProjectile>(8, this);
+        _cannonProjectilePool = new ObjectPool<CannonProjectile>(8, this);
     }
 
     public override void _Process(double delta)
@@ -182,18 +197,17 @@ public partial class GameManager : Node2D
     }
 
     /// <summary>
-    /// Each tower targets the nearest enemy within range.
+    /// Each tower targets the nearest enemy within its own range.
     /// </summary>
     private void UpdateTowerTargeting()
     {
-        float rangePixels = GameConstants.CellDistanceInPixels(GameConstants.ArrowTowerRange);
-        float rangeSq = rangePixels * rangePixels;
-
         foreach (var tower in _activeTowers)
         {
             Enemy? nearest = null;
             float nearestDistSq = float.MaxValue;
             Vector2 towerPos = tower.Position;
+            float rangePixels = tower.RangePixels;
+            float rangeSq = rangePixels * rangePixels;
 
             foreach (var enemy in _activeEnemies)
             {
@@ -212,7 +226,7 @@ public partial class GameManager : Node2D
     }
 
     /// <summary>
-    /// Towers fire at their current target.
+    /// Towers fire at their current target, spawning the appropriate projectile type.
     /// </summary>
     private void UpdateTowerFiring()
     {
@@ -223,8 +237,18 @@ public partial class GameManager : Node2D
 
             if (tower.TryFire(tower.CurrentTarget, out Vector2 targetPos))
             {
-                // Acquire projectile from pool
-                var projectile = _projectilePool!.Acquire();
+                Projectile projectile;
+                if (tower is CannonTower)
+                {
+                    var cannon = _cannonProjectilePool!.Acquire();
+                    cannon.Exploded += OnCannonExploded;
+                    projectile = cannon;
+                }
+                else
+                {
+                    projectile = _arrowProjectilePool!.Acquire();
+                }
+
                 projectile.Initialize(tower, targetPos, tower.CurrentTarget);
                 projectile.EnemyHit += OnProjectileHitEnemy;
                 projectile.Dissipated += OnProjectileDissipated;
@@ -324,7 +348,7 @@ public partial class GameManager : Node2D
         enemy.ReachedEnd -= OnEnemyReachedEnd;
         enemy.Destroyed -= OnEnemyDestroyed;
 
-        _coins += GameConstants.CoinDropPerKill;
+        _coins += enemy.CoinDrop;
 
         EmitSignal(SignalName.CoinsChanged, _coins);
         EmitSignal(SignalName.TowerPlacementStateChanged, _coins >= GameConstants.ArrowTowerCost);
@@ -346,8 +370,7 @@ public partial class GameManager : Node2D
 
         // Damage is already applied synchronously in Projectile.HitEnemy.
         // This handler only manages lifecycle (pool release, list cleanup).
-
-        _projectilePool?.Release(projectile);
+        ReleaseProjectile(projectile);
     }
 
     private void OnProjectileDissipated(Projectile projectile)
@@ -356,7 +379,42 @@ public partial class GameManager : Node2D
         projectile.EnemyHit -= OnProjectileHitEnemy;
         projectile.Dissipated -= OnProjectileDissipated;
 
-        _projectilePool?.Release(projectile);
+        ReleaseProjectile(projectile);
+    }
+
+    /// <summary>
+    /// Applies cannonball AoE damage. Uses a snapshot to avoid modifying the active
+    /// enemy list while iterating it (TakeDamage emits Destroyed, which mutates the list).
+    /// </summary>
+    private void OnCannonExploded(CannonProjectile projectile, Vector2 impactPosition)
+    {
+        _aoeSnapshot.Clear();
+
+        float radius = projectile.ExplosionRadius;
+        foreach (var enemy in _activeEnemies)
+        {
+            if (!enemy.IsDead && CannonProjectile.IsWithinRadius(impactPosition, radius, enemy.Position))
+                _aoeSnapshot.Add(enemy);
+        }
+
+        foreach (var enemy in _aoeSnapshot)
+        {
+            if (!enemy.IsDead)
+                enemy.TakeDamage(projectile.ExplosionDamage);
+        }
+    }
+
+    private void ReleaseProjectile(Projectile projectile)
+    {
+        if (projectile is CannonProjectile cannon)
+        {
+            cannon.Exploded -= OnCannonExploded;
+            _cannonProjectilePool?.Release(cannon);
+        }
+        else if (projectile is ArrowProjectile arrow)
+        {
+            _arrowProjectilePool?.Release(arrow);
+        }
     }
 
     // === Wave lifecycle ===
@@ -391,7 +449,7 @@ public partial class GameManager : Node2D
     // === Tower placement ===
 
     /// <summary>
-    /// Place a tower at the specified grid position.
+    /// Place a tower of the currently selected type at the specified grid position.
     /// Returns true if placement succeeded.
     /// </summary>
     public bool PlaceTower(int row, int col)
@@ -399,14 +457,20 @@ public partial class GameManager : Node2D
         if (_state != GameState.Playing)
             return false;
 
-        if (_coins < GameConstants.ArrowTowerCost)
+        if (PlacingTowerType == null)
+            return false;
+
+        var type = PlacingTowerType.Value;
+        int cost = GameConstants.TowerCost(type);
+
+        if (_coins < cost)
             return false;
 
         if (_gridManager == null || !_gridManager.CanPlaceTower(row, col))
             return false;
 
         // Deduct coins
-        _coins -= GameConstants.ArrowTowerCost;
+        _coins -= cost;
         EmitSignal(SignalName.CoinsChanged, _coins);
         EmitSignal(SignalName.TowerPlacementStateChanged, _coins >= GameConstants.ArrowTowerCost);
 
@@ -414,7 +478,7 @@ public partial class GameManager : Node2D
         _gridManager.PlaceTower(row, col);
 
         // Create tower
-        var tower = new ArrowTower();
+        Tower tower = type == TowerType.Cannon ? new CannonTower() : new ArrowTower();
         tower.Initialize(row, col);
         _activeTowers.Add(tower);
         AddChild(tower);
@@ -447,7 +511,7 @@ public partial class GameManager : Node2D
             {
                 projectile.EnemyHit -= OnProjectileHitEnemy;
                 projectile.Dissipated -= OnProjectileDissipated;
-                _projectilePool?.Release(projectile);
+                ReleaseProjectile(projectile);
             }
         }
         _activeProjectiles.Clear();
@@ -474,6 +538,8 @@ public partial class GameManager : Node2D
         }
 
         _state = GameState.Playing;
+        _level = null;
+        PlacingTowerType = null;
         _initialized = false;
         // Do NOT call Initialize() — Main.StartNewGame() is the sole caller
     }

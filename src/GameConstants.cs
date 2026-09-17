@@ -28,12 +28,26 @@ public static class GameConstants
     public const int ArrowTowerDamage = 10;
     public const int ArrowTowerCost = 10;
 
+    // Cannon Tower
+    public const int CannonTowerRange = 4;
+    public const float CannonTowerFireRate = 2.5f;
+    public const int CannonTowerDamage = 15;   // AoE damage
+    public const int CannonTowerAoeRadius = 64; // 1 cell, in pixels
+    public const int CannonTowerCost = 15;
+
+    // Swarm Enemy
+    public const int SwarmEnemyHP = 3;
+    public const int SwarmEnemyDiameter = 24;
+    public const float SwarmEnemySpeed = 2f;
+    public const int SwarmClusterSize = 3;
+    public const float SwarmClusterSpacing = 16f;
+    public const int SwarmCoinDropPerKill = 1;
+
     // Projectile
     public const float ProjectileSpeed = 8f;
     public const int ProjectileSize = 12;
 
     // Waves
-    public static readonly int[] WaveEnemyCounts = { 3, 5, 7, 9, 12 };
     public const int TotalWaves = 5;
 
     // World pixel dimensions
@@ -53,4 +67,11 @@ public static class GameConstants
     public static float CellCenterX(int col) => col * CellSize + CellSize / 2f;
     public static float CellCenterY(int row) => row * CellSize + CellSize / 2f;
     public static float CellDistanceInPixels(float cells) => cells * CellSize;
+
+    // Tower type lookups (used by placement preview and UI before a tower instance exists)
+    public static int TowerCost(TowerType type) =>
+        type == TowerType.Cannon ? CannonTowerCost : ArrowTowerCost;
+
+    public static int TowerRange(TowerType type) =>
+        type == TowerType.Cannon ? CannonTowerRange : ArrowTowerRange;
 }

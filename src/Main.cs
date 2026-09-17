@@ -3,7 +3,7 @@ using Godot;
 namespace GeometryTowerDefense;
 
 /// <summary>
-/// Main game controller. Manages scene flow: title -> game -> game over / victory -> title.
+/// Main game controller. Manages scene flow: title -> level select -> game -> game over / victory -> title.
 /// </summary>
 public partial class Main : Node2D
 {
@@ -13,13 +13,14 @@ public partial class Main : Node2D
     private ResultScreen? _gameOverScreen;
     private ResultScreen? _victoryScreen;
     private bool _gameRunning = false;
-    private ArrowTower? _selectedTower = null;
+    private Tower? _selectedTower = null;
+    private LevelDefinition? _selectedLevel = null;
 
     public override void _Ready()
     {
         // Create title screen
         _titleScreen = new TitleScreen();
-        _titleScreen.StartGame += OnStartGame;
+        _titleScreen.LevelSelected += OnLevelSelected;
         AddChild(_titleScreen);
 
         // Create game manager (hidden initially)
@@ -63,13 +64,17 @@ public partial class Main : Node2D
         AddChild(_victoryScreen);
     }
 
-    private void OnStartGame()
+    private void OnLevelSelected(int levelId)
     {
+        _selectedLevel = Levels.Get(levelId);
         StartNewGame();
     }
 
     private void StartNewGame()
     {
+        if (_selectedLevel == null)
+            return;
+
         // Hide title
         if (_titleScreen != null)
             _titleScreen.Visible = false;
@@ -84,11 +89,12 @@ public partial class Main : Node2D
             if (_gameHUD != null)
             {
                 _gameHUD.Visible = true;
+                _gameHUD.ConfigureForLevel(_selectedLevel);
                 _gameHUD.ConnectToGameManager(_gameManager);
                 _gameHUD.SetStartWaveEnabled(true);
             }
 
-            _gameManager.Initialize();
+            _gameManager.Initialize(_selectedLevel);
 
             _gameRunning = true;
         }
@@ -111,6 +117,13 @@ public partial class Main : Node2D
     {
         if (_gameHUD == null || _gameManager == null)
             return;
+
+        // Disabled outside of active play (game over / victory).
+        if (_gameManager.State != GameState.Playing)
+        {
+            _gameHUD.SetStartWaveEnabled(false);
+            return;
+        }
 
         // Disabled during tower placement mode
         if (_gameManager.IsPlacingTower)
@@ -135,23 +148,24 @@ public partial class Main : Node2D
         }
     }
 
-    private void OnPlaceTowerPressed()
+    private void OnPlaceTowerPressed(int towerType)
     {
         if (!_gameRunning || _gameManager == null) return;
 
-        if (_gameManager.IsPlacingTower)
+        var type = (TowerType)towerType;
+
+        if (_gameManager.PlacingTowerType == type)
         {
             // Cancel placement
-            _gameManager.IsPlacingTower = false;
+            _gameManager.PlacingTowerType = null;
             _gameManager.Grid?.HidePlacementPreview();
             UpdateStartWaveButtonState();
-            // Reset cursor
             Input.SetDefaultCursorShape(Input.CursorShape.Arrow);
         }
         else
         {
-            // Enter placement mode
-            _gameManager.IsPlacingTower = true;
+            // Enter placement mode for the requested type
+            _gameManager.PlacingTowerType = type;
             _gameHUD?.SetStartWaveEnabled(false); // Disable wave start during placement
             Input.SetDefaultCursorShape(Input.CursorShape.Cross);
 
@@ -209,6 +223,7 @@ public partial class Main : Node2D
 
         _gameRunning = false;
         _selectedTower = null;
+        _selectedLevel = null;
     }
 
     public override void _Input(InputEvent @event)
@@ -237,7 +252,7 @@ public partial class Main : Node2D
                 rightClick.ButtonIndex == MouseButton.Right &&
                 rightClick.Pressed)
             {
-                _gameManager.IsPlacingTower = false;
+                _gameManager.PlacingTowerType = null;
                 _gameManager.Grid?.HidePlacementPreview();
                 Input.SetDefaultCursorShape(Input.CursorShape.Arrow);
                 UpdateStartWaveButtonState();
@@ -252,7 +267,7 @@ public partial class Main : Node2D
             click.Pressed)
         {
             // Find which tower (if any) was clicked
-            ArrowTower? clickedTower = null;
+            Tower? clickedTower = null;
             foreach (var tower in _gameManager.GetActiveTowers())
             {
                 float towerSize = GameConstants.CellSize;
@@ -298,7 +313,13 @@ public partial class Main : Node2D
     /// </summary>
     private void UpdateTowerPlacementPreview(Vector2 mousePos)
     {
-        if (_gameManager?.Grid == null) return;
+        if (_gameManager?.Grid == null)
+            return;
+
+        if (_gameManager.PlacingTowerType == null)
+            return;
+
+        var type = _gameManager.PlacingTowerType.Value;
 
         Vector2I gridPos = _gameManager.Grid.PixelToGrid(mousePos);
         int row = gridPos.Y;
@@ -306,9 +327,9 @@ public partial class Main : Node2D
 
         if (_gameManager.Grid.IsInBounds(row, col))
         {
-            bool enoughCoins = _gameManager.Coins >= GameConstants.ArrowTowerCost;
+            bool enoughCoins = _gameManager.Coins >= GameConstants.TowerCost(type);
             bool canPlace = enoughCoins && _gameManager.Grid.CanPlaceTower(row, col);
-            _gameManager.Grid.ShowPlacementPreview(row, col, canPlace);
+            _gameManager.Grid.ShowPlacementPreview(row, col, canPlace, type);
         }
         else
         {
@@ -318,7 +339,8 @@ public partial class Main : Node2D
 
     private void TryPlaceTowerAtMouse(Vector2 mousePos)
     {
-        if (_gameManager?.Grid == null) return;
+        if (_gameManager?.Grid == null)
+            return;
 
         Vector2I gridPos = _gameManager.Grid.PixelToGrid(mousePos);
 
@@ -329,11 +351,12 @@ public partial class Main : Node2D
             // Hide preview momentarily — next mouse motion will re-show
             _gameManager.Grid.HidePlacementPreview();
 
-            // Stay in placement mode - player can place multiple towers
-            // Re-check if we can still place (might have run out of coins)
-            if (_gameManager.Coins < GameConstants.ArrowTowerCost)
+            // Stay in placement mode - player can place multiple towers.
+            // Re-check if we can still afford the selected type.
+            var type = _gameManager.PlacingTowerType;
+            if (type != null && _gameManager.Coins < GameConstants.TowerCost(type.Value))
             {
-                _gameManager.IsPlacingTower = false;
+                _gameManager.PlacingTowerType = null;
                 Input.SetDefaultCursorShape(Input.CursorShape.Arrow);
                 UpdateStartWaveButtonState();
             }

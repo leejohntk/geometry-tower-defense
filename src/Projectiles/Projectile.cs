@@ -3,14 +3,13 @@ using Godot;
 namespace GeometryTowerDefense;
 
 /// <summary>
-/// Arrow projectile that travels in a straight line.
-/// Hits the first enemy encountered on its trajectory.
-/// Dissipates on hit or at max range (4 cells).
-/// Arrow never changes direction. One hit per arrow. No piercing.
+/// Base class for all projectiles. Handles straight-line movement, max range,
+/// collision detection, and the synchronous hit lifecycle. Variants supply damage
+/// application and visuals.
 /// </summary>
-public partial class Projectile : Node2D
+public abstract partial class Projectile : Node2D
 {
-    // Signal emitted when projectile hits an enemy
+    // Signal emitted when projectile hits an enemy (lifecycle management)
     [Signal]
     public delegate void EnemyHitEventHandler(Projectile projectile, Enemy enemy);
 
@@ -18,16 +17,17 @@ public partial class Projectile : Node2D
     [Signal]
     public delegate void DissipatedEventHandler(Projectile projectile);
 
-    private Vector2 _direction = Vector2.Zero;
-    private float _distanceTraveled = 0f;
-    private float _maxRangePixels;
-    private float _speed;
+    protected Vector2 _direction = Vector2.Zero;
+    protected float _distanceTraveled = 0f;
+    protected float _maxRangePixels;
+    protected float _speed;
+    protected int _damage;
     private bool _hasHit = false;
 
     /// <summary>
     /// The tower that fired this projectile.
     /// </summary>
-    public ArrowTower? SourceTower { get; private set; }
+    public Tower? SourceTower { get; private set; }
 
     /// <summary>
     /// The original intended target of this projectile.
@@ -41,9 +41,106 @@ public partial class Projectile : Node2D
 
     public override void _Ready()
     {
-        _maxRangePixels = GameConstants.CellDistanceInPixels(GameConstants.ArrowTowerRange);
+        BuildVisual();
+    }
+
+    /// <summary>
+    /// Build this projectile's visual representation. Called once from _Ready.
+    /// </summary>
+    protected abstract void BuildVisual();
+
+    /// <summary>
+    /// Apply damage/side-effects on first contact with a live enemy.
+    /// </summary>
+    protected abstract void OnHit(Enemy enemy);
+
+    /// <summary>
+    /// Initialize the projectile with source, direction, and intended target.
+    /// Safe to call multiple times (for pool reuse) — resets all per-shot state.
+    /// </summary>
+    public void Initialize(Tower tower, Vector2 targetPosition, Enemy target)
+    {
+        _hasHit = false;
+        _distanceTraveled = 0f;
+        SourceTower = tower;
+        IntendedTarget = target;
+
+        _damage = tower.Damage;
+        _maxRangePixels = tower.RangePixels;
         _speed = GameConstants.ProjectileSpeed * GameConstants.CellSize;
 
+        Position = tower.Position;
+        _direction = (targetPosition - tower.Position).Normalized();
+
+        // Rotate to face direction
+        float angle = Mathf.Atan2(_direction.Y, _direction.X);
+        Rotation = angle;
+    }
+
+    public override void _Process(double delta)
+    {
+        if (_hasHit)
+            return;
+
+        float moveDistance = _speed * (float)delta;
+        Position += _direction * moveDistance;
+        _distanceTraveled += moveDistance;
+
+        if (_distanceTraveled >= _maxRangePixels)
+        {
+            _hasHit = true;
+            EmitSignal(SignalName.Dissipated, this);
+            // GameManager.OnProjectileDissipated handles pool release
+        }
+    }
+
+    /// <summary>
+    /// Called by GameManager when this projectile collides with an enemy.
+    /// Applies damage synchronously, then emits EnemyHit for lifecycle management.
+    ///
+    /// If the enemy is already dead (from another projectile hitting it first this frame),
+    /// returns immediately without consuming this projectile, so it continues flying past.
+    /// </summary>
+    public void HitEnemy(Enemy enemy)
+    {
+        if (_hasHit)
+            return;
+
+        // If the enemy is already dead (from another projectile this frame),
+        // don't consume this projectile — let it fly past and dissipate naturally.
+        if (enemy.IsDead)
+            return;
+
+        _hasHit = true;
+
+        // Apply damage/side-effects synchronously — do not rely on signal timing.
+        OnHit(enemy);
+
+        // Signal for lifecycle management (pool release, list cleanup).
+        EmitSignal(SignalName.EnemyHit, this, enemy);
+    }
+
+    /// <summary>
+    /// Returns true if the projectile's bounding circle overlaps with an enemy's bounding circle.
+    /// </summary>
+    public bool CheckCollision(Enemy enemy)
+    {
+        if (_hasHit || enemy.IsDead)
+            return false;
+
+        float collisionRadius = GameConstants.ProjectileSize / 2f + enemy.CollisionRadius;
+        return Position.DistanceSquaredTo(enemy.Position) <= collisionRadius * collisionRadius;
+    }
+}
+
+/// <summary>
+/// Arrow projectile: small yellow triangle that hits the first enemy on its trajectory.
+/// Deals single-target damage. No piercing.
+/// </summary>
+public partial class ArrowProjectile : Projectile
+{
+    protected override void BuildVisual()
+    {
         // Draw the projectile as a small yellow triangle
         var arrowPoints = new Vector2[]
         {
@@ -69,83 +166,11 @@ public partial class Projectile : Node2D
         arrow.AddChild(outline);
     }
 
-    /// <summary>
-    /// Initialize the projectile with source, direction, and intended target.
-    /// Safe to call multiple times (for pool reuse) — resets all per-shot state.
-    /// </summary>
-    public void Initialize(ArrowTower tower, Vector2 targetPosition, Enemy target)
+    protected override void OnHit(Enemy enemy)
     {
-        _hasHit = false;
-        _distanceTraveled = 0f;
-        SourceTower = tower;
-        IntendedTarget = target;
-
-        Position = tower.Position;
-        _direction = (targetPosition - tower.Position).Normalized();
-
-        // Rotate arrow to face direction
-        float angle = Mathf.Atan2(_direction.Y, _direction.X);
-        Rotation = angle;
-    }
-
-    public override void _Process(double delta)
-    {
-        if (_hasHit)
-            return;
-
-        float moveDistance = _speed * (float)delta;
-        Position += _direction * moveDistance;
-        _distanceTraveled += moveDistance;
-
-        if (_distanceTraveled >= _maxRangePixels)
-        {
-            _hasHit = true;
-            EmitSignal(SignalName.Dissipated, this);
-            // GameManager.OnProjectileDissipated handles pool release
-        }
-    }
-
-    /// <summary>
-    /// Called by GameManager when this projectile hits an enemy.
-    /// Applies damage synchronously, then emits the signal for lifecycle management.
-    /// Damage is applied here (not in the signal handler) to avoid a race condition
-    /// where two projectiles hitting the same enemy in one frame could both deal
-    /// damage if signal delivery is deferred or batched.
-    ///
-    /// If the enemy is already dead (from another projectile hitting it first this frame),
-    /// returns immediately without consuming this projectile, so it continues flying past.
-    /// </summary>
-    public void HitEnemy(Enemy enemy)
-    {
-        if (_hasHit)
-            return;
-
-        // If the enemy is already dead (from another projectile this frame),
-        // don't consume this projectile — let it fly past and dissipate naturally.
-        if (enemy.IsDead)
-            return;
-
-        _hasHit = true;
-
-        // Apply damage synchronously — do not rely on signal timing.
-        // This ensures that when two projectiles hit the same enemy in one frame,
-        // the second hit correctly sees the enemy as dead.
-        enemy.TakeDamage(GameConstants.ArrowTowerDamage);
-
-        // Signal for lifecycle management (pool release, list cleanup).
-        EmitSignal(SignalName.EnemyHit, this, enemy);
-    }
-
-    /// <summary>
-    /// Returns true if the projectile's bounding circle overlaps with an enemy's bounding circle.
-    /// Uses correct radius: ProjectileSize/2 + EnemyDiameter/2.
-    /// </summary>
-    public bool CheckCollision(Enemy enemy)
-    {
-        if (_hasHit || enemy.IsDead)
-            return false;
-
-        float collisionRadius = GameConstants.ProjectileSize / 2f + GameConstants.EnemyDiameter / 2f;
-        return Position.DistanceSquaredTo(enemy.Position) <= collisionRadius * collisionRadius;
+        // Apply single-target damage synchronously. This ensures that when two
+        // projectiles hit the same enemy in one frame, the second hit correctly
+        // sees the enemy as dead (via HitEnemy's IsDead guard).
+        enemy.TakeDamage(_damage);
     }
 }
