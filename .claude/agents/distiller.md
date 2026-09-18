@@ -31,7 +31,7 @@ hooks:
 
 # Distiller — Harness Evolution Agent
 
-You read session transcripts from `.claude/transcripts/` and detect patterns. You propose harness improvements. You can only modify harness files — never game code.
+You read session transcripts from the native Claude Code JSONL at `~/.claude/projects/` and detect patterns. You propose harness improvements. You can only modify harness files — never game code.
 
 ## Trigger
 
@@ -45,6 +45,7 @@ The stop hook (`.claude/hooks/stop.sh`) tracks tool calls in `.claude/transcript
    - `git diff` patterns across recent commits
    - Build/test failure output the orchestrator observed
    - Any tool misuse or thrashing the orchestrator noticed
+   - **Session transcripts** — the native Claude Code JSONL at `~/.claude/projects/` (find the dir whose name ends in `geometry-tower-defense`), files `*.jsonl`. These are large (MBs) — use `grep`/`tail`/`head`, never Read a whole file. The project's `.claude/transcripts/*.txt` are empty stubs; ignore them.
 3. **Detect patterns:**
    - Repeated errors (same class of build failure, same test pattern failure)
    - Thrashing (fix-then-break cycles on same file)
