@@ -17,13 +17,12 @@ metadata:
 
 ## What's Broken
 
-- **Session transcript capture** — `.claude/transcripts/session-*.txt` files are created nearly empty (38 bytes, end timestamp only). No meaningful conversation data is captured. This limits distiller's ability to analyze conversation patterns. Fix requires a SessionEnd hook or modification to stop.sh — both high risk, blocked for distiller. Human should consider adding a SessionEnd hook to settings.json that writes transcript data. **Still unresolved as of 2026-09-17 — third distillation run in a row blocked from conversation-level analysis.**
-- **Inert PreToolUse hooks in agent frontmatter** — three agent hooks still emit the legacy `{"decision": "deny"}` shape that PR #9 proved is silently ignored by Claude Code v2+:
-  - `.claude/agents/reviewer.md:12` — read-only guard (agent has `Bash`, so this is its only real guard)
-  - `.claude/agents/investigator.md:12` — read-only guard (same `Bash` caveat)
-  - `.claude/agents/distiller.md:19` — harness-write-scope guard (agent has `Write`/`Edit`, so nothing scopes it)
+(None open.)
 
-  PR #9 migrated only `.claude/agents/implementer.md`. These three were left behind, so the "deterministic" claims in `harness-safety.md` and `dark-factory-patterns.md` do not hold for them. The distiller hook has a second defect: it reads the file path from `$1`, but PreToolUse input arrives as stdin JSON — `pre-tool-use.sh:5` does this correctly (`INPUT=$(cat)`). Fixing requires editing agent hook frontmatter — **HIGH risk, human only** (see Distiller Observations 2026-09-17 for the exact patch).
+### Resolved 2026-09-18
+
+- **Inert PreToolUse hooks** — reviewer/investigator/distiller migrated to the v2 `hookSpecificOutput.permissionDecision` deny format (PR #10). Distiller's harness-write-scope guard now enforces and reads stdin JSON (not `$1`).
+- **Session transcript capture** — distiller now reads the native Claude Code JSONL at `~/.claude/projects/` (full conversation data), not the empty `.claude/transcripts/*.txt` stubs. No SessionEnd hook required after all.
 
 ## Distiller Observations
 
