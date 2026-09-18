@@ -47,12 +47,12 @@ public class GridManagerTest
         AssertThat(waypoints.Count).IsEqual(Levels.Level2.PathCells.Count + 1);
         AssertThat(waypoints[0]).IsEqual(new Vector2(
             GameConstants.CellCenterX(0),
-            GameConstants.CellCenterY(10)
+            GameConstants.CellCenterY(7)
         ));
 
         var last = waypoints[^1];
         AssertThat(last.X).IsEqual(GameConstants.CellCenterX(19) + GameConstants.CellSize);
-        AssertThat(last.Y).IsEqual(GameConstants.CellCenterY(10));
+        AssertThat(last.Y).IsEqual(GameConstants.CellCenterY(7));
     }
 
     [TestCase]
@@ -74,6 +74,6 @@ public class GridManagerTest
 
         AssertThat(grid.PixelToGrid(new Vector2(0, 0))).IsEqual(new Vector2I(0, 0));
         AssertThat(grid.PixelToGrid(new Vector2(64, 64))).IsEqual(new Vector2I(1, 1));
-        AssertThat(grid.PixelToGrid(new Vector2(1279, 1279))).IsEqual(new Vector2I(19, 19));
+        AssertThat(grid.PixelToGrid(new Vector2(1279, 895))).IsEqual(new Vector2I(19, 13));
     }
 }

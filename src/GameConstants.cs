@@ -9,7 +9,7 @@ public static class GameConstants
 {
     // Grid
     public const int GridCols = 20;
-    public const int GridRows = 20;
+    public const int GridRows = 14;
     public const int CellSize = 64;
     public const int PathRow = 10;
 

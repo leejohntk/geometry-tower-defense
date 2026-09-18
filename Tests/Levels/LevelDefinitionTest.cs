@@ -41,8 +41,8 @@ public class LevelDefinitionTest
         var path = Levels.Level2.PathCells;
 
         AssertThat(path.Count > 0).IsTrue();
-        AssertThat(Levels.Level2.SpawnCell).IsEqual(new Vector2I(0, 10));
-        AssertThat(Levels.Level2.BaseCell).IsEqual(new Vector2I(19, 10));
+        AssertThat(Levels.Level2.SpawnCell).IsEqual(new Vector2I(0, 7));
+        AssertThat(Levels.Level2.BaseCell).IsEqual(new Vector2I(19, 7));
 
         AssertThat(LevelDefinition.IsPathConnectedAndInBounds(path, GameConstants.GridCols, GameConstants.GridRows)).IsTrue();
         AssertThat(LevelDefinition.PathSelfIntersects(path)).IsFalse();

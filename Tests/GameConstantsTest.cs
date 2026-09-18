@@ -15,7 +15,7 @@ public class GameConstantsTest
     public void GridConstants_AreCorrect()
     {
         AssertThat(GameConstants.GridCols).IsEqual(20);
-        AssertThat(GameConstants.GridRows).IsEqual(20);
+        AssertThat(GameConstants.GridRows).IsEqual(14);
         AssertThat(GameConstants.CellSize).IsEqual(64);
         AssertThat(GameConstants.PathRow).IsEqual(10);
     }
@@ -68,7 +68,7 @@ public class GameConstantsTest
         int half = GameConstants.CellSize / 2;
         AssertThat(GameConstants.CellCenterY(0)).IsEqual(half);
         AssertThat(GameConstants.CellCenterY(GameConstants.PathRow)).IsEqual(GameConstants.PathRow * GameConstants.CellSize + half);
-        AssertThat(GameConstants.CellCenterY(19)).IsEqual(19 * GameConstants.CellSize + half);
+        AssertThat(GameConstants.CellCenterY(13)).IsEqual(13 * GameConstants.CellSize + half);
     }
 
     [TestCase]
@@ -84,6 +84,6 @@ public class GameConstantsTest
     public void PlayAreaDimensions_AreCorrect()
     {
         AssertThat(GameConstants.PlayAreaWidth).IsEqual(1280);
-        AssertThat(GameConstants.PlayAreaHeight).IsEqual(1280);
+        AssertThat(GameConstants.PlayAreaHeight).IsEqual(896);
     }
 }
