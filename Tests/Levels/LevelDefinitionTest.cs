@@ -71,7 +71,7 @@ public class LevelDefinitionTest
 
         AssertThat(path.Count).IsEqual(5); // (0,0),(1,0),(2,0),(2,1),(2,2)
         AssertThat(LevelDefinition.PathSelfIntersects(path)).IsFalse();
-        AssertThat(LevelDefinition.IsPathConnectedAndInBounds(path, 20, 20)).IsTrue();
+        AssertThat(LevelDefinition.IsPathConnectedAndInBounds(path, GameConstants.GridCols, GameConstants.GridRows)).IsTrue();
     }
 
     [TestCase]
