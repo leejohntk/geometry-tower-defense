@@ -9,15 +9,15 @@ hooks:
       hooks:
         - type: "command"
           command: |
-            # Only allow writes to harness directories
-            FILE="$1"
-            case "$FILE" in
-              .claude/skills/*|.claude/rules/*|.claude/memory/*|.claude/agents/*|.claude/commands/*|.claude/templates/*)
-                echo '{"decision": "allow"}'
+            # Only allow writes to harness directories. PreToolUse input arrives as stdin JSON, not $1.
+            INPUT="${1:-}"
+            if [ ! -t 0 ]; then INPUT="$INPUT$(cat 2>/dev/null || true)"; fi
+            case "$INPUT" in
+              *.claude/skills/*|*.claude/rules/*|*.claude/memory/*|*.claude/agents/*|*.claude/commands/*|*.claude/templates/*)
+                printf '{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "allow"}}\n'
                 ;;
               *)
-                echo '{"decision": "deny", "reason": "Distiller can only modify harness files (.claude/skills/, .claude/rules/, .claude/memory/, .claude/agents/, .claude/commands/, .claude/templates/)"}'
-                exit 1
+                printf '{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "Distiller can only modify harness files (.claude/skills/, .claude/rules/, .claude/memory/, .claude/agents/, .claude/commands/, .claude/templates/)"}}\n'
                 ;;
             esac
   SubagentStop:

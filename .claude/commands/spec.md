@@ -9,7 +9,7 @@ Human invokes: `/spec I want a piercing tower that shoots through multiple enemi
 
 ## Workflow
 
-1. **Orchestrator reads the description** and fills out `.claude/templates/spec-template.md`:
+1. **Orchestrator reads the description** and writes the spec to `.claude/specs/{feature}.md` (structure from `.claude/templates/spec-template.md`), committed on the feature branch:
    - Feature name
    - Description
    - Acceptance criteria

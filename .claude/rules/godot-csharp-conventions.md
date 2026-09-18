@@ -36,6 +36,7 @@ Tests/
 - Use `Vector2`/`Vector2I` for 2D positions. Snap to grid using `Mathf.Round` when needed.
 - `_Ready()` for node initialization, `_Process(double delta)` for per-frame updates.
 - `GD.Print()` for debug logging. Remove before PR unless intentionally permanent.
+- Keep simulation position and presentation/formation offset as separate fields. Never snap or overwrite the simulation anchor to achieve a visual effect — recompute `Position = anchor + offset` each tick. Reference: `src/Enemies/Enemy.cs` `_anchorPosition` / `_formationOffset`.
 
 ## Performance
 
