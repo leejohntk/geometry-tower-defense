@@ -45,19 +45,19 @@ public static class Levels
 
     private static LevelDefinition CreateLevel2()
     {
-        // Winding path: spawn (0,10) -> base (19,10), four vertical direction changes.
+        // Winding path: spawn (0,7) -> base (19,7), three vertical direction changes.
         var corners = new[]
         {
-            new Vector2I(0, 10),
-            new Vector2I(3, 10),
-            new Vector2I(3, 14),
-            new Vector2I(7, 14),
-            new Vector2I(7, 6),
-            new Vector2I(11, 6),
-            new Vector2I(11, 14),
-            new Vector2I(15, 14),
-            new Vector2I(15, 10),
-            new Vector2I(19, 10)
+            new Vector2I(0, 7),
+            new Vector2I(3, 7),
+            new Vector2I(3, 11),
+            new Vector2I(7, 11),
+            new Vector2I(7, 3),
+            new Vector2I(11, 3),
+            new Vector2I(11, 11),
+            new Vector2I(15, 11),
+            new Vector2I(15, 7),
+            new Vector2I(19, 7)
         };
         var path = LevelDefinition.BuildPath(corners);
 

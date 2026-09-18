@@ -4,7 +4,7 @@ using System.Collections.Generic;
 namespace GeometryTowerDefense;
 
 /// <summary>
-/// Manages the 20x20 grid: cell occupancy, path detection, coordinate conversion.
+/// Manages the 20x14 grid: cell occupancy, path detection, coordinate conversion.
 /// The game coordinate system uses column (x) and row (y) where (0,0) is top-left.
 /// The path is defined per-level as a list of cells (not a single row).
 /// Grid is drawn via _Draw() with individual line segments.
