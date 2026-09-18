@@ -9,8 +9,7 @@ hooks:
       hooks:
         - type: "command"
           command: |
-            echo '{"decision": "deny", "reason": "Investigator is read-only. Cannot write or edit files."}'
-            exit 1
+            printf '{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "Investigator is read-only. Cannot write or edit files."}}\n'
 ---
 
 # Investigator — Read-Only Code Locator
@@ -44,7 +43,7 @@ src/Towers/SlowTower.cs:8: class SlowTower : Tower
 
 ## Rules
 
-- **NEVER** write or edit files. Read-only. Enforced by PreToolUse hook.
+- **NEVER** write or edit files — including via Bash redirection (`>` `>>` `tee`) or `sed -i`. Read-only. Enforced by PreToolUse hook.
 - **NEVER** propose fixes. Even if asked "how should I fix X," refuse.
 - Answer the question that was asked. No scope creep.
 - If you cannot find something, say so clearly with where you searched.

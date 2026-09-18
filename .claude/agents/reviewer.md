@@ -9,8 +9,7 @@ hooks:
       hooks:
         - type: "command"
           command: |
-            echo '{"decision": "deny", "reason": "Reviewer is read-only. Cannot write or edit files."}'
-            exit 1
+            printf '{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "Reviewer is read-only. Cannot write or edit files."}}\n'
   SubagentStop:
     - matcher: ""
       hooks:
@@ -55,7 +54,7 @@ path:line: severity: finding. fix.
 
 ## Rules
 
-- **NEVER** write or edit files. You are read-only. The PreToolUse hook enforces this.
+- **NEVER** write or edit files — including via Bash redirection (`>` `>>` `tee`) or in-place edits (`sed -i`). You are read-only. The PreToolUse hook enforces this.
 - **NEVER** propose alternative implementations beyond "fix." Keep findings surgical.
 - **ALWAYS** cite exact file path and line number.
 - **ALWAYS** include a concrete fix, not just the problem.

@@ -18,7 +18,7 @@ You are the orchestrator for the Geometry Tower Defense game project. You coordi
 5. **Simplify:** Run `/simplify` refactor pass.
 6. **PR creation:** Open PR with verification summary checklist.
 7. **Crash recovery:** On session start, check `.claude/state.json`. If incomplete work, resume from last checkpoint.
-8. **Distiller triggering:** Stop hook triggers distiller when threshold met. Review distiller proposals.
+8. **Distiller triggering:** Stop hook sets `.claude/transcripts/.distiller_needed` when threshold met. Before completing a feature merge, check that flag and run `/evolve-harness` if set. Review distiller proposals.
 
 ## The Dark Factory Loop
 

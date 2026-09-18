@@ -26,7 +26,7 @@ Orchestrator runs this skill when human approves spec + holdouts.
 
 ## Phase 1: Spec
 
-Human describes feature. Orchestrator proposes spec using `.claude/templates/spec-template.md`. Orchestrator drafts holdout scenarios in `.claude/holdouts/{feature}/`. Human reviews both and says "approved."
+Human describes feature. Orchestrator writes the spec to `.claude/specs/{feature}.md` (template: `.claude/templates/spec-template.md`) and commits it on the feature branch. Orchestrator drafts holdout scenarios in `.claude/holdouts/{feature}/`. Human reviews both and says "approved."
 
 ## Phase 2: Plan
 
@@ -89,4 +89,4 @@ Human playtests. Two outcomes:
 4. Move holdouts to `.claude/holdouts/regression/{name}/`
 5. Mark feature complete in `.claude/memory/current-feature.md`
 6. Delete `.claude/state.json`
-7. Trigger distiller on session transcript
+7. Check `.claude/transcripts/.distiller_needed`; if set, run `/evolve-harness` (distillation) before declaring merge complete.
