@@ -324,7 +324,7 @@ public partial class GameManager : Node2D
 
     // === Enemy lifecycle ===
 
-    private void OnEnemySpawned(Enemy enemy)
+    private void OnEnemySpawned(Enemy enemy, int routeIndex)
     {
         enemy.ReachedEnd += OnEnemyReachedEnd;
         enemy.Destroyed += OnEnemyDestroyed;
@@ -332,7 +332,7 @@ public partial class GameManager : Node2D
         // Set path
         if (_gridManager != null)
         {
-            enemy.SetPath(_gridManager.GetPathWaypoints());
+            enemy.SetPath(_gridManager.GetPathWaypoints(routeIndex));
         }
 
         _activeEnemies.Add(enemy);
@@ -607,6 +607,7 @@ public partial class GameManager : Node2D
 
         if (_waveManager != null && IsInstanceValid(_waveManager))
         {
+            _waveManager.StopSpawning();
             _waveManager.QueueFree();
             _waveManager = null;
         }

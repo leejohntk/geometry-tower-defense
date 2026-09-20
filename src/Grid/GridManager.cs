@@ -6,7 +6,7 @@ namespace GeometryTowerDefense;
 /// <summary>
 /// Manages the 20x14 grid: cell occupancy, path detection, coordinate conversion.
 /// The game coordinate system uses column (x) and row (y) where (0,0) is top-left.
-/// The path is defined per-level as a list of cells (not a single row).
+/// The paths are defined per-level as a list of routes (each a list of cells), not a single row.
 /// Grid is drawn via _Draw() with individual line segments.
 /// </summary>
 public partial class GridManager : Node2D
@@ -27,19 +27,20 @@ public partial class GridManager : Node2D
     private Control? _previewRange;
     private float _previewRangePixels = GameConstants.CellDistanceInPixels(GameConstants.ArrowTowerRange);
 
-    // Cached path waypoints (immutable, computed once per level)
-    private List<Vector2>? _cachedWaypoints;
+    // Cached path waypoints per route (immutable, computed once per level)
+    private List<List<Vector2>>? _cachedWaypoints;
 
     /// <summary>
-    /// Configure this grid for a specific level's path. Must be called before AddChild.
+    /// Configure this grid for a specific level's routes. Must be called before AddChild.
     /// </summary>
     public void Configure(LevelDefinition level)
     {
         _level = level;
 
         _pathCells.Clear();
-        foreach (var cell in level.PathCells)
-            _pathCells.Add(cell);
+        foreach (var route in level.Paths)
+            foreach (var cell in route)
+                _pathCells.Add(cell);
 
         _cachedWaypoints = null;
     }
@@ -179,26 +180,14 @@ public partial class GridManager : Node2D
 
     private void CreateSpawnAndBaseIndicators()
     {
-        Vector2I spawnCell = _level?.SpawnCell ?? new Vector2I(0, GameConstants.PathRow);
-        Vector2I baseCell = _level?.BaseCell ?? new Vector2I(GameConstants.GridCols - 1, GameConstants.PathRow);
+        // Configure(level) runs before _Ready, so _level is always set here.
+        var level = _level!;
 
-        // Spawn zone indicator on the spawn cell
-        var spawnZone = new ColorRect();
-        spawnZone.Size = new Vector2(GameConstants.CellSize, GameConstants.CellSize);
-        spawnZone.Position = new Vector2(spawnCell.X * GameConstants.CellSize, spawnCell.Y * GameConstants.CellSize);
-        spawnZone.Color = new Color(1f, 0.2f, 0.2f, 0.15f);
-        AddChild(spawnZone);
+        // One spawn indicator per route spawn cell.
+        foreach (var spawnCell in level.SpawnCells)
+            CreateSpawnIndicator(spawnCell);
 
-        // Spawn label
-        var spawnLabel = new Label();
-        spawnLabel.Text = "SPAWN";
-        spawnLabel.Position = new Vector2(
-            GameConstants.CellCenterX(spawnCell.X) - 25,
-            GameConstants.CellCenterY(spawnCell.Y) - 8
-        );
-        spawnLabel.AddThemeColorOverride("font_color", new Color(1f, 0.5f, 0.5f, 0.6f));
-        spawnLabel.Scale = new Vector2(0.7f, 0.7f);
-        AddChild(spawnLabel);
+        Vector2I baseCell = level.BaseCell;
 
         // House/base indicator on the base cell
         float houseX = GameConstants.CellCenterX(baseCell.X);
@@ -230,6 +219,27 @@ public partial class GridManager : Node2D
         baseLabel.AddThemeColorOverride("font_color", new Color(1f, 0.8f, 0.5f, 0.8f));
         baseLabel.Scale = new Vector2(0.7f, 0.7f);
         AddChild(baseLabel);
+    }
+
+    private void CreateSpawnIndicator(Vector2I spawnCell)
+    {
+        // Spawn zone indicator on the spawn cell
+        var spawnZone = new ColorRect();
+        spawnZone.Size = new Vector2(GameConstants.CellSize, GameConstants.CellSize);
+        spawnZone.Position = new Vector2(spawnCell.X * GameConstants.CellSize, spawnCell.Y * GameConstants.CellSize);
+        spawnZone.Color = new Color(1f, 0.2f, 0.2f, 0.15f);
+        AddChild(spawnZone);
+
+        // Spawn label
+        var spawnLabel = new Label();
+        spawnLabel.Text = "SPAWN";
+        spawnLabel.Position = new Vector2(
+            GameConstants.CellCenterX(spawnCell.X) - 25,
+            GameConstants.CellCenterY(spawnCell.Y) - 8
+        );
+        spawnLabel.AddThemeColorOverride("font_color", new Color(1f, 0.5f, 0.5f, 0.6f));
+        spawnLabel.Scale = new Vector2(0.7f, 0.7f);
+        AddChild(spawnLabel);
     }
 
     // === Placement Preview ===
@@ -341,44 +351,62 @@ public partial class GridManager : Node2D
     // === Path ===
 
     /// <summary>
-    /// Gets a list of grid cell center positions along the level's path.
+    /// Gets a list of grid cell center positions along one route of the level's paths.
     /// Enemies follow these waypoints from spawn to base, then one cell past the base.
+    /// The returned list is shared (read-only) across all enemies on the same route.
     /// </summary>
-    public List<Vector2> GetPathWaypoints()
+    public List<Vector2> GetPathWaypoints(int routeIndex)
     {
-        if (_cachedWaypoints != null)
-            return _cachedWaypoints;
+        if (_cachedWaypoints == null)
+            _cachedWaypoints = BuildAllWaypoints();
 
-        _cachedWaypoints = new List<Vector2>();
+        if (routeIndex < 0 || routeIndex >= _cachedWaypoints.Count)
+            return new List<Vector2>();
 
-        if (_level == null || _level.PathCells.Count == 0)
-            return _cachedWaypoints;
+        return _cachedWaypoints[routeIndex];
+    }
 
-        foreach (var cell in _level.PathCells)
+    /// <summary>
+    /// Builds the waypoint list for every route, cached once per level configuration.
+    /// </summary>
+    private List<List<Vector2>> BuildAllWaypoints()
+    {
+        var allWaypoints = new List<List<Vector2>>();
+
+        if (_level == null)
+            return allWaypoints;
+
+        foreach (var route in _level.Paths)
         {
-            _cachedWaypoints.Add(new Vector2(
-                GameConstants.CellCenterX(cell.X),
-                GameConstants.CellCenterY(cell.Y)
-            ));
+            var waypoints = new List<Vector2>();
+
+            foreach (var cell in route)
+            {
+                waypoints.Add(new Vector2(
+                    GameConstants.CellCenterX(cell.X),
+                    GameConstants.CellCenterY(cell.Y)
+                ));
+            }
+
+            // A single-cell route has no previous cell to derive an exit direction from,
+            // so skip the past-base waypoint.
+            if (route.Count >= 2)
+            {
+                var last = route[^1];
+                var prev = route[^2];
+                int dc = System.Math.Sign(last.X - prev.X);
+                int dr = System.Math.Sign(last.Y - prev.Y);
+
+                waypoints.Add(new Vector2(
+                    GameConstants.CellCenterX(last.X) + dc * GameConstants.CellSize,
+                    GameConstants.CellCenterY(last.Y) + dr * GameConstants.CellSize
+                ));
+            }
+
+            allWaypoints.Add(waypoints);
         }
 
-        // A single-cell path has no previous cell to derive an exit direction from,
-        // so skip the past-base waypoint.
-        if (_level.PathCells.Count < 2)
-            return _cachedWaypoints;
-
-        // Add a final waypoint one cell past the last path cell so enemies walk off-grid.
-        var last = _level.PathCells[^1];
-        var prev = _level.PathCells[^2];
-        int dc = System.Math.Sign(last.X - prev.X);
-        int dr = System.Math.Sign(last.Y - prev.Y);
-
-        _cachedWaypoints.Add(new Vector2(
-            GameConstants.CellCenterX(last.X) + dc * GameConstants.CellSize,
-            GameConstants.CellCenterY(last.Y) + dr * GameConstants.CellSize
-        ));
-
-        return _cachedWaypoints;
+        return allWaypoints;
     }
 
     // === Coordinate Conversion ===
