@@ -28,7 +28,7 @@ godot
 
 ## Architecture
 
-- **Engine:** Godot 4.7 with C# / .NET 8
+- **Engine:** Godot 4.7 with C# / .NET 10
 - **Testing:** GdUnit4Net (selective Godot runtime — `[RequireGodotRuntime]` only when needed)
 - **Theme:** Geometric — towers, enemies, projectiles rendered as geometric shapes
 - **Source:** `src/` — game code

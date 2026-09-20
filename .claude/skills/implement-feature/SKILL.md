@@ -89,4 +89,5 @@ Human playtests. Two outcomes:
 4. Move holdouts to `.claude/holdouts/regression/{name}/`
 5. Mark feature complete in `.claude/memory/current-feature.md`
 6. Delete `.claude/state.json`
-7. Check `.claude/transcripts/.distiller_needed`; if set, run `/evolve-harness` (distillation) before declaring merge complete.
+7. Prune merged worktrees — for every `.claude/worktrees/agent-*` whose HEAD is an ancestor of `main`, `git worktree remove --force` it (subagent-isolation scratch is superseded once merged).
+8. Check `.claude/transcripts/.distiller_needed`; if set, run `/evolve-harness` (distillation) before declaring merge complete.

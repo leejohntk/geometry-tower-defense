@@ -43,3 +43,8 @@ Distiller must classify every harness change proposal:
 - Changing implementer SubagentStop build validation → **high risk** → blocked
 - Updating agent prompt to remind about null checks → **medium risk** → propose diff
 - Adding new permission allow for a new tool → **high risk** → blocked
+
+## Destructive Git Ops
+
+- Never run `git reset --hard`, `git clean -f`, `git checkout -- .`, or `git restore` while uncommitted changes are present.
+- Commit `.claude/**` config promptly after approving it — it is git-tracked, so a working-tree loss leaves no reflog entry to recover from.

@@ -30,7 +30,7 @@
       "Bash(cut:*)"
     ],
     "deny": [
-      "Write(.claude/settings.json)",
+      "Edit(.claude/settings.json)",
       "Bash(git push origin main:*)",
       "Bash(git push origin master:*)"
     ]

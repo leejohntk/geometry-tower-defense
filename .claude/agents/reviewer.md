@@ -1,7 +1,7 @@
 ---
 name: reviewer
 description: Code reviewer with a specific lens (security, performance, correctness). Read-only except for findings report. Fresh context per invocation for bias isolation.
-tools: Read, Bash, Glob, Grep
+tools: Read, Glob, Grep
 model: sonnet
 hooks:
   PreToolUse:

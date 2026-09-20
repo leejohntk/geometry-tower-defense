@@ -1,7 +1,7 @@
 ---
 name: investigator
 description: Read-only code locator. Returns file:line tables for codebase questions. Refuses to suggest fixes or implementations.
-tools: Read, Grep, Glob, Bash
+tools: Read, Grep, Glob
 model: haiku
 hooks:
   PreToolUse:
