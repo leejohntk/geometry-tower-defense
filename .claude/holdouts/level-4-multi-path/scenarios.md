@@ -27,8 +27,8 @@ Implementer must NOT see this file. Orchestrator runs these during verification.
 ## H7 — All three tower types allowed
 - `Level4.AllowCannonTower == true` and `Level4.AllowLaserTower == true`. HUD shows Cannon and Laser buttons for Level 4.
 
-## H8 — All three enemy kinds present
-- Level 4 waves contain at least one Basic, one SwarmCluster, and one Armored spawn.
+## H8 — Every wave mixes all three enemy kinds
+- Each of the 5 Level 4 waves contains at least one Basic, one SwarmCluster, and one Armored spawn (no single-kind waves).
 
 ## H9 — No cross-route contamination
 - An enemy assigned route A walks only route A's split segment (row 4), never route B's (row 10), and vice versa.

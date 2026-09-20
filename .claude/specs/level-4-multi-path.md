@@ -48,13 +48,13 @@ Route B (bottom spawn):
 - Converge cells (shared): `(5,7)`, `(11,7)`, `(17,7)` (+ the runs between).
 - Split cells: `(8,7)` (to rows 4/10), `(14,7)` (to rows 10/4).
 
-Waves (all three enemy kinds, escalating):
+Waves (every wave mixes all three enemy kinds, escalating):
 
-1. 6 Basic
-2. 4 Basic + 2 SwarmCluster
-3. 4 Basic + 2 Armored
-4. 3 Basic + 2 SwarmCluster + 2 Armored
-5. 2 Basic + 2 SwarmCluster + 4 Armored
+1. 3 Basic + 1 SwarmCluster + 1 Armored
+2. 3 Basic + 2 SwarmCluster + 1 Armored
+3. 2 Basic + 2 SwarmCluster + 2 Armored
+4. 2 Basic + 3 SwarmCluster + 3 Armored
+5. 1 Basic + 3 SwarmCluster + 4 Armored
 
 `AllowCannonTower: true`, `AllowLaserTower: true`.
 
