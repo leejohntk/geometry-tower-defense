@@ -41,41 +41,36 @@ public partial class TitleScreen : Control
         subtitle.AddThemeColorOverride("font_color", new Color(0.6f, 0.6f, 0.8f));
         AddChild(subtitle);
 
-        // Level 1 button
-        var level1Button = new Button();
-        level1Button.Text = "Level 1";
-        level1Button.Position = new Vector2(viewportSize.X / 2f - 120, viewportSize.Y / 2f + 40);
-        level1Button.Size = new Vector2(240, 50);
-        level1Button.Pressed += () => EmitSignal(SignalName.LevelSelected, Levels.Level1.Id);
-        level1Button.AddThemeFontSizeOverride("font_size", 22);
-        AddChild(level1Button);
-
-        // Level 2 button
-        var level2Button = new Button();
-        level2Button.Text = "Level 2";
-        level2Button.Position = new Vector2(viewportSize.X / 2f - 120, viewportSize.Y / 2f + 110);
-        level2Button.Size = new Vector2(240, 50);
-        level2Button.Pressed += () => EmitSignal(SignalName.LevelSelected, Levels.Level2.Id);
-        level2Button.AddThemeFontSizeOverride("font_size", 22);
-        AddChild(level2Button);
-
-        // Level 3 button
-        var level3Button = new Button();
-        level3Button.Text = "Level 3";
-        level3Button.Position = new Vector2(viewportSize.X / 2f - 120, viewportSize.Y / 2f + 180);
-        level3Button.Size = new Vector2(240, 50);
-        level3Button.Pressed += () => EmitSignal(SignalName.LevelSelected, Levels.Level3.Id);
-        level3Button.AddThemeFontSizeOverride("font_size", 22);
-        AddChild(level3Button);
+        // Level selection buttons
+        CreateLevelButton(Levels.Level1.Id, "Level 1", 40);
+        CreateLevelButton(Levels.Level2.Id, "Level 2", 110);
+        CreateLevelButton(Levels.Level3.Id, "Level 3", 180);
+        CreateLevelButton(Levels.Level4.Id, "Level 4", 250);
 
         // Instructions text
         var instructions = new Label();
         instructions.Text = "Select a level to begin.\nPlace towers to defend your base. Survive 5 waves to win!";
         instructions.HorizontalAlignment = HorizontalAlignment.Center;
-        instructions.Position = new Vector2(0, viewportSize.Y / 2f + 250);
+        instructions.Position = new Vector2(0, viewportSize.Y / 2f + 330);
         instructions.Size = new Vector2(viewportSize.X, 60);
         instructions.AddThemeFontSizeOverride("font_size", 14);
         instructions.AddThemeColorOverride("font_color", new Color(0.5f, 0.5f, 0.7f));
         AddChild(instructions);
+    }
+
+    /// <summary>
+    /// Creates a level-select button with the shared layout used by all levels.
+    /// </summary>
+    private void CreateLevelButton(int levelId, string label, float yOffset)
+    {
+        var viewportSize = GetViewportRect().Size;
+
+        var button = new Button();
+        button.Text = label;
+        button.Position = new Vector2(viewportSize.X / 2f - 120, viewportSize.Y / 2f + yOffset);
+        button.Size = new Vector2(240, 50);
+        button.Pressed += () => EmitSignal(SignalName.LevelSelected, levelId);
+        button.AddThemeFontSizeOverride("font_size", 22);
+        AddChild(button);
     }
 }

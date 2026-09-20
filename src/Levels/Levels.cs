@@ -6,13 +6,15 @@ namespace GeometryTowerDefense;
 /// <summary>
 /// Registry of all playable levels. Level 1 is the original straight-path level;
 /// Level 2 adds the winding path, the Cannon tower, and Swarm enemies;
-/// Level 3 adds Armored enemies and the Laser tower.
+/// Level 3 adds Armored enemies and the Laser tower;
+/// Level 4 adds a second spawn route and mixes all three enemy kinds.
 /// </summary>
 public static class Levels
 {
     public static readonly LevelDefinition Level1 = CreateLevel1();
     public static readonly LevelDefinition Level2 = CreateLevel2();
     public static readonly LevelDefinition Level3 = CreateLevel3();
+    public static readonly LevelDefinition Level4 = CreateLevel4();
 
     /// <summary>
     /// Resolve a level by id. Unknown ids fall back to Level 1.
@@ -21,6 +23,7 @@ public static class Levels
     {
         2 => Level2,
         3 => Level3,
+        4 => Level4,
         _ => Level1
     };
 
@@ -43,7 +46,7 @@ public static class Levels
             BasicWave(12)
         };
 
-        return new LevelDefinition(1, "Level 1", path, allowCannonTower: false, allowLaserTower: false, waves);
+        return new LevelDefinition(1, "Level 1", new[] { path }, allowCannonTower: false, allowLaserTower: false, waves);
     }
 
     private static LevelDefinition CreateLevel2()
@@ -78,7 +81,7 @@ public static class Levels
             new WaveDefinition(SpawnKind.Basic, SpawnKind.Basic, SpawnKind.Basic, SpawnKind.Basic, SpawnKind.Basic, SpawnKind.Basic, SpawnKind.SwarmCluster, SpawnKind.SwarmCluster, SpawnKind.SwarmCluster)
         };
 
-        return new LevelDefinition(2, "Level 2", path, allowCannonTower: true, allowLaserTower: false, waves);
+        return new LevelDefinition(2, "Level 2", new[] { path }, allowCannonTower: true, allowLaserTower: false, waves);
     }
 
     private static LevelDefinition CreateLevel3()
@@ -114,7 +117,47 @@ public static class Levels
             new WaveDefinition(SpawnKind.Basic, SpawnKind.Basic, SpawnKind.SwarmCluster, SpawnKind.Armored, SpawnKind.Armored)
         };
 
-        return new LevelDefinition(3, "Level 3", path, allowCannonTower: true, allowLaserTower: true, waves);
+        return new LevelDefinition(3, "Level 3", new[] { path }, allowCannonTower: true, allowLaserTower: true, waves);
+    }
+
+    private static LevelDefinition CreateLevel4()
+    {
+        // Two routes that converge in the center, split, converge, split, then a
+        // final converge into a single base at (19,7). Shared converge cells are
+        // (5,7), (11,7) and (17,7) plus the row-7 runs between them.
+        var routeACorners = new[]
+        {
+            new Vector2I(0, 3), new Vector2I(5, 3), new Vector2I(5, 7), new Vector2I(8, 7),
+            new Vector2I(8, 4), new Vector2I(11, 4), new Vector2I(11, 7), new Vector2I(14, 7),
+            new Vector2I(14, 10), new Vector2I(17, 10), new Vector2I(17, 7), new Vector2I(19, 7)
+        };
+        var routeBCorners = new[]
+        {
+            new Vector2I(0, 11), new Vector2I(5, 11), new Vector2I(5, 7), new Vector2I(8, 7),
+            new Vector2I(8, 10), new Vector2I(11, 10), new Vector2I(11, 7), new Vector2I(14, 7),
+            new Vector2I(14, 4), new Vector2I(17, 4), new Vector2I(17, 7), new Vector2I(19, 7)
+        };
+        var paths = new IReadOnlyList<Vector2I>[]
+        {
+            LevelDefinition.BuildPath(routeACorners),
+            LevelDefinition.BuildPath(routeBCorners)
+        };
+
+        var waves = new List<WaveDefinition>
+        {
+            // Wave 1: 3 Basic + 1 SwarmCluster + 1 Armored
+            new WaveDefinition(SpawnKind.Basic, SpawnKind.Basic, SpawnKind.Basic, SpawnKind.SwarmCluster, SpawnKind.Armored),
+            // Wave 2: 3 Basic + 2 SwarmCluster + 1 Armored
+            new WaveDefinition(SpawnKind.Basic, SpawnKind.Basic, SpawnKind.Basic, SpawnKind.SwarmCluster, SpawnKind.SwarmCluster, SpawnKind.Armored),
+            // Wave 3: 2 Basic + 2 SwarmCluster + 2 Armored
+            new WaveDefinition(SpawnKind.Basic, SpawnKind.Basic, SpawnKind.SwarmCluster, SpawnKind.SwarmCluster, SpawnKind.Armored, SpawnKind.Armored),
+            // Wave 4: 2 Basic + 3 SwarmCluster + 3 Armored
+            new WaveDefinition(SpawnKind.Basic, SpawnKind.Basic, SpawnKind.SwarmCluster, SpawnKind.SwarmCluster, SpawnKind.SwarmCluster, SpawnKind.Armored, SpawnKind.Armored, SpawnKind.Armored),
+            // Wave 5: 1 Basic + 3 SwarmCluster + 4 Armored
+            new WaveDefinition(SpawnKind.Basic, SpawnKind.SwarmCluster, SpawnKind.SwarmCluster, SpawnKind.SwarmCluster, SpawnKind.Armored, SpawnKind.Armored, SpawnKind.Armored, SpawnKind.Armored)
+        };
+
+        return new LevelDefinition(4, "Level 4", paths, allowCannonTower: true, allowLaserTower: true, waves);
     }
 
     private static WaveDefinition BasicWave(int count)

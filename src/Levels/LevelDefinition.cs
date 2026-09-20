@@ -36,48 +36,82 @@ public class WaveDefinition
         {
             int total = 0;
             foreach (var spawn in Spawns)
-                total += spawn == SpawnKind.SwarmCluster ? GameConstants.SwarmClusterSize : 1;
+                total += Resolve(spawn).Count;
             return total;
         }
     }
+
+    /// <summary>
+    /// Maps a spawn kind to the enemy kind it produces and how many enemies it
+    /// spawns. Basic and Armored produce one enemy; SwarmCluster produces
+    /// GameConstants.SwarmClusterSize swarm enemies. This is the single source of
+    /// truth for the spawn-kind mapping — a new enemy kind is added here only.
+    /// </summary>
+    public static (EnemyKind Kind, int Count) Resolve(SpawnKind spawn) => spawn switch
+    {
+        SpawnKind.Basic => (EnemyKind.Basic, 1),
+        SpawnKind.Armored => (EnemyKind.Armored, 1),
+        SpawnKind.SwarmCluster => (EnemyKind.Swarm, GameConstants.SwarmClusterSize),
+        _ => throw new System.ArgumentOutOfRangeException(nameof(spawn), spawn, "Unknown spawn kind.")
+    };
 }
 
 /// <summary>
-/// Per-level configuration: path cells, tower availability, and wave composition.
+/// Per-level configuration: enemy routes, tower availability, and wave composition.
 /// </summary>
 public class LevelDefinition
 {
     public int Id { get; }
     public string DisplayName { get; }
-    public IReadOnlyList<Vector2I> PathCells { get; }
+    public IReadOnlyList<IReadOnlyList<Vector2I>> Paths { get; }
     public IReadOnlyList<WaveDefinition> Waves { get; }
     public bool AllowCannonTower { get; }
     public bool AllowLaserTower { get; }
 
     /// <summary>
-    /// The grid cell (col, row) where enemies spawn.
+    /// The grid cell (col, row) where each route spawns enemies — one per route (route[0]).
     /// </summary>
-    public Vector2I SpawnCell => PathCells[0];
+    public IReadOnlyList<Vector2I> SpawnCells { get; }
 
     /// <summary>
-    /// The grid cell (col, row) of the home base.
+    /// The grid cell (col, row) of the home base. Every route ends at this same cell.
     /// </summary>
-    public Vector2I BaseCell => PathCells[^1];
+    public Vector2I BaseCell { get; }
 
     public LevelDefinition(
         int id,
         string displayName,
-        IReadOnlyList<Vector2I> pathCells,
+        IReadOnlyList<IReadOnlyList<Vector2I>> paths,
         bool allowCannonTower,
         bool allowLaserTower,
         IReadOnlyList<WaveDefinition> waves)
     {
+        if (paths.Count == 0)
+            throw new ArgumentException("A level needs at least one route.", nameof(paths));
+
         Id = id;
         DisplayName = displayName;
-        PathCells = pathCells;
+        Paths = paths;
         AllowCannonTower = allowCannonTower;
         AllowLaserTower = allowLaserTower;
         Waves = waves;
+
+        var spawnCells = new Vector2I[paths.Count];
+        for (int i = 0; i < paths.Count; i++)
+        {
+            if (paths[i].Count == 0)
+                throw new ArgumentException("Every route needs at least one cell.", nameof(paths));
+            spawnCells[i] = paths[i][0];
+        }
+        SpawnCells = spawnCells;
+
+        Vector2I baseCell = paths[0][^1];
+        for (int i = 1; i < paths.Count; i++)
+        {
+            if (paths[i][^1] != baseCell)
+                throw new ArgumentException("All routes must end at the same base cell.", nameof(paths));
+        }
+        BaseCell = baseCell;
     }
 
     /// <summary>

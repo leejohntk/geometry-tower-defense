@@ -15,9 +15,10 @@ public partial class WaveManager : Node
     [Signal]
     public delegate void WaveStartedEventHandler(int waveNumber);
 
-    // Signal emitted when an enemy is spawned during a wave
+    // Signal emitted when an enemy is spawned during a wave, along with the
+    // route index the enemy follows (round-robin across the level's routes).
     [Signal]
-    public delegate void EnemySpawnedEventHandler(Enemy enemy);
+    public delegate void EnemySpawnedEventHandler(Enemy enemy, int routeIndex);
 
     // Signal emitted when all enemies in current wave are dead
     [Signal]
@@ -30,6 +31,10 @@ public partial class WaveManager : Node
     private int _currentWave = 0;
     private int _enemiesAliveThisWave = 0;
     private bool _isSpawning = false;
+
+    // Round-robin counter for assigning routes to spawn events. Persists across
+    // waves so the assignment keeps alternating without a per-wave reset.
+    private int _routeCounter = 0;
 
     private LevelDefinition? _level;
     private readonly Queue<SpawnKind> _pendingSpawns = new();
@@ -127,6 +132,18 @@ public partial class WaveManager : Node
         return true;
     }
 
+    /// <summary>
+    /// Halts spawning immediately: stops the spawn timer and drops any pending
+    /// spawns. Called by GameManager.ResetGame before this node is freed so the
+    /// timer callback can't fire after the level has been cleared.
+    /// </summary>
+    public void StopSpawning()
+    {
+        _spawnTimer?.Stop();
+        _pendingSpawns.Clear();
+        _isSpawning = false;
+    }
+
     private void OnSpawnTimeout()
     {
         if (_pendingSpawns.Count == 0)
@@ -143,26 +160,47 @@ public partial class WaveManager : Node
 
     private void SpawnNext()
     {
-        if (_pendingSpawns.Count == 0)
+        // Guard against spawning after the level/pool has been cleared (e.g. a
+        // mid-wave reset): the timer callback can still fire before QueueFree
+        // removes it, so bail out instead of dereferencing a null level.
+        if (_level == null || _enemyPool == null || _pendingSpawns.Count == 0)
             return;
 
         var spawn = _pendingSpawns.Dequeue();
-        switch (spawn)
+
+        // One route per spawn EVENT: a SwarmCluster is a single event, so all of
+        // its members share this route index (they never straddle two routes).
+        int routeIndex = NextRouteIndex(ref _routeCounter, _level.Paths.Count);
+
+        var (kind, count) = WaveDefinition.Resolve(spawn);
+
+        if (count == 1)
         {
-            case SpawnKind.Basic:
-                SpawnEnemy(EnemyKind.Basic, Vector2.Zero);
-                break;
-
-            case SpawnKind.Armored:
-                // Single armored enemy: fixed to the path anchor (no formation offset/orbit).
-                SpawnEnemy(EnemyKind.Armored, Vector2.Zero);
-                break;
-
-            case SpawnKind.SwarmCluster:
-                foreach (var offset in GenerateClusterOffsets(GameConstants.SwarmClusterSize, GameConstants.SwarmClusterRadius))
-                    SpawnEnemy(EnemyKind.Swarm, offset);
-                break;
+            // Basic/Armored: single enemy fixed to the path anchor (no formation offset/orbit).
+            SpawnEnemy(kind, Vector2.Zero, routeIndex);
         }
+        else
+        {
+            // SwarmCluster: each member gets the same route index.
+            foreach (var offset in GenerateClusterOffsets(count, GameConstants.SwarmClusterRadius))
+                SpawnEnemy(kind, offset, routeIndex);
+        }
+    }
+
+    /// <summary>
+    /// Computes the round-robin route index for the next spawn event and advances
+    /// the counter. Called once per spawn EVENT (a SwarmCluster is a single event),
+    /// so all members of a cluster share one route index. The modulo wraps the
+    /// counter cleanly no matter how many waves have run.
+    /// </summary>
+    public static int NextRouteIndex(ref int counter, int routeCount)
+    {
+        if (routeCount <= 0)
+            return 0;
+
+        int index = (int)(((uint)counter) % (uint)routeCount);
+        counter++;
+        return index;
     }
 
     /// <summary>
@@ -184,7 +222,7 @@ public partial class WaveManager : Node
         return offsets;
     }
 
-    private void SpawnEnemy(EnemyKind kind, Vector2 offset)
+    private void SpawnEnemy(EnemyKind kind, Vector2 offset, int routeIndex)
     {
         // Acquire enemy from pool, resetting its state for reuse
         var enemy = _enemyPool!.Acquire();
@@ -201,7 +239,7 @@ public partial class WaveManager : Node
 
         _enemiesAliveThisWave++;
 
-        EmitSignal(SignalName.EnemySpawned, enemy);
+        EmitSignal(SignalName.EnemySpawned, enemy, routeIndex);
     }
 
     /// <summary>

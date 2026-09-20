@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using GeometryTowerDefense;
 using GdUnit4;
 using Godot;
@@ -14,10 +15,10 @@ public class LevelDefinitionTest
     [TestCase]
     public void Level1_HasStraightPathOnRow10()
     {
-        var path = Levels.Level1.PathCells;
+        var path = Levels.Level1.Paths[0];
 
         AssertThat(path.Count).IsEqual(GameConstants.GridCols);
-        AssertThat(Levels.Level1.SpawnCell).IsEqual(new Vector2I(0, GameConstants.PathRow));
+        AssertThat(Levels.Level1.SpawnCells[0]).IsEqual(new Vector2I(0, GameConstants.PathRow));
         AssertThat(Levels.Level1.BaseCell).IsEqual(new Vector2I(GameConstants.GridCols - 1, GameConstants.PathRow));
 
         foreach (var cell in path)
@@ -38,10 +39,10 @@ public class LevelDefinitionTest
     [TestCase]
     public void Level2_PathIsValid_AndWindsAtLeastThreeTimes()
     {
-        var path = Levels.Level2.PathCells;
+        var path = Levels.Level2.Paths[0];
 
         AssertThat(path.Count > 0).IsTrue();
-        AssertThat(Levels.Level2.SpawnCell).IsEqual(new Vector2I(0, 7));
+        AssertThat(Levels.Level2.SpawnCells[0]).IsEqual(new Vector2I(0, 7));
         AssertThat(Levels.Level2.BaseCell).IsEqual(new Vector2I(19, 7));
 
         AssertThat(LevelDefinition.IsPathConnectedAndInBounds(path, GameConstants.GridCols, GameConstants.GridRows)).IsTrue();
@@ -84,10 +85,10 @@ public class LevelDefinitionTest
     [TestCase]
     public void Level3_PathIsValid_AndEndsAtBase()
     {
-        var path = Levels.Level3.PathCells;
+        var path = Levels.Level3.Paths[0];
 
         AssertThat(path.Count > 0).IsTrue();
-        AssertThat(Levels.Level3.SpawnCell).IsEqual(new Vector2I(0, 5));
+        AssertThat(Levels.Level3.SpawnCells[0]).IsEqual(new Vector2I(0, 5));
         AssertThat(Levels.Level3.BaseCell).IsEqual(new Vector2I(19, 5));
 
         AssertThat(LevelDefinition.IsPathConnectedAndInBounds(path, GameConstants.GridCols, GameConstants.GridRows)).IsTrue();
@@ -109,6 +110,113 @@ public class LevelDefinitionTest
         AssertThat(Levels.Level3.Waves[3].TotalEnemies).IsEqual(5);
         // 2 basic + 1 swarm cluster + 2 armored (2 + 3 + 2)
         AssertThat(Levels.Level3.Waves[4].TotalEnemies).IsEqual(7);
+    }
+
+    [TestCase]
+    public void Levels1To3_EachHaveExactlyOneRoute_AndUnchangedSpawnBase()
+    {
+        AssertSingleRoute(Levels.Level1, new Vector2I(0, GameConstants.PathRow), new Vector2I(GameConstants.GridCols - 1, GameConstants.PathRow));
+        AssertSingleRoute(Levels.Level2, new Vector2I(0, 7), new Vector2I(19, 7));
+        AssertSingleRoute(Levels.Level3, new Vector2I(0, 5), new Vector2I(19, 5));
+    }
+
+    [TestCase]
+    public void Get_ResolvesLevel4()
+    {
+        AssertThat(Levels.Get(4)).IsEqual(Levels.Level4);
+        AssertThat(Levels.Get(4).Id).IsEqual(4);
+    }
+
+    [TestCase]
+    public void Level4_HasTwoRoutes_BothStartingLeft_AndSharingBase()
+    {
+        var paths = Levels.Level4.Paths;
+
+        AssertThat(paths.Count).IsEqual(2);
+        AssertThat(paths[0][0].X).IsEqual(0);
+        AssertThat(paths[1][0].X).IsEqual(0);
+        AssertThat(paths[0][^1]).IsEqual(paths[1][^1]);
+
+        AssertThat(Levels.Level4.SpawnCells.Count).IsEqual(2);
+        AssertThat(Levels.Level4.SpawnCells[0]).IsEqual(new Vector2I(0, 3));
+        AssertThat(Levels.Level4.SpawnCells[1]).IsEqual(new Vector2I(0, 11));
+        AssertThat(Levels.Level4.BaseCell).IsEqual(new Vector2I(19, 7));
+    }
+
+    [TestCase]
+    public void Level4_EachRouteIsValid_AndDoesNotSelfIntersect()
+    {
+        foreach (var route in Levels.Level4.Paths)
+        {
+            AssertThat(LevelDefinition.IsPathConnectedAndInBounds(route, GameConstants.GridCols, GameConstants.GridRows)).IsTrue();
+            AssertThat(LevelDefinition.PathSelfIntersects(route)).IsFalse();
+        }
+    }
+
+    [TestCase]
+    public void Level4_RoutesShareConvergeCells_AndDivergeAtSplitCells()
+    {
+        var routeA = Levels.Level4.Paths[0];
+        var routeB = Levels.Level4.Paths[1];
+
+        var cellsA = new HashSet<Vector2I>(routeA);
+        var cellsB = new HashSet<Vector2I>(routeB);
+
+        // The two routes are NOT identical — they diverge between converge cells.
+        AssertThat(cellsA.SetEquals(cellsB)).IsFalse();
+
+        // Shared converge cells (and the row-7 runs between them).
+        foreach (var converge in new[] { new Vector2I(5, 7), new Vector2I(11, 7), new Vector2I(17, 7) })
+        {
+            AssertThat(cellsA.Contains(converge)).IsTrue();
+            AssertThat(cellsB.Contains(converge)).IsTrue();
+        }
+
+        // Split cells are shared, but the cell immediately after each split goes
+        // to a different row on each route.
+        AssertThat(cellsA.Contains(new Vector2I(8, 7)) && cellsB.Contains(new Vector2I(8, 7))).IsTrue();
+        AssertThat(cellsA.Contains(new Vector2I(8, 4))).IsTrue();   // route A splits up
+        AssertThat(cellsB.Contains(new Vector2I(8, 10))).IsTrue();  // route B splits down
+
+        AssertThat(cellsA.Contains(new Vector2I(14, 7)) && cellsB.Contains(new Vector2I(14, 7))).IsTrue();
+        AssertThat(cellsA.Contains(new Vector2I(14, 10))).IsTrue(); // route A splits down
+        AssertThat(cellsB.Contains(new Vector2I(14, 4))).IsTrue();  // route B splits up
+    }
+
+    [TestCase]
+    public void Level4_AllowsAllTowerTypes()
+    {
+        AssertThat(Levels.Level4.AllowCannonTower).IsTrue();
+        AssertThat(Levels.Level4.AllowLaserTower).IsTrue();
+    }
+
+    [TestCase]
+    public void Level4_EveryWaveMixesAllThreeEnemyKinds()
+    {
+        AssertThat(Levels.Level4.Waves.Count).IsEqual(5);
+
+        foreach (var wave in Levels.Level4.Waves)
+        {
+            AssertThat(HasSpawn(wave, SpawnKind.Basic)).IsTrue();
+            AssertThat(HasSpawn(wave, SpawnKind.SwarmCluster)).IsTrue();
+            AssertThat(HasSpawn(wave, SpawnKind.Armored)).IsTrue();
+        }
+    }
+
+    private static void AssertSingleRoute(LevelDefinition level, Vector2I spawnCell, Vector2I baseCell)
+    {
+        AssertThat(level.Paths.Count).IsEqual(1);
+        AssertThat(level.SpawnCells.Count).IsEqual(1);
+        AssertThat(level.SpawnCells[0]).IsEqual(spawnCell);
+        AssertThat(level.BaseCell).IsEqual(baseCell);
+    }
+
+    private static bool HasSpawn(WaveDefinition wave, SpawnKind kind)
+    {
+        foreach (var spawn in wave.Spawns)
+            if (spawn == kind)
+                return true;
+        return false;
     }
 
     private static bool HasArmoredSpawn(LevelDefinition level)
