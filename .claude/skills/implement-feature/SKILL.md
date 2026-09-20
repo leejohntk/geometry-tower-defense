@@ -69,11 +69,14 @@ Human describes feature. Orchestrator writes the spec to `.claude/specs/{feature
 
 ## Phase 7: PR
 
-1. Stage all changes, commit with conventional commit message.
-2. Push feature branch.
-3. Create PR via `gh pr create` with verification checklist from `.github/pull_request_template.md`.
-4. Fill checklist: build status, test results, review findings (summary), holdout results, simplify pass done.
-5. Update state: `"phase": "awaiting_playtest"`
+1. Stage all game-code + test changes, commit with conventional commit message.
+2. Final bookkeeping commit on the feature branch (so `main` stays clean after merge):
+   - Move holdouts to `.claude/holdouts/regression/{name}/`.
+   - Update `.claude/memory/current-feature.md` (mark feature complete + add to Recent Features).
+3. Push feature branch.
+4. Create PR via `gh pr create` with verification checklist from `.github/pull_request_template.md`.
+5. Fill checklist: build status, test results, review findings (summary), holdout results, simplify pass done.
+6. Update state: `"phase": "awaiting_playtest"`
 
 ## Phase 8: Human Playtest
 
@@ -84,10 +87,8 @@ Human playtests. Two outcomes:
 ## Merge Cleanup (post-approval)
 
 1. `gh pr merge --squash {pr_url}`
-2. `git checkout main && git pull`
+2. `git fetch origin && git checkout main && git pull --ff-only`. If the working tree is dirty, STOP and surface the files to the human — never `git reset --hard`, `git clean -f`, or `git restore` to clear it.
 3. `git branch -d feature/{name}`
-4. Move holdouts to `.claude/holdouts/regression/{name}/`
-5. Mark feature complete in `.claude/memory/current-feature.md`
-6. Delete `.claude/state.json`
-7. Prune merged worktrees — for every `.claude/worktrees/agent-*` whose HEAD is an ancestor of `main`, `git worktree remove --force` it (subagent-isolation scratch is superseded once merged).
-8. Check `.claude/transcripts/.distiller_needed`; if set, run `/evolve-harness` (distillation) before declaring merge complete.
+4. Delete `.claude/state.json`
+5. Prune merged worktrees — for every `.claude/worktrees/agent-*` whose HEAD is an ancestor of `main`, `git worktree remove --force` it (subagent-isolation scratch is superseded once merged).
+6. Check `.claude/transcripts/.distiller_needed`; if set, run `/evolve-harness` (distillation) before declaring merge complete.
