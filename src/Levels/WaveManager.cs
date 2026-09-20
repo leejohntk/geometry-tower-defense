@@ -147,14 +147,21 @@ public partial class WaveManager : Node
             return;
 
         var spawn = _pendingSpawns.Dequeue();
-        if (spawn == SpawnKind.Basic)
+        switch (spawn)
         {
-            SpawnEnemy(EnemyKind.Basic, Vector2.Zero);
-        }
-        else
-        {
-            foreach (var offset in GenerateClusterOffsets(GameConstants.SwarmClusterSize, GameConstants.SwarmClusterRadius))
-                SpawnEnemy(EnemyKind.Swarm, offset);
+            case SpawnKind.Basic:
+                SpawnEnemy(EnemyKind.Basic, Vector2.Zero);
+                break;
+
+            case SpawnKind.Armored:
+                // Single armored enemy: fixed to the path anchor (no formation offset/orbit).
+                SpawnEnemy(EnemyKind.Armored, Vector2.Zero);
+                break;
+
+            case SpawnKind.SwarmCluster:
+                foreach (var offset in GenerateClusterOffsets(GameConstants.SwarmClusterSize, GameConstants.SwarmClusterRadius))
+                    SpawnEnemy(EnemyKind.Swarm, offset);
+                break;
         }
     }
 

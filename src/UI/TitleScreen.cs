@@ -59,11 +59,20 @@ public partial class TitleScreen : Control
         level2Button.AddThemeFontSizeOverride("font_size", 22);
         AddChild(level2Button);
 
+        // Level 3 button
+        var level3Button = new Button();
+        level3Button.Text = "Level 3";
+        level3Button.Position = new Vector2(viewportSize.X / 2f - 120, viewportSize.Y / 2f + 180);
+        level3Button.Size = new Vector2(240, 50);
+        level3Button.Pressed += () => EmitSignal(SignalName.LevelSelected, Levels.Level3.Id);
+        level3Button.AddThemeFontSizeOverride("font_size", 22);
+        AddChild(level3Button);
+
         // Instructions text
         var instructions = new Label();
         instructions.Text = "Select a level to begin.\nPlace towers to defend your base. Survive 5 waves to win!";
         instructions.HorizontalAlignment = HorizontalAlignment.Center;
-        instructions.Position = new Vector2(0, viewportSize.Y / 2f + 180);
+        instructions.Position = new Vector2(0, viewportSize.Y / 2f + 250);
         instructions.Size = new Vector2(viewportSize.X, 60);
         instructions.AddThemeFontSizeOverride("font_size", 14);
         instructions.AddThemeColorOverride("font_color", new Color(0.5f, 0.5f, 0.7f));

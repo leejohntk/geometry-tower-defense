@@ -86,4 +86,37 @@ public class GameConstantsTest
         AssertThat(GameConstants.PlayAreaWidth).IsEqual(1280);
         AssertThat(GameConstants.PlayAreaHeight).IsEqual(896);
     }
+
+    [TestCase]
+    public void SwarmEnemyHP_IsFive()
+    {
+        AssertThat(GameConstants.SwarmEnemyHP).IsEqual(5);
+    }
+
+    [TestCase]
+    public void ArmoredEnemyConstants_AreCorrect()
+    {
+        AssertThat(GameConstants.ArmoredEnemyHP).IsEqual(14);
+        AssertThat(GameConstants.ArmoredEnemyArmor).IsEqual(5);
+        AssertThat(GameConstants.ArmoredEnemySpeed).IsEqual(2f);
+        AssertThat(GameConstants.ArmoredEnemyDiameter).IsEqual(48);
+        AssertThat(GameConstants.ArmoredCoinDropPerKill).IsEqual(2);
+    }
+
+    [TestCase]
+    public void LaserTowerConstants_AreCorrect()
+    {
+        AssertThat(GameConstants.LaserTowerRange).IsEqual(3);
+        AssertThat(GameConstants.LaserTowerDps).IsEqual(4f);
+        AssertThat(GameConstants.LaserTowerCost).IsEqual(15);
+    }
+
+    [TestCase]
+    public void TowerLookups_HandleLaser()
+    {
+        AssertThat(GameConstants.TowerCost(TowerType.Laser)).IsEqual(15);
+        AssertThat(GameConstants.TowerRange(TowerType.Laser)).IsEqual(3);
+        AssertThat(GameConstants.TowerCost(TowerType.Arrow)).IsEqual(10);
+        AssertThat(GameConstants.TowerCost(TowerType.Cannon)).IsEqual(10);
+    }
 }

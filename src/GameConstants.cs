@@ -38,7 +38,7 @@ public static class GameConstants
     public const int CannonTowerCost = 10;
 
     // Swarm Enemy
-    public const int SwarmEnemyHP = 3;
+    public const int SwarmEnemyHP = 5;
     public const int SwarmEnemyDiameter = 24;
     public const float SwarmEnemySpeed = 2f;
     public const int SwarmClusterSize = 3;
@@ -50,6 +50,18 @@ public static class GameConstants
     // At 2.5 rad/s each member completes a full revolution in ~2.5 seconds.
     public const float SwarmClusterRotationSpeed = 2.5f;
     public const int SwarmCoinDropPerKill = 1;
+
+    // Armored Enemy
+    public const int ArmoredEnemyHP = 14;
+    public const int ArmoredEnemyArmor = 5;
+    public const float ArmoredEnemySpeed = 2f;
+    public const int ArmoredEnemyDiameter = 48;
+    public const int ArmoredCoinDropPerKill = 2;
+
+    // Laser Tower
+    public const int LaserTowerRange = 3;
+    public const float LaserTowerDps = 4f;
+    public const int LaserTowerCost = 15;
 
     // Projectile
     public const float ProjectileSpeed = 8f;
@@ -82,9 +94,17 @@ public static class GameConstants
     public static float CellDistanceInPixels(float cells) => cells * CellSize;
 
     // Tower type lookups (used by placement preview and UI before a tower instance exists)
-    public static int TowerCost(TowerType type) =>
-        type == TowerType.Cannon ? CannonTowerCost : ArrowTowerCost;
+    public static int TowerCost(TowerType type) => type switch
+    {
+        TowerType.Cannon => CannonTowerCost,
+        TowerType.Laser => LaserTowerCost,
+        _ => ArrowTowerCost
+    };
 
-    public static int TowerRange(TowerType type) =>
-        type == TowerType.Cannon ? CannonTowerRange : ArrowTowerRange;
+    public static int TowerRange(TowerType type) => type switch
+    {
+        TowerType.Cannon => CannonTowerRange,
+        TowerType.Laser => LaserTowerRange,
+        _ => ArrowTowerRange
+    };
 }

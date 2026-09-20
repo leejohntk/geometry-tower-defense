@@ -35,7 +35,7 @@ public class EnemyTest
     }
 
     [TestCase]
-    public void SwarmEnemy_HasThreeHP_Diameter24()
+    public void SwarmEnemy_HasFiveHP_Diameter24()
     {
         var enemy = new Enemy();
         enemy.Configure(EnemyKind.Swarm);
@@ -45,8 +45,8 @@ public class EnemyTest
         AssertThat(enemy.CoinDrop).IsEqual(1);
         AssertThat(enemy.Kind).IsEqual(EnemyKind.Swarm);
 
-        // 3 HP: 2 damage leaves it alive, 1 more kills it.
-        enemy.TakeDamage(2);
+        // 5 HP: 4 damage leaves it alive, 1 more kills it.
+        enemy.TakeDamage(4);
         AssertThat(enemy.IsDead).IsFalse();
         enemy.TakeDamage(1);
         AssertThat(enemy.IsDead).IsTrue();
@@ -57,7 +57,7 @@ public class EnemyTest
     {
         var enemy = new Enemy();
         enemy.Configure(EnemyKind.Swarm);
-        enemy.TakeDamage(3); // dead
+        enemy.TakeDamage(5); // dead (swarm HP is 5)
 
         AssertThat(enemy.IsDead).IsTrue();
         enemy.TakeDamage(100); // should not re-kill or throw
@@ -175,5 +175,122 @@ public class EnemyTest
 
         enemy.ResetForPool();
         AssertThat(enemy.FormationAngularSpeed).IsEqual(0f);
+    }
+
+    [TestCase]
+    public void ArmoredEnemy_HasCorrectStats()
+    {
+        var enemy = new Enemy();
+        enemy.Configure(EnemyKind.Armored);
+
+        AssertThat(enemy.Kind).IsEqual(EnemyKind.Armored);
+        AssertThat(enemy.CurrentHP).IsEqual(14f);
+        AssertThat(enemy.Armor).IsEqual(5);
+        AssertThat(enemy.Diameter).IsEqual(48f);
+        AssertThat(enemy.CollisionRadius).IsEqual(24f);
+        AssertThat(enemy.CoinDrop).IsEqual(2);
+    }
+
+    [TestCase]
+    public void ArmoredEnemy_ArrowDamage_ReducedByArmor()
+    {
+        var enemy = new Enemy();
+        enemy.Configure(EnemyKind.Armored);
+
+        // Arrow (10 dmg) - 5 armor = 5 applied.
+        enemy.TakeDamage(GameConstants.ArrowTowerDamage);
+        AssertThat(enemy.CurrentHP).IsEqual(14f - 5f);
+    }
+
+    [TestCase]
+    public void ArmoredEnemy_CannonDamage_ReducedByArmor()
+    {
+        var enemy = new Enemy();
+        enemy.Configure(EnemyKind.Armored);
+
+        // Cannon (15 dmg) - 5 armor = 10 applied.
+        enemy.TakeDamage(GameConstants.CannonTowerDamage);
+        AssertThat(enemy.CurrentHP).IsEqual(14f - 10f);
+    }
+
+    [TestCase]
+    public void ArmoredEnemy_DamageAtOrBelowArmor_ClampsToZero()
+    {
+        // Exactly the armor value.
+        var exact = new Enemy();
+        exact.Configure(EnemyKind.Armored);
+        exact.TakeDamage(5);
+        AssertThat(exact.CurrentHP).IsEqual(14f);
+        AssertThat(exact.IsDead).IsFalse();
+
+        // Below the armor value: must not heal or go negative.
+        var below = new Enemy();
+        below.Configure(EnemyKind.Armored);
+        below.TakeDamage(3);
+        AssertThat(below.CurrentHP).IsEqual(14f);
+        AssertThat(below.IsDead).IsFalse();
+    }
+
+    [TestCase]
+    public void ArmoredEnemy_IgnoreArmor_BypassesReduction()
+    {
+        var enemy = new Enemy();
+        enemy.Configure(EnemyKind.Armored);
+
+        // 4 damage would be fully absorbed by 5 armor; ignoring armor applies it all.
+        enemy.TakeDamage(4, ignoreArmor: true);
+        AssertThat(enemy.CurrentHP).IsEqual(14f - 4f);
+    }
+
+    [TestCase]
+    public void ArmoredEnemy_LaserDps_IgnoresArmor()
+    {
+        var enemy = new Enemy();
+        enemy.Configure(EnemyKind.Armored);
+
+        // Laser drains Dps per second with armor bypass.
+        enemy.TakeDamage(GameConstants.LaserTowerDps, ignoreArmor: true);
+        AssertThat(enemy.CurrentHP).IsEqual(14f - GameConstants.LaserTowerDps);
+    }
+
+    [TestCase]
+    public void ArmoredEnemy_ArrowNeedsExactlyThreeHits()
+    {
+        var enemy = new Enemy();
+        enemy.Configure(EnemyKind.Armored);
+
+        enemy.TakeDamage(GameConstants.ArrowTowerDamage);
+        enemy.TakeDamage(GameConstants.ArrowTowerDamage);
+        AssertThat(enemy.IsDead).IsFalse();
+
+        enemy.TakeDamage(GameConstants.ArrowTowerDamage);
+        AssertThat(enemy.IsDead).IsTrue();
+    }
+
+    [TestCase]
+    public void ArmoredEnemy_CannonNeedsExactlyTwoHits()
+    {
+        var enemy = new Enemy();
+        enemy.Configure(EnemyKind.Armored);
+
+        enemy.TakeDamage(GameConstants.CannonTowerDamage);
+        AssertThat(enemy.IsDead).IsFalse();
+
+        enemy.TakeDamage(GameConstants.CannonTowerDamage);
+        AssertThat(enemy.IsDead).IsTrue();
+    }
+
+    [TestCase]
+    public void PooledReuse_ArmoredThenBasic_ResetsArmor()
+    {
+        var enemy = new Enemy();
+        enemy.Configure(EnemyKind.Armored);
+        AssertThat(enemy.Armor).IsEqual(5);
+
+        enemy.ResetForPool();
+        enemy.Configure(EnemyKind.Basic);
+
+        AssertThat(enemy.Armor).IsEqual(0);
+        AssertThat(enemy.CurrentHP).IsEqual(10f);
     }
 }

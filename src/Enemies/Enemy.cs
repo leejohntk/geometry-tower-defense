@@ -4,12 +4,14 @@ using System.Collections.Generic;
 namespace GeometryTowerDefense;
 
 /// <summary>
-/// Identifies an enemy variant. Basic is a red circle; Swarm is a smaller orange circle.
+/// Identifies an enemy variant. Basic is a red circle; Swarm is a smaller orange circle;
+/// Armored is a grey square (diamond) with flat damage reduction.
 /// </summary>
 public enum EnemyKind
 {
     Basic,
-    Swarm
+    Swarm,
+    Armored
 }
 
 /// <summary>
@@ -35,6 +37,7 @@ public partial class Enemy : Node2D
     private float _currentHP;
     private float _maxHP;
     private float _speed;
+    private int _armor;
     private int _diameter;
     private Color _fillColor;
     private Color _borderColor;
@@ -47,6 +50,16 @@ public partial class Enemy : Node2D
     public EnemyKind Kind { get; private set; } = EnemyKind.Basic;
 
     public bool IsDead => _isDead;
+
+    /// <summary>
+    /// Flat damage reduction applied to each incoming hit unless the attack ignores armor.
+    /// </summary>
+    public int Armor => _armor;
+
+    /// <summary>
+    /// Current HP (read-only). Useful for tests that verify exact damage application.
+    /// </summary>
+    public float CurrentHP => _currentHP;
 
     /// <summary>
     /// Coin value awarded when this enemy is destroyed.
@@ -89,6 +102,7 @@ public partial class Enemy : Node2D
         {
             case EnemyKind.Basic:
                 _maxHP = GameConstants.EnemyHP;
+                _armor = 0;
                 _speed = GameConstants.EnemySpeed;
                 _diameter = GameConstants.EnemyDiameter;
                 _fillColor = new Color(0.9f, 0.1f, 0.1f);   // Red fill
@@ -98,11 +112,22 @@ public partial class Enemy : Node2D
 
             case EnemyKind.Swarm:
                 _maxHP = GameConstants.SwarmEnemyHP;
+                _armor = 0;
                 _speed = GameConstants.SwarmEnemySpeed;
                 _diameter = GameConstants.SwarmEnemyDiameter;
                 _fillColor = new Color(1f, 0.55f, 0.1f);     // Orange fill
                 _borderColor = new Color(0.85f, 0.4f, 0.05f); // Darker orange border
                 CoinDrop = GameConstants.SwarmCoinDropPerKill;
+                break;
+
+            case EnemyKind.Armored:
+                _maxHP = GameConstants.ArmoredEnemyHP;
+                _armor = GameConstants.ArmoredEnemyArmor;
+                _speed = GameConstants.ArmoredEnemySpeed;
+                _diameter = GameConstants.ArmoredEnemyDiameter;
+                _fillColor = new Color(0.6f, 0.6f, 0.65f);    // Grey fill
+                _borderColor = new Color(0.3f, 0.3f, 0.35f);  // Darker grey border
+                CoinDrop = GameConstants.ArmoredCoinDropPerKill;
                 break;
         }
 
@@ -125,7 +150,7 @@ public partial class Enemy : Node2D
         _circleContainer.Name = "CircleContainer";
         _circleContainer.MouseFilter = Control.MouseFilterEnum.Ignore;
         AddChild(_circleContainer);
-        _circleContainer.Draw += () => DrawEnemyCircle(_circleContainer);
+        _circleContainer.Draw += () => DrawEnemyShape(_circleContainer);
         UpdateVisual();
     }
 
@@ -139,12 +164,37 @@ public partial class Enemy : Node2D
         _circleContainer.QueueRedraw();
     }
 
-    private void DrawEnemyCircle(Control container)
+    private void DrawEnemyShape(Control container)
     {
         if (!IsInstanceValid(container)) return;
 
         float radius = _diameter / 2f;
         Vector2 center = new Vector2(_diameter / 2f, _diameter / 2f);
+
+        if (Kind == EnemyKind.Armored)
+        {
+            // Grey square rendered as a diamond (rotated 45°), matching the geometric theme.
+            var diamond = new Vector2[]
+            {
+                new Vector2(center.X, 0f),          // top
+                new Vector2(_diameter, center.Y),   // right
+                new Vector2(center.X, _diameter),   // bottom
+                new Vector2(0f, center.Y)           // left
+            };
+            container.DrawPolygon(diamond, new[] { _fillColor });
+
+            // Darker inset border so the outline hugs the diamond silhouette.
+            var inset = new Vector2[]
+            {
+                new Vector2(center.X, 2f),
+                new Vector2(_diameter - 2f, center.Y),
+                new Vector2(center.X, _diameter - 2f),
+                new Vector2(2f, center.Y),
+                new Vector2(center.X, 2f)
+            };
+            container.DrawPolyline(inset, _borderColor, 2.0f);
+            return;
+        }
 
         // Filled circle
         container.DrawCircle(center, radius, _fillColor);
@@ -249,21 +299,24 @@ public partial class Enemy : Node2D
         _formationOffset = Vector2.Zero;
         _formationAngularSpeed = 0f;
         _anchorPosition = Vector2.Zero;
+        _armor = 0;
         _currentHP = _maxHP > 0 ? _maxHP : GameConstants.EnemyHP;
         _isDead = false;
         Position = Vector2.Zero;
     }
 
     /// <summary>
-    /// Apply damage to this enemy. If HP reaches 0, enemy is destroyed.
+    /// Apply damage to this enemy. Flat armor reduces the damage (clamped to >= 0)
+    /// unless ignoreArmor is true. If HP reaches 0, enemy is destroyed.
     /// The Destroyed signal is emitted; GameManager handles release to pool.
     /// </summary>
-    public void TakeDamage(float damage)
+    public void TakeDamage(float damage, bool ignoreArmor = false)
     {
         if (_isDead)
             return;
 
-        _currentHP -= damage;
+        float applied = Mathf.Max(ignoreArmor ? damage : damage - _armor, 0f);
+        _currentHP -= applied;
 
         if (_currentHP <= 0)
         {

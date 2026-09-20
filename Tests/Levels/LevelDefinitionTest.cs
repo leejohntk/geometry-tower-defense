@@ -64,6 +64,63 @@ public class LevelDefinitionTest
     }
 
     [TestCase]
+    public void Level1And2_HaveNoArmoredSpawns_AndNoLaserTower()
+    {
+        AssertThat(Levels.Level1.AllowLaserTower).IsFalse();
+        AssertThat(Levels.Level2.AllowLaserTower).IsFalse();
+
+        AssertThat(HasArmoredSpawn(Levels.Level1)).IsFalse();
+        AssertThat(HasArmoredSpawn(Levels.Level2)).IsFalse();
+    }
+
+    [TestCase]
+    public void Level3_HasArmoredSpawns_AndAllowsLaserTower()
+    {
+        AssertThat(Levels.Level3.AllowLaserTower).IsTrue();
+        AssertThat(Levels.Level3.AllowCannonTower).IsTrue();
+        AssertThat(HasArmoredSpawn(Levels.Level3)).IsTrue();
+    }
+
+    [TestCase]
+    public void Level3_PathIsValid_AndEndsAtBase()
+    {
+        var path = Levels.Level3.PathCells;
+
+        AssertThat(path.Count > 0).IsTrue();
+        AssertThat(Levels.Level3.SpawnCell).IsEqual(new Vector2I(0, 5));
+        AssertThat(Levels.Level3.BaseCell).IsEqual(new Vector2I(19, 5));
+
+        AssertThat(LevelDefinition.IsPathConnectedAndInBounds(path, GameConstants.GridCols, GameConstants.GridRows)).IsTrue();
+        AssertThat(LevelDefinition.PathSelfIntersects(path)).IsFalse();
+    }
+
+    [TestCase]
+    public void Level3_WaveComposition_MatchesSpec()
+    {
+        AssertThat(Levels.Level3.Waves.Count).IsEqual(5);
+
+        // 4 basic
+        AssertThat(Levels.Level3.Waves[0].TotalEnemies).IsEqual(4);
+        // 6 basic
+        AssertThat(Levels.Level3.Waves[1].TotalEnemies).IsEqual(6);
+        // 4 basic + 1 swarm cluster (4 + 3)
+        AssertThat(Levels.Level3.Waves[2].TotalEnemies).IsEqual(7);
+        // 3 basic + 2 armored
+        AssertThat(Levels.Level3.Waves[3].TotalEnemies).IsEqual(5);
+        // 2 basic + 1 swarm cluster + 2 armored (2 + 3 + 2)
+        AssertThat(Levels.Level3.Waves[4].TotalEnemies).IsEqual(7);
+    }
+
+    private static bool HasArmoredSpawn(LevelDefinition level)
+    {
+        foreach (var wave in level.Waves)
+            foreach (var spawn in wave.Spawns)
+                if (spawn == SpawnKind.Armored)
+                    return true;
+        return false;
+    }
+
+    [TestCase]
     public void BuildPath_ExpandsCornersWithoutDuplicates()
     {
         var corners = new[] { new Vector2I(0, 0), new Vector2I(2, 0), new Vector2I(2, 2) };

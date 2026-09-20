@@ -34,6 +34,16 @@ public abstract partial class Tower : Node2D
     protected abstract Color RangeColor { get; }
 
     /// <summary>
+    /// Continuous damage per second for drain-style towers. Zero for discrete-fire towers.
+    /// </summary>
+    public virtual float Dps => 0f;
+
+    /// <summary>
+    /// True if this tower damages continuously every frame (no projectile, no cooldown).
+    /// </summary>
+    public virtual bool IsContinuous => false;
+
+    /// <summary>
     /// Tower range in pixels.
     /// </summary>
     public float RangePixels => GameConstants.CellDistanceInPixels(RangeCells);

@@ -197,6 +197,9 @@ public partial class GameManager : Node2D
         // Try to fire towers at targets
         UpdateTowerFiring();
 
+        // Apply continuous tower drain (laser) to their current targets
+        UpdateTowerDrain((float)delta);
+
         // Update projectile collision detection
         UpdateProjectileCollisions();
     }
@@ -237,6 +240,10 @@ public partial class GameManager : Node2D
     {
         foreach (var tower in _activeTowers)
         {
+            // Continuous towers drain instead of firing projectiles.
+            if (tower.IsContinuous)
+                continue;
+
             if (tower.CurrentTarget == null || tower.CurrentTarget.IsDead)
                 continue;
 
@@ -259,6 +266,29 @@ public partial class GameManager : Node2D
                 projectile.Dissipated += OnProjectileDissipated;
                 _activeProjectiles.Add(projectile);
             }
+        }
+    }
+
+    /// <summary>
+    /// Continuous towers (laser) drain their current target every frame. The target is
+    /// the nearest in-range enemy already computed by UpdateTowerTargeting — no extra scan.
+    /// Laser damage ignores armor.
+    /// </summary>
+    private void UpdateTowerDrain(float delta)
+    {
+        foreach (var tower in _activeTowers)
+        {
+            if (!tower.IsContinuous)
+                continue;
+
+            var target = tower.CurrentTarget;
+            if (target == null || target.IsDead)
+                continue;
+
+            if (!tower.IsTargetInRange(target))
+                continue;
+
+            target.TakeDamage(tower.Dps * delta, ignoreArmor: true);
         }
     }
 
@@ -506,7 +536,12 @@ public partial class GameManager : Node2D
         _gridManager.PlaceTower(row, col);
 
         // Create tower
-        Tower tower = type == TowerType.Cannon ? new CannonTower() : new ArrowTower();
+        Tower tower = type switch
+        {
+            TowerType.Cannon => new CannonTower(),
+            TowerType.Laser => new LaserTower(),
+            _ => new ArrowTower()
+        };
         tower.Initialize(row, col);
         _activeTowers.Add(tower);
         AddChild(tower);
