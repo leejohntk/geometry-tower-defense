@@ -14,6 +14,8 @@ metadata:
 | 2026-07-07 | Initial scaffold created | N/A | Human spec | Awaiting first feature |
 | 2026-07-10 | First distillation run | N/A | Stop hook (73 tool calls) | 3 low-risk updates applied, 2 medium-risk proposals queued |
 | 2026-09-17 | Second distillation run | N/A | Stop hook (flag set 2026-09-17, counter 45) | 2 low-risk memory updates applied, 4 medium proposals queued, 1 high-risk finding escalated |
+| 2026-09-20 | Third distillation run | N/A | Stop hook (completed 2026-09-20T03:54:07, counter 31) | Proposals landed as PR #14 (M3, M6, M7, H4, M8, "No Local Commits on Main" rule); run's own log entry lost (committed on main, then discarded by reset/branch shuffle) — reconstructed below in run #4 |
+| 2026-09-20 | Fourth distillation run | N/A | Stop hook (flag set 2026-09-20T04:24:24, counter 31) | 2 low-risk memory updates applied; 2 medium skill proposals queued (merge-cleanup git safety + post-merge bookkeeping); 1 high finding re-escalated (H3 hook guard for destructive git ops) |
 
 ## Distillation Log
 
@@ -63,3 +65,32 @@ metadata:
 - **H2 (HIGH — blocked, carried forward from 2026-07-10).** Session transcript capture requires a SessionEnd hook or a `stop.sh` change. Both are human-only. Still the single largest limit on distillation quality.
 
 **Applied this run (both LOW risk, memory only):** refresh of `harness-feedback.md` (new "What's Broken" entry for the inert hooks; 2026-09-17 observations; changelog pointer deduplicated) and `harness-evolution.md` (change-history row + this log entry). No rule, skill, agent-prompt, or command file was modified — all four medium proposals await human approval, per the tier table in `harness-safety.md`.
+
+### 2026-09-20 — Third Distillation Run (record reconstructed in run #4)
+
+**Status:** Completed 2026-09-20T03:54:07Z (`.last_distillation` updated, counter reset). Its proposals landed as PR #14, but its own memory log entry was **lost** — committed on `main`, then discarded by the `git reset --hard origin/main` / branch-delete shuffle (see run #4 Pattern 3). This entry reconstructs the record from PR #14's content and the scope note.
+
+**Window:** PR #13 armored-laser merge review.
+
+**Proposals (all landed via PR #14, squash commit `2954c0d`):**
+- **M3 (MEDIUM, applied)** — `Bash` dropped from `reviewer.md` / `investigator.md` tool lists.
+- **M6 (MEDIUM, applied)** — "Destructive Git Ops" section added to `.claude/rules/harness-safety.md`.
+- **M7 (MEDIUM, applied)** — CLAUDE.md `.NET 8` → `.NET 10`.
+- **H4 (HIGH, human-applied)** — `Edit(.claude/settings.json)` deny in `.claude/settings.json`.
+- **M8 (MEDIUM, applied)** — stale `.claude/worktrees/agent-*` pruned.
+- **NEW rule (MEDIUM, applied)** — "No Local Commits on Main" section in `.claude/rules/no-push-to-main.md`.
+- **M5 (SKIPPED)** — prefer Glob/Grep over find/ls. Human answered but ultimately skipped. Treat as open only with fresh evidence; no fresh evidence found this run.
+- **H3 (HIGH, still open)** — guard `reset --hard` / `clean -f` / `checkout -- .` / `restore` in the pre-tool-use hook. Only the guidance version (M6) landed; no hook guard exists yet. Re-escalated in run #4.
+
+### 2026-09-20 — Fourth Distillation Run
+
+**Evidence base:** native Claude Code JSONL `3c60a3c1-…-7ff6e0ace051.jsonl` (window after 2026-09-20T03:54:07Z), git history (PRs #14, #15), harness file inspection.
+
+**Patterns found:**
+1. **Merge Cleanup git step contradicts Destructive Git Ops rule (MEDIUM)** — `skills/implement-feature/SKILL.md` Merge Cleanup step 2 is `git checkout main && git pull`, but agents drifted to `git reset --hard origin/main` after PRs #14 and #15 (three invocations; one denied by the auto-mode classifier as "Irreversible Local Destruction" with a dirty working tree). The skill is silent on the dirty-tree case, so agents improvise. Proposed: step 2 → `git fetch origin && git checkout main && git pull --ff-only`, plus a line that any dirty working tree must be surfaced to the human before cleanup proceeds.
+2. **Post-merge bookkeeping stranded on main (MEDIUM)** — Merge Cleanup steps 4–6 write to the working tree while on `main`, but the new "No Local Commits on Main" rule means those writes can never be committed. `current-feature.md` sat dirty for the whole window. Proposed: explicit step that post-merge bookkeeping is committed on a short-lived `chore/post-merge-{feature}` branch + PR, or stated as committed on the *next* feature branch.
+3. **Run #3 memory writes lost (LOW, applied this run)** — `.last_distillation` was updated but `git log --all --grep="distillation memory"` returned nothing and `harness-evolution.md` had no third-run entry. Root cause: distillation committed on `main`, then discarded by the reset/branch shuffle. Fixed here by reconstructing the run #3 record and adding the "publish through a PR branch" rule to `harness-feedback.md`.
+4. **Distiller flag cadence (INFO)** — flag set 04:24:24Z ~30 min after run #3, counter 31 vs threshold 12. Working as designed (reset then re-trip). No action.
+5. **Null-forgiving `!` idiom (INFO)** — level-4 multi-lens review caught a Security CRITICAL (`WaveManager` null-forgiving deref after mid-wave reset → NRE + leaked enemy). Review process worked correctly. `!` appears in several places in `GameManager.cs`; if it recurs, consider a convention that `!` must immediately follow an explicit null check on the same field. No rule proposed yet.
+
+**Applied this run (LOW risk, memory only):** `harness-evolution.md` (change-history rows + this log entry + reconstructed run #3), `harness-feedback.md` (PR-branch publishing rule + queued medium proposals). Two medium skill proposals and the H3 high finding are queued for human review — not applied, per the tier table in `harness-safety.md`.
