@@ -6,11 +6,12 @@
 
 ## Description
 
-Adds an Armored enemy type and a Laser tower to Level 2.
+Adds an Armored enemy type, a Laser tower, and a new Level 3 that introduces both.
 
-- **Armored enemy** — slow, tough, grey square. Has flat armor that reduces damage from each Arrow or Cannon hit, so neither basic tower can one-shot it. Armor does not affect the Laser tower.
+- **Armored enemy** — tough, grey square, same speed as basic. Has flat armor that reduces damage from each Arrow or Cannon hit, so neither basic tower can one-shot it. Armor does not affect the Laser tower.
 - **Laser tower** — fires a continuous beam (no projectile). Deals small damage every frame as a "drain" to a single target: the nearest enemy in range, matching how Arrow/Cannon already target. Damage ignores armor. Range is shorter than the Arrow tower.
 - Swarm enemy HP raised from 3 to 5.
+- Armored enemies and the Laser tower appear only in Level 3.
 
 ## Acceptance Criteria
 
@@ -19,7 +20,7 @@ Adds an Armored enemy type and a Laser tower to Level 2.
 - [ ] Laser damage bypasses armor entirely.
 - [ ] Laser tower has 3-cell range (shorter than Arrow's 4) and drains a single nearest target continuously.
 - [ ] Laser tower produces no projectile and no pooling churn.
-- [ ] Armored enemies and the Laser tower are available in Level 2.
+- [ ] Armored enemies and the Laser tower are available in Level 3 only — absent from Levels 1 and 2.
 - [ ] Swarm enemy HP is 5 (was 3).
 - [ ] `dotnet build` exits 0; `dotnet test` all pass.
 
@@ -39,6 +40,7 @@ Adds an Armored enemy type and a Laser tower to Level 2.
 - `LevelDefinition.AllowCannonTower` pattern — extended with `AllowLaserTower`.
 - `SpawnKind` / `EnemyKind` enums — extended with `Armored`.
 - `TowerType` enum — extended with `Laser`.
+- `Levels` registry — new `Level3` entry (path + waves + tower flags).
 
 ## Constraints
 
@@ -56,8 +58,27 @@ Adds an Armored enemy type and a Laser tower to Level 2.
 
 - Laser splitting to multiple targets (future).
 - Cache + slow re-scan targeting optimization (future perf work).
-- New level (Level 3); this feature extends Level 2.
-- Armored enemy speed/balance beyond the initial values below.
+- Armored enemy balance beyond the initial values below.
+
+## Level 3 Definition
+
+New level, following the Level-2-introduced-new-content pattern. Allows Arrow + Cannon + Laser. Armored enemies appear in later waves.
+
+Path corners (20×14 grid):
+
+```
+(0,5) (4,5) (4,10) (8,10) (8,3) (12,3) (12,10) (16,10) (16,5) (19,5)
+```
+
+Waves:
+
+1. 4 Basic
+2. 6 Basic
+3. 4 Basic + 1 SwarmCluster
+4. 3 Basic + 2 Armored
+5. 2 Basic + 1 SwarmCluster + 2 Armored
+
+`AllowCannonTower: true`, `AllowLaserTower: true`. Path/waves are tunable.
 
 ## Constants (tunable — review before approve)
 
@@ -66,7 +87,7 @@ Adds an Armored enemy type and a Laser tower to Level 2.
 | `SwarmEnemyHP` | 5 | was 3 |
 | `ArmoredEnemyHP` | 14 | 3 arrow hits / 2 cannon hits |
 | `ArmoredEnemyArmor` | 5 | flat reduction |
-| `ArmoredEnemySpeed` | 1.5f | slower than basic (2.0) |
+| `ArmoredEnemySpeed` | 2.0f | same as basic — stays in formation with the wave |
 | `ArmoredEnemyDiameter` | 48 | same as basic |
 | `ArmoredCoinDropPerKill` | 2 | tankier = more reward |
 | `LaserTowerRange` | 3 | cells |

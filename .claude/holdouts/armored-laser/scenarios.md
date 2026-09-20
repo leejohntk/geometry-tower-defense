@@ -37,3 +37,8 @@ Implementer must NOT see this file. Orchestrator runs these during verification.
 
 ## H10 — Cannon AoE applies armor once per armored enemy
 - Two armored enemies inside a cannon blast each take exactly 10 (15 − 5), not 15, not doubled.
+
+## H11 — Level gating
+- Level 1 and Level 2 contain no Armored spawns and do not offer the Laser tower.
+- Level 3 contains Armored spawns and offers the Laser tower (plus Arrow and Cannon).
+- Armored enemy speed equals basic (2.0), so armored stays in formation and blocks the path like basic.
