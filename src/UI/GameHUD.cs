@@ -20,8 +20,10 @@ public partial class GameHUD : CanvasLayer
     private Button? _startWaveButton;
     private Button? _placeArrowButton;
     private Button? _placeCannonButton;
+    private Button? _placeLaserButton;
     private GameManager? _gameManager;
     private bool _allowCannon = false;
+    private bool _allowLaser = false;
     private int _totalWaves = 0;
 
     public override void _Ready()
@@ -130,10 +132,21 @@ public partial class GameHUD : CanvasLayer
         _placeCannonButton.AddThemeFontSizeOverride("font_size", 12);
         AddChild(_placeCannonButton);
 
+        // Place Laser button (hidden for levels that don't allow it)
+        _placeLaserButton = new Button();
+        _placeLaserButton.Text = $"Place Laser ({GameConstants.LaserTowerCost}$)";
+        _placeLaserButton.Position = new Vector2(sidebarCenterX - 80, 120);
+        _placeLaserButton.Size = new Vector2(160, 40);
+        _placeLaserButton.Disabled = true;
+        _placeLaserButton.Visible = false;
+        _placeLaserButton.Pressed += () => EmitSignal(SignalName.PlaceTowerPressed, (int)TowerType.Laser);
+        _placeLaserButton.AddThemeFontSizeOverride("font_size", 12);
+        AddChild(_placeLaserButton);
+
         // Start Wave button — in sidebar, below the tower buttons
         _startWaveButton = new Button();
         _startWaveButton.Text = "Start Wave";
-        _startWaveButton.Position = new Vector2(sidebarCenterX - 70, 130);
+        _startWaveButton.Position = new Vector2(sidebarCenterX - 70, 180);
         _startWaveButton.Size = new Vector2(140, 40);
         _startWaveButton.Pressed += OnStartWavePressed;
         _startWaveButton.AddThemeFontSizeOverride("font_size", 14);
@@ -146,9 +159,12 @@ public partial class GameHUD : CanvasLayer
     public void ConfigureForLevel(LevelDefinition level)
     {
         _allowCannon = level.AllowCannonTower;
+        _allowLaser = level.AllowLaserTower;
         _totalWaves = level.Waves.Count;
         if (_placeCannonButton != null)
             _placeCannonButton.Visible = _allowCannon;
+        if (_placeLaserButton != null)
+            _placeLaserButton.Visible = _allowLaser;
     }
 
     /// <summary>
@@ -211,6 +227,7 @@ public partial class GameHUD : CanvasLayer
         _startWaveButton?.SetDeferred("disabled", true);
         _placeArrowButton?.SetDeferred("disabled", true);
         _placeCannonButton?.SetDeferred("disabled", true);
+        _placeLaserButton?.SetDeferred("disabled", true);
     }
 
     private void OnVictory()
@@ -218,6 +235,7 @@ public partial class GameHUD : CanvasLayer
         _startWaveButton?.SetDeferred("disabled", true);
         _placeArrowButton?.SetDeferred("disabled", true);
         _placeCannonButton?.SetDeferred("disabled", true);
+        _placeLaserButton?.SetDeferred("disabled", true);
     }
 
     private void OnTowerPlacementStateChanged(bool canPlace)
@@ -234,6 +252,9 @@ public partial class GameHUD : CanvasLayer
 
         if (_placeCannonButton != null)
             _placeCannonButton.Disabled = !_allowCannon || coins < GameConstants.CannonTowerCost;
+
+        if (_placeLaserButton != null)
+            _placeLaserButton.Disabled = !_allowLaser || coins < GameConstants.LaserTowerCost;
     }
 
     /// <summary>

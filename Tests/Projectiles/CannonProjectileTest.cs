@@ -51,7 +51,7 @@ public class CannonProjectileTest
         var enemy = new Enemy();
         enemy.Configure(EnemyKind.Swarm);
         enemy.Position = Vector2.Zero;
-        enemy.TakeDamage(3); // already dead (swarm HP is 3)
+        enemy.TakeDamage(5); // already dead (swarm HP is 5)
 
         var enemies = new List<Enemy> { enemy };
         var cannon = new CannonProjectile();

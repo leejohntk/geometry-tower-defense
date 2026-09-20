@@ -6,5 +6,6 @@ namespace GeometryTowerDefense;
 public enum TowerType
 {
     Arrow,
-    Cannon
+    Cannon,
+    Laser
 }

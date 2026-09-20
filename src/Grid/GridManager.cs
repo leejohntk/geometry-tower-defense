@@ -23,6 +23,7 @@ public partial class GridManager : Node2D
     private ColorRect? _previewHighlight;
     private Polygon2D? _previewTower;
     private Control? _previewTowerCircle;
+    private Control? _previewTowerLaser;
     private Control? _previewRange;
     private float _previewRangePixels = GameConstants.CellDistanceInPixels(GameConstants.ArrowTowerRange);
 
@@ -136,6 +137,23 @@ public partial class GridManager : Node2D
         };
         AddChild(_previewTowerCircle);
 
+        // Ghost tower for Laser (semi-transparent magenta/purple circle)
+        _previewTowerLaser = new Control();
+        _previewTowerLaser.Size = new Vector2(GameConstants.CellSize, GameConstants.CellSize);
+        _previewTowerLaser.MouseFilter = Control.MouseFilterEnum.Ignore;
+        _previewTowerLaser.Visible = false;
+        _previewTowerLaser.ZIndex = previewZ + 1;
+        _previewTowerLaser.Draw += () =>
+        {
+            if (!IsInstanceValid(_previewTowerLaser)) return;
+
+            float radius = GameConstants.CellSize / 2f - 4;
+            Vector2 center = new Vector2(GameConstants.CellSize / 2f, GameConstants.CellSize / 2f);
+            _previewTowerLaser.DrawCircle(center, radius, new Color(0.8f, 0.3f, 1.0f, 0.45f));
+            _previewTowerLaser.DrawCircle(center, radius, new Color(0.4f, 0.1f, 0.6f, 0.6f), false, 2.0f);
+        };
+        AddChild(_previewTowerLaser);
+
         // Range preview circle (shown on valid placements)
         _previewRange = new Control();
         _previewRange.MouseFilter = Control.MouseFilterEnum.Ignore;
@@ -223,7 +241,8 @@ public partial class GridManager : Node2D
     /// </summary>
     public void ShowPlacementPreview(int row, int col, bool canPlace, TowerType towerType)
     {
-        if (_previewHighlight == null || _previewTower == null || _previewTowerCircle == null || _previewRange == null)
+        if (_previewHighlight == null || _previewTower == null || _previewTowerCircle == null ||
+            _previewTowerLaser == null || _previewRange == null)
             return;
 
         Vector2 cellPos = new Vector2(col * GameConstants.CellSize, row * GameConstants.CellSize);
@@ -248,6 +267,11 @@ public partial class GridManager : Node2D
         if (canPlace && towerType == TowerType.Cannon)
             _previewTowerCircle.QueueRedraw();
 
+        _previewTowerLaser.Position = cellPos;
+        _previewTowerLaser.Visible = canPlace && towerType == TowerType.Laser;
+        if (canPlace && towerType == TowerType.Laser)
+            _previewTowerLaser.QueueRedraw();
+
         // Range indicator — only on valid spots
         float rangePx = GameConstants.CellDistanceInPixels(GameConstants.TowerRange(towerType));
         _previewRangePixels = rangePx;
@@ -269,6 +293,8 @@ public partial class GridManager : Node2D
             _previewTower.Visible = false;
         if (_previewTowerCircle != null)
             _previewTowerCircle.Visible = false;
+        if (_previewTowerLaser != null)
+            _previewTowerLaser.Visible = false;
         if (_previewRange != null)
             _previewRange.Visible = false;
     }

@@ -6,12 +6,13 @@ namespace GeometryTowerDefense;
 
 /// <summary>
 /// A single spawn entry in a wave. Basic spawns one basic enemy; SwarmCluster
-/// spawns a tight cluster of three swarm enemies.
+/// spawns a tight cluster of three swarm enemies; Armored spawns one armored enemy.
 /// </summary>
 public enum SpawnKind
 {
     Basic,
-    SwarmCluster
+    SwarmCluster,
+    Armored
 }
 
 /// <summary>
@@ -51,6 +52,7 @@ public class LevelDefinition
     public IReadOnlyList<Vector2I> PathCells { get; }
     public IReadOnlyList<WaveDefinition> Waves { get; }
     public bool AllowCannonTower { get; }
+    public bool AllowLaserTower { get; }
 
     /// <summary>
     /// The grid cell (col, row) where enemies spawn.
@@ -67,12 +69,14 @@ public class LevelDefinition
         string displayName,
         IReadOnlyList<Vector2I> pathCells,
         bool allowCannonTower,
+        bool allowLaserTower,
         IReadOnlyList<WaveDefinition> waves)
     {
         Id = id;
         DisplayName = displayName;
         PathCells = pathCells;
         AllowCannonTower = allowCannonTower;
+        AllowLaserTower = allowLaserTower;
         Waves = waves;
     }
 

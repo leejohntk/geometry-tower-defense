@@ -36,6 +36,29 @@ public class TowerTest
     }
 
     [TestCase]
+    public void LaserTower_HasCorrectStats()
+    {
+        var tower = new LaserTower();
+
+        AssertThat(tower.Type).IsEqual(TowerType.Laser);
+        AssertThat(tower.RangeCells).IsEqual(3);
+        AssertThat(tower.Damage).IsEqual(0);
+        AssertThat(tower.FireRate).IsEqual(0f);
+        AssertThat(tower.Cost).IsEqual(10);
+        AssertThat(tower.Dps).IsEqual(4f);
+        AssertThat(tower.IsContinuous).IsTrue();
+    }
+
+    [TestCase]
+    public void DiscreteTowers_AreNotContinuous_AndHaveZeroDps()
+    {
+        AssertThat(new ArrowTower().IsContinuous).IsFalse();
+        AssertThat(new ArrowTower().Dps).IsEqual(0f);
+        AssertThat(new CannonTower().IsContinuous).IsFalse();
+        AssertThat(new CannonTower().Dps).IsEqual(0f);
+    }
+
+    [TestCase]
     public void Tower_Initialize_SetsGridPosition()
     {
         var tower = new ArrowTower();
