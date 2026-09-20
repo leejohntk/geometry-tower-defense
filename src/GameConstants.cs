@@ -61,7 +61,7 @@ public static class GameConstants
     // Laser Tower
     public const int LaserTowerRange = 3;
     public const float LaserTowerDps = 4f;
-    public const int LaserTowerCost = 15;
+    public const int LaserTowerCost = 10;
 
     // Projectile
     public const float ProjectileSpeed = 8f;

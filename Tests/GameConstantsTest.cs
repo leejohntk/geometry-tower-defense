@@ -108,13 +108,13 @@ public class GameConstantsTest
     {
         AssertThat(GameConstants.LaserTowerRange).IsEqual(3);
         AssertThat(GameConstants.LaserTowerDps).IsEqual(4f);
-        AssertThat(GameConstants.LaserTowerCost).IsEqual(15);
+        AssertThat(GameConstants.LaserTowerCost).IsEqual(10);
     }
 
     [TestCase]
     public void TowerLookups_HandleLaser()
     {
-        AssertThat(GameConstants.TowerCost(TowerType.Laser)).IsEqual(15);
+        AssertThat(GameConstants.TowerCost(TowerType.Laser)).IsEqual(10);
         AssertThat(GameConstants.TowerRange(TowerType.Laser)).IsEqual(3);
         AssertThat(GameConstants.TowerCost(TowerType.Arrow)).IsEqual(10);
         AssertThat(GameConstants.TowerCost(TowerType.Cannon)).IsEqual(10);

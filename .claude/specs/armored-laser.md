@@ -92,7 +92,7 @@ Waves:
 | `ArmoredCoinDropPerKill` | 2 | tankier = more reward |
 | `LaserTowerRange` | 3 | cells |
 | `LaserTowerDps` | 4.0f | float; armor ignored |
-| `LaserTowerCost` | 15 | premium anti-armor |
+| `LaserTowerCost` | 10 | same cost as arrow/cannon |
 
 Armor math check (Armored: 14 HP, 5 armor):
 - Arrow 10 − 5 = 5/hit → ceil(14/5) = 3 hits.

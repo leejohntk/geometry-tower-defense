@@ -44,7 +44,7 @@ public class TowerTest
         AssertThat(tower.RangeCells).IsEqual(3);
         AssertThat(tower.Damage).IsEqual(0);
         AssertThat(tower.FireRate).IsEqual(0f);
-        AssertThat(tower.Cost).IsEqual(15);
+        AssertThat(tower.Cost).IsEqual(10);
         AssertThat(tower.Dps).IsEqual(4f);
         AssertThat(tower.IsContinuous).IsTrue();
     }
