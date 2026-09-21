@@ -67,6 +67,11 @@ public partial class Enemy : Node2D
     public int CoinDrop { get; private set; } = GameConstants.CoinDropPerKill;
 
     /// <summary>
+    /// Persistent Skill Points awarded when this enemy is destroyed (tiered by kind).
+    /// </summary>
+    public int SkillPointValue { get; private set; } = GameConstants.SkillPointBasicPerKill;
+
+    /// <summary>
     /// Collision radius in pixels (half of the rendered diameter).
     /// </summary>
     public float CollisionRadius => _diameter / 2f;
@@ -108,6 +113,7 @@ public partial class Enemy : Node2D
                 _fillColor = new Color(0.9f, 0.1f, 0.1f);   // Red fill
                 _borderColor = new Color(0.8f, 0.05f, 0.05f); // Darker red border
                 CoinDrop = GameConstants.CoinDropPerKill;
+                SkillPointValue = GameConstants.SkillPointBasicPerKill;
                 break;
 
             case EnemyKind.Swarm:
@@ -118,6 +124,7 @@ public partial class Enemy : Node2D
                 _fillColor = new Color(1f, 0.55f, 0.1f);     // Orange fill
                 _borderColor = new Color(0.85f, 0.4f, 0.05f); // Darker orange border
                 CoinDrop = GameConstants.SwarmCoinDropPerKill;
+                SkillPointValue = GameConstants.SkillPointSwarmPerKill;
                 break;
 
             case EnemyKind.Armored:
@@ -128,6 +135,7 @@ public partial class Enemy : Node2D
                 _fillColor = new Color(0.6f, 0.6f, 0.65f);    // Grey fill
                 _borderColor = new Color(0.3f, 0.3f, 0.35f);  // Darker grey border
                 CoinDrop = GameConstants.ArmoredCoinDropPerKill;
+                SkillPointValue = GameConstants.SkillPointArmoredPerKill;
                 break;
         }
 

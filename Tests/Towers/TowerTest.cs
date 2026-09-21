@@ -17,7 +17,7 @@ public class TowerTest
         var tower = new ArrowTower();
 
         AssertThat(tower.Type).IsEqual(TowerType.Arrow);
-        AssertThat(tower.RangeCells).IsEqual(4);
+        AssertThat(tower.RangeCells).IsEqual(4f);
         AssertThat(tower.Damage).IsEqual(10);
         AssertThat(tower.FireRate).IsEqual(1.5f);
         AssertThat(tower.Cost).IsEqual(10);
@@ -29,7 +29,7 @@ public class TowerTest
         var tower = new CannonTower();
 
         AssertThat(tower.Type).IsEqual(TowerType.Cannon);
-        AssertThat(tower.RangeCells).IsEqual(4);
+        AssertThat(tower.RangeCells).IsEqual(4f);
         AssertThat(tower.Damage).IsEqual(15);
         AssertThat(tower.FireRate).IsEqual(2.5f);
         AssertThat(tower.Cost).IsEqual(10);
@@ -41,7 +41,7 @@ public class TowerTest
         var tower = new LaserTower();
 
         AssertThat(tower.Type).IsEqual(TowerType.Laser);
-        AssertThat(tower.RangeCells).IsEqual(3);
+        AssertThat(tower.RangeCells).IsEqual(3f);
         AssertThat(tower.Damage).IsEqual(0);
         AssertThat(tower.FireRate).IsEqual(0f);
         AssertThat(tower.Cost).IsEqual(10);
@@ -84,5 +84,61 @@ public class TowerTest
 
         AssertThat(tower.TryFire(enemy, out _)).IsTrue();
         AssertThat(tower.TryFire(enemy, out _)).IsFalse(); // cooldown active
+    }
+
+    [TestCase]
+    public void ArrowTower_AppliesSkillModifiers_AtRank5()
+    {
+        var state = new SkillTreeState();
+        state.SetRank(SkillTreeCatalog.ArrowDamage, 5);
+        state.SetRank(SkillTreeCatalog.ArrowAttackSpeed, 5);
+        state.SetRank(SkillTreeCatalog.ArrowRange, 5);
+
+        var tower = new ArrowTower();
+        tower.SetSkillTree(state);
+
+        AssertThat(tower.Damage).IsEqual(20);
+        AssertThat(tower.FireRate).IsEqual(1.0f);
+        AssertThat(tower.RangeCells).IsEqual(6.5f);
+    }
+
+    [TestCase]
+    public void CannonTower_AppliesSkillModifiers_AtRank5()
+    {
+        var state = new SkillTreeState();
+        state.SetRank(SkillTreeCatalog.CannonPowderCharge, 5);
+        state.SetRank(SkillTreeCatalog.CannonAttackSpeed, 5);
+        state.SetRank(SkillTreeCatalog.CannonSplashRadius, 5);
+
+        var tower = new CannonTower();
+        tower.SetSkillTree(state);
+
+        AssertThat(tower.Damage).IsEqual(20);
+        AssertThat(tower.FireRate).IsEqual(2.5f / 1.5f);
+        AssertThat(tower.SplashRadius).IsEqual(104);
+        AssertThat(tower.ProjectileSpeedMultiplier).IsEqual(1.5f);
+    }
+
+    [TestCase]
+    public void LaserTower_AppliesSkillModifiers_AtRank5()
+    {
+        var state = new SkillTreeState();
+        state.SetRank(SkillTreeCatalog.LaserDps, 5);
+        state.SetRank(SkillTreeCatalog.LaserRange, 5);
+
+        var tower = new LaserTower();
+        tower.SetSkillTree(state);
+
+        AssertThat(tower.Dps).IsEqual(8f);
+        AssertThat(tower.RangeCells).IsEqual(5.5f);
+    }
+
+    [TestCase]
+    public void Towers_WithoutSkillState_UseBaseStats()
+    {
+        // No SetSkillTree call: every tower reports its unmodified base stats.
+        AssertThat(new ArrowTower().RangeCells).IsEqual(4f);
+        AssertThat(new CannonTower().Damage).IsEqual(15);
+        AssertThat(new LaserTower().Dps).IsEqual(4f);
     }
 }

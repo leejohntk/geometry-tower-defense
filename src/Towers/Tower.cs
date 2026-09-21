@@ -26,12 +26,36 @@ public abstract partial class Tower : Node2D
     /// </summary>
     public Enemy? CurrentTarget { get; private set; } = null;
 
+    /// <summary>
+    /// Current skill-tree state used to layer modifiers onto this tower's stats.
+    /// Null until set (base stats apply) or across the tower's whole lifetime.
+    /// </summary>
+    private SkillTreeState? _skillState;
+
     public abstract TowerType Type { get; }
-    public abstract int RangeCells { get; }
     public abstract int Damage { get; }
     public abstract float FireRate { get; }
     public abstract int Cost { get; }
     protected abstract Color RangeColor { get; }
+
+    /// <summary>
+    /// Final range (cells), base plus skill ranks. Concrete here so the placement
+    /// preview (via <see cref="SkillStats.RangeCells"/>) and every placed tower
+    /// share exactly one "type → range" mapping.
+    /// </summary>
+    public float RangeCells => SkillStats.RangeCells(Type, _skillState);
+
+    /// <summary>
+    /// Multiplier applied to projectile speed at launch. Base is 1.0; the cannon's
+    /// Powder Charge node raises it. Arrow projectiles keep the default.
+    /// </summary>
+    public virtual float ProjectileSpeedMultiplier => 1f;
+
+    /// <summary>
+    /// Final explosion radius (px) for towers that explode on hit. Zero for towers
+    /// without a splash; the cannon overrides it with its skill-modified radius.
+    /// </summary>
+    public virtual float SplashRadius => 0f;
 
     /// <summary>
     /// Continuous damage per second for drain-style towers. Zero for discrete-fire towers.
@@ -47,6 +71,20 @@ public abstract partial class Tower : Node2D
     /// Tower range in pixels.
     /// </summary>
     public float RangePixels => GameConstants.CellDistanceInPixels(RangeCells);
+
+    /// <summary>
+    /// Attaches the player's skill-tree state so this tower's final stats layer in
+    /// skill-node ranks. Pass null to fall back to base stats.
+    /// </summary>
+    public void SetSkillTree(SkillTreeState? state)
+    {
+        _skillState = state;
+    }
+
+    /// <summary>
+    /// Current rank of a skill node for this tower's type (0 when no state attached).
+    /// </summary>
+    protected int SkillRank(string nodeId) => _skillState?.GetRank(nodeId) ?? 0;
 
     /// <summary>
     /// Initialize tower at a specific grid position.

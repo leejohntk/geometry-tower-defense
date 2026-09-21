@@ -10,10 +10,15 @@ namespace GeometryTowerDefense;
 public partial class CannonTower : Tower
 {
     public override TowerType Type => TowerType.Cannon;
-    public override int RangeCells => GameConstants.CannonTowerRange;
-    public override int Damage => GameConstants.CannonTowerDamage;
-    public override float FireRate => GameConstants.CannonTowerFireRate;
+    public override int Damage => SkillStats.CannonDamage(SkillRank(SkillTreeCatalog.CannonPowderCharge));
+    public override float FireRate => SkillStats.CannonFireRate(SkillRank(SkillTreeCatalog.CannonAttackSpeed));
     public override int Cost => GameConstants.CannonTowerCost;
+    public override float ProjectileSpeedMultiplier => SkillStats.CannonProjectileSpeedMultiplier(SkillRank(SkillTreeCatalog.CannonPowderCharge));
+
+    /// <summary>
+    /// Final AoE radius (px) with the Splash Radius node applied.
+    /// </summary>
+    public override float SplashRadius => SkillStats.CannonSplashRadius(SkillRank(SkillTreeCatalog.CannonSplashRadius));
     protected override Color RangeColor => new Color(0.3f, 0.6f, 0.4f);
 
     public override void _Ready()

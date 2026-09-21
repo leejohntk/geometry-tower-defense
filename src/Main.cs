@@ -8,6 +8,8 @@ namespace GeometryTowerDefense;
 public partial class Main : Node2D
 {
     private TitleScreen? _titleScreen;
+    private SkillTree? _skillTree;
+    private SkillTreeScreen? _skillTreeScreen;
     private GameManager? _gameManager;
     private GameHUD? _gameHUD;
     private ResultScreen? _gameOverScreen;
@@ -18,14 +20,26 @@ public partial class Main : Node2D
 
     public override void _Ready()
     {
+        // Load the persistent skill tree before any screen or game object needs it.
+        _skillTree = new SkillTree(SkillTreeSave.Load());
+
         // Create title screen
         _titleScreen = new TitleScreen();
         _titleScreen.LevelSelected += OnLevelSelected;
+        _titleScreen.SkillTreePressed += OnSkillTreePressed;
         AddChild(_titleScreen);
+
+        // Create skill tree screen (hidden initially)
+        _skillTreeScreen = new SkillTreeScreen(_skillTree);
+        _skillTreeScreen.Name = "SkillTreeScreen";
+        _skillTreeScreen.BackPressed += OnSkillTreeBackPressed;
+        _skillTreeScreen.Visible = false;
+        AddChild(_skillTreeScreen);
 
         // Create game manager (hidden initially)
         _gameManager = new GameManager();
         _gameManager.Name = "GameManager";
+        _gameManager.SkillTree = _skillTree;
         _gameManager.GameOver += OnGameOverTriggered;
         _gameManager.Victory += OnVictoryTriggered;
         _gameManager.WaveChanged += OnWaveChangedForUI;
@@ -68,6 +82,27 @@ public partial class Main : Node2D
     {
         _selectedLevel = Levels.Get(levelId);
         StartNewGame();
+    }
+
+    private void OnSkillTreePressed()
+    {
+        if (_titleScreen != null)
+            _titleScreen.Visible = false;
+
+        if (_skillTreeScreen != null)
+        {
+            _skillTreeScreen.Refresh();
+            _skillTreeScreen.Visible = true;
+        }
+    }
+
+    private void OnSkillTreeBackPressed()
+    {
+        if (_skillTreeScreen != null)
+            _skillTreeScreen.Visible = false;
+
+        if (_titleScreen != null)
+            _titleScreen.Visible = true;
     }
 
     private void StartNewGame()
@@ -329,7 +364,8 @@ public partial class Main : Node2D
         {
             bool enoughCoins = _gameManager.Coins >= GameConstants.TowerCost(type);
             bool canPlace = enoughCoins && _gameManager.Grid.CanPlaceTower(row, col);
-            _gameManager.Grid.ShowPlacementPreview(row, col, canPlace, type);
+            float rangeCells = SkillStats.RangeCells(type, _skillTree?.State);
+            _gameManager.Grid.ShowPlacementPreview(row, col, canPlace, type, rangeCells);
         }
         else
         {

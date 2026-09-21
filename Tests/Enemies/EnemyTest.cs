@@ -293,4 +293,19 @@ public class EnemyTest
         AssertThat(enemy.Armor).IsEqual(0);
         AssertThat(enemy.CurrentHP).IsEqual(10f);
     }
+
+    [TestCase]
+    public void SkillPointValue_IsTieredPerEnemyKind()
+    {
+        var basic = new Enemy();
+        basic.Configure(EnemyKind.Basic);
+        var swarm = new Enemy();
+        swarm.Configure(EnemyKind.Swarm);
+        var armored = new Enemy();
+        armored.Configure(EnemyKind.Armored);
+
+        AssertThat(basic.SkillPointValue).IsEqual(GameConstants.SkillPointBasicPerKill);
+        AssertThat(swarm.SkillPointValue).IsEqual(GameConstants.SkillPointSwarmPerKill);
+        AssertThat(armored.SkillPointValue).IsEqual(GameConstants.SkillPointArmoredPerKill);
+    }
 }

@@ -115,8 +115,30 @@ public class GameConstantsTest
     public void TowerLookups_HandleLaser()
     {
         AssertThat(GameConstants.TowerCost(TowerType.Laser)).IsEqual(10);
-        AssertThat(GameConstants.TowerRange(TowerType.Laser)).IsEqual(3);
+        AssertThat(GameConstants.TowerRange(TowerType.Laser)).IsEqual(3f);
         AssertThat(GameConstants.TowerCost(TowerType.Arrow)).IsEqual(10);
         AssertThat(GameConstants.TowerCost(TowerType.Cannon)).IsEqual(10);
+    }
+
+    [TestCase]
+    public void SkillTreeConstants_AreCorrect()
+    {
+        AssertThat(GameConstants.SkillPointBasicPerKill).IsEqual(5);
+        AssertThat(GameConstants.SkillPointSwarmPerKill).IsEqual(2);
+        AssertThat(GameConstants.SkillPointArmoredPerKill).IsEqual(8);
+        AssertThat(GameConstants.SkillNodeRankCost).IsEqual(10);
+        AssertThat(GameConstants.SkillMaxRanks).IsEqual(5);
+
+        AssertThat(GameConstants.SkillArrowDamagePerRank).IsEqual(2);
+        AssertThat(GameConstants.SkillArrowAttackSpeedPerRank).IsEqual(0.10f);
+        AssertThat(GameConstants.SkillArrowRangePerRank).IsEqual(0.5f);
+
+        AssertThat(GameConstants.SkillCannonPowderDamagePerRank).IsEqual(1);
+        AssertThat(GameConstants.SkillCannonPowderSpeedPerRank).IsEqual(0.10f);
+        AssertThat(GameConstants.SkillCannonAttackSpeedPerRank).IsEqual(0.10f);
+        AssertThat(GameConstants.SkillCannonSplashRadiusPerRank).IsEqual(8);
+
+        AssertThat(GameConstants.SkillLaserDpsPerRank).IsEqual(0.8f);
+        AssertThat(GameConstants.SkillLaserRangePerRank).IsEqual(0.5f);
     }
 }
