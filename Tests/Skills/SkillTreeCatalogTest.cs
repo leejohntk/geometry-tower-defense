@@ -6,8 +6,8 @@ using static GdUnit4.Assertions;
 namespace GeometryTowerDefense.Tests;
 
 /// <summary>
-/// Catalog integrity tests: exactly 15 nodes, 8 enabled stat nodes, 7 disabled
-/// mechanic nodes, 5 per tower (3 trunk + 2 seed), and unique ids.
+/// Catalog integrity tests: exactly 15 nodes, all enabled as of Part 2 (8 stat nodes
+/// + 7 mechanic nodes), 5 per tower (3 trunk + 2 seed), and unique ids.
 /// </summary>
 [TestSuite]
 public class SkillTreeCatalogTest
@@ -19,17 +19,25 @@ public class SkillTreeCatalogTest
     }
 
     [TestCase]
-    public void Catalog_HasEightEnabledStatNodes()
+    public void Catalog_AllFifteenNodes_AreEnabled()
     {
         int enabled = CountNodes(n => n.Enabled);
-        AssertThat(enabled).IsEqual(8);
+        AssertThat(enabled).IsEqual(15);
     }
 
     [TestCase]
-    public void Catalog_HasSevenDisabledMechanicNodes()
+    public void Catalog_HasEightStatAndSevenMechanicNodes()
     {
-        int disabled = CountNodes(n => !n.Enabled);
-        AssertThat(disabled).IsEqual(7);
+        int stat = 0;
+        int mechanic = 0;
+        foreach (var node in SkillTreeCatalog.All)
+        {
+            if (IsMechanicNode(node.Id)) mechanic++;
+            else stat++;
+        }
+
+        AssertThat(stat).IsEqual(8);
+        AssertThat(mechanic).IsEqual(7);
     }
 
     [TestCase]
@@ -70,16 +78,16 @@ public class SkillTreeCatalogTest
     }
 
     [TestCase]
-    public void Catalog_MechanicNodes_AreDisabled()
+    public void Catalog_MechanicNodes_AreEnabled()
     {
-        // The seven Part-2 nodes must all be disabled ("coming soon").
-        AssertThat(SkillTreeCatalog.Find(SkillTreeCatalog.ArrowPierce)!.Enabled).IsFalse();
-        AssertThat(SkillTreeCatalog.Find(SkillTreeCatalog.ArrowCritChance)!.Enabled).IsFalse();
-        AssertThat(SkillTreeCatalog.Find(SkillTreeCatalog.CannonCluster)!.Enabled).IsFalse();
-        AssertThat(SkillTreeCatalog.Find(SkillTreeCatalog.CannonStunChance)!.Enabled).IsFalse();
-        AssertThat(SkillTreeCatalog.Find(SkillTreeCatalog.LaserIgnite)!.Enabled).IsFalse();
-        AssertThat(SkillTreeCatalog.Find(SkillTreeCatalog.LaserChain)!.Enabled).IsFalse();
-        AssertThat(SkillTreeCatalog.Find(SkillTreeCatalog.LaserRampUp)!.Enabled).IsFalse();
+        // The seven Part-2 nodes are all buyable now.
+        AssertThat(SkillTreeCatalog.Find(SkillTreeCatalog.ArrowPierce)!.Enabled).IsTrue();
+        AssertThat(SkillTreeCatalog.Find(SkillTreeCatalog.ArrowCritChance)!.Enabled).IsTrue();
+        AssertThat(SkillTreeCatalog.Find(SkillTreeCatalog.CannonCluster)!.Enabled).IsTrue();
+        AssertThat(SkillTreeCatalog.Find(SkillTreeCatalog.CannonStunChance)!.Enabled).IsTrue();
+        AssertThat(SkillTreeCatalog.Find(SkillTreeCatalog.LaserIgnite)!.Enabled).IsTrue();
+        AssertThat(SkillTreeCatalog.Find(SkillTreeCatalog.LaserChain)!.Enabled).IsTrue();
+        AssertThat(SkillTreeCatalog.Find(SkillTreeCatalog.LaserRampUp)!.Enabled).IsTrue();
     }
 
     [TestCase]
@@ -147,6 +155,18 @@ public class SkillTreeCatalogTest
         }
         return count;
     }
+
+    private static bool IsMechanicNode(string nodeId) => nodeId switch
+    {
+        SkillTreeCatalog.ArrowPierce => true,
+        SkillTreeCatalog.ArrowCritChance => true,
+        SkillTreeCatalog.CannonCluster => true,
+        SkillTreeCatalog.CannonStunChance => true,
+        SkillTreeCatalog.LaserIgnite => true,
+        SkillTreeCatalog.LaserChain => true,
+        SkillTreeCatalog.LaserRampUp => true,
+        _ => false
+    };
 
     private static int CountTowerNodes(TowerType type)
     {

@@ -12,6 +12,8 @@ public partial class ArrowTower : Tower
     public override int Damage => SkillStats.ArrowDamage(SkillRank(SkillTreeCatalog.ArrowDamage));
     public override float FireRate => SkillStats.ArrowFireRate(SkillRank(SkillTreeCatalog.ArrowAttackSpeed));
     public override int Cost => GameConstants.ArrowTowerCost;
+    public override int PierceCount => SkillMechanics.ArrowPierceCount(SkillRank(SkillTreeCatalog.ArrowPierce));
+    public override float CritChance => SkillMechanics.ArrowCritChance(SkillRank(SkillTreeCatalog.ArrowCritChance));
     protected override Color RangeColor => new Color(0.2f, 0.5f, 1.0f);
 
     public override void _Ready()

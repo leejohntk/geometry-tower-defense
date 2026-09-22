@@ -79,15 +79,15 @@ public class SkillTreeSaveTest
     }
 
     [TestCase]
-    public void FromConfig_RejectsDisabledNodeRanks()
+    public void FromConfig_RoundsTripMechanicAndStatNodeRanks()
     {
         var config = new ConfigFile();
-        config.SetValue("skilltree", SkillTreeCatalog.LaserChain, 3);  // disabled mechanic node
-        config.SetValue("skilltree", SkillTreeCatalog.ArrowDamage, 2); // enabled stat node
+        config.SetValue("skilltree", SkillTreeCatalog.LaserChain, 3);  // mechanic node
+        config.SetValue("skilltree", SkillTreeCatalog.ArrowDamage, 2); // stat node
 
         var loaded = SkillTreeSave.FromConfigFile(config);
 
-        AssertThat(loaded.GetRank(SkillTreeCatalog.LaserChain)).IsEqual(0);
+        AssertThat(loaded.GetRank(SkillTreeCatalog.LaserChain)).IsEqual(3);
         AssertThat(loaded.GetRank(SkillTreeCatalog.ArrowDamage)).IsEqual(2);
     }
 

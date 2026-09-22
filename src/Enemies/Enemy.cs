@@ -44,12 +44,37 @@ public partial class Enemy : Node2D
     private bool _isDead = false;
     private Control? _circleContainer;
 
+    // Status state (Part 2). Stun pauses movement; burn is a damage-over-time that
+    // ignores armor; hit flash is a brief crit brightening. Timers tick in the
+    // centralized status pass (GameManager) — never in _Process — and are reset on
+    // pool reuse.
+    private float _stunRemaining = 0f;
+    private float _burnRemaining = 0f;
+    private float _burnDps = 0f;
+    private float _hitFlashRemaining = 0f;
+
+    // Cached armored geometry + fill-color array so the per-frame redraw allocates
+    // nothing. The diamond/inset points depend on _diameter and are rebuilt in
+    // UpdateVisual (which runs on Configure); the color array is reused and its
+    // single element reassigned on every draw.
+    private Vector2[] _diamondPoints = System.Array.Empty<Vector2>();
+    private Vector2[] _insetPoints = System.Array.Empty<Vector2>();
+    private readonly Color[] _fillColorArray = new Color[1];
+
     /// <summary>
     /// The kind this enemy is currently configured as.
     /// </summary>
     public EnemyKind Kind { get; private set; } = EnemyKind.Basic;
 
     public bool IsDead => _isDead;
+
+    /// <summary>
+    /// Monotonically increasing identity generation, incremented on every pool reset.
+    /// Long-lived consumers (e.g. a laser's ramp/ignite state) use it to detect that a
+    /// pooled object was reissued as a brand-new enemy even though the reference is
+    /// identical (the pool is LIFO).
+    /// </summary>
+    public int Generation { get; private set; }
 
     /// <summary>
     /// Flat damage reduction applied to each incoming hit unless the attack ignores armor.
@@ -75,6 +100,26 @@ public partial class Enemy : Node2D
     /// Rendered diameter in pixels.
     /// </summary>
     public float Diameter => _diameter;
+
+    /// <summary>
+    /// True while this enemy is stunned (movement paused).
+    /// </summary>
+    public bool IsStunned => _stunRemaining > 0f;
+
+    /// <summary>
+    /// Seconds of stun remaining.
+    /// </summary>
+    public float StunRemaining => _stunRemaining;
+
+    /// <summary>
+    /// True while this enemy is burning (a laser ignite DoT is active).
+    /// </summary>
+    public bool IsBurning => _burnRemaining > 0f;
+
+    /// <summary>
+    /// Seconds of burn remaining.
+    /// </summary>
+    public float BurnRemaining => _burnRemaining;
 
     /// <summary>
     /// Constant offset from the path anchor applied to Position every tick.
@@ -156,6 +201,9 @@ public partial class Enemy : Node2D
 
     private void UpdateVisual()
     {
+        // Geometry is diameter-dependent; rebuild on configure (not per draw).
+        RebuildArmoredGeometry();
+
         if (_circleContainer == null) return;
 
         float radius = _diameter / 2f;
@@ -164,43 +212,83 @@ public partial class Enemy : Node2D
         _circleContainer.QueueRedraw();
     }
 
+    /// <summary>
+    /// Rebuilds the cached armored diamond/inset vertex arrays from the current
+    /// diameter. No-op for non-armored kinds.
+    /// </summary>
+    private void RebuildArmoredGeometry()
+    {
+        if (Kind != EnemyKind.Armored)
+            return;
+
+        float diameter = _diameter;
+        Vector2 center = new Vector2(diameter / 2f, diameter / 2f);
+
+        _diamondPoints = new Vector2[]
+        {
+            new Vector2(center.X, 0f),          // top
+            new Vector2(diameter, center.Y),    // right
+            new Vector2(center.X, diameter),    // bottom
+            new Vector2(0f, center.Y)           // left
+        };
+
+        _insetPoints = new Vector2[]
+        {
+            new Vector2(center.X, 2f),
+            new Vector2(diameter - 2f, center.Y),
+            new Vector2(center.X, diameter - 2f),
+            new Vector2(2f, center.Y),
+            new Vector2(center.X, 2f)
+        };
+    }
+
     private void DrawEnemyShape(Control container)
     {
         if (!IsInstanceValid(container)) return;
 
         float radius = _diameter / 2f;
         Vector2 center = new Vector2(_diameter / 2f, _diameter / 2f);
+        Color fill = EffectiveFillColor();
 
         if (Kind == EnemyKind.Armored)
         {
-            // Grey square rendered as a diamond (rotated 45°), matching the geometric theme.
-            var diamond = new Vector2[]
-            {
-                new Vector2(center.X, 0f),          // top
-                new Vector2(_diameter, center.Y),   // right
-                new Vector2(center.X, _diameter),   // bottom
-                new Vector2(0f, center.Y)           // left
-            };
-            container.DrawPolygon(diamond, new[] { _fillColor });
-
-            // Darker inset border so the outline hugs the diamond silhouette.
-            var inset = new Vector2[]
-            {
-                new Vector2(center.X, 2f),
-                new Vector2(_diameter - 2f, center.Y),
-                new Vector2(center.X, _diameter - 2f),
-                new Vector2(2f, center.Y),
-                new Vector2(center.X, 2f)
-            };
-            container.DrawPolyline(inset, _borderColor, 2.0f);
+            // Grey square rendered as a diamond (rotated 45°), matching the geometric
+            // theme. Vertices come from the cached arrays rebuilt on Configure.
+            _fillColorArray[0] = fill;
+            container.DrawPolygon(_diamondPoints, _fillColorArray);
+            container.DrawPolyline(_insetPoints, _borderColor, 2.0f);
             return;
         }
 
         // Filled circle
-        container.DrawCircle(center, radius, _fillColor);
+        container.DrawCircle(center, radius, fill);
 
         // Dark border
         container.DrawCircle(center, radius - 2, _borderColor, false, 2.0f);
+    }
+
+    /// <summary>
+    /// Fill color with the status overlays applied: stun desaturates toward grey,
+    /// burn tints toward orange, and a crit flash brightens toward white.
+    /// </summary>
+    private Color EffectiveFillColor()
+    {
+        Color color = _fillColor;
+
+        if (_stunRemaining > 0f)
+        {
+            float luminance = color.R * 0.299f + color.G * 0.587f + color.B * 0.114f;
+            var grey = new Color(luminance, luminance, luminance, color.A);
+            color = color.Lerp(grey, 0.6f);
+        }
+
+        if (_burnRemaining > 0f)
+            color = color.Lerp(new Color(1f, 0.5f, 0f, color.A), 0.5f);
+
+        if (_hitFlashRemaining > 0f)
+            color = color.Lerp(new Color(1f, 1f, 1f, color.A), 0.6f);
+
+        return color;
     }
 
     /// <summary>
@@ -238,6 +326,11 @@ public partial class Enemy : Node2D
     public override void _Process(double delta)
     {
         if (_isDead || _waypoints.Count == 0)
+            return;
+
+        // Stun pauses movement only (formation orbit included). Status timers tick
+        // in GameManager's centralized status pass, not here.
+        if (_stunRemaining > 0f)
             return;
 
         MoveAlongPath((float)delta);
@@ -290,6 +383,10 @@ public partial class Enemy : Node2D
     /// </summary>
     public void ResetForPool()
     {
+        // Bump the identity generation so consumers holding this reference (e.g. a
+        // laser's ramp state) can detect it was reissued as a new enemy.
+        Generation++;
+
         // Reassign to a fresh empty list rather than Clear() — the previous list may
         // be a shared cached path reference owned by GridManager.
         _waypoints = new List<Vector2>();
@@ -303,6 +400,12 @@ public partial class Enemy : Node2D
         _currentHP = _maxHP > 0 ? _maxHP : GameConstants.EnemyHP;
         _isDead = false;
         Position = Vector2.Zero;
+
+        // Clear stun/burn/flash so a pooled enemy can't leak a status into reuse.
+        _stunRemaining = 0f;
+        _burnRemaining = 0f;
+        _burnDps = 0f;
+        _hitFlashRemaining = 0f;
     }
 
     /// <summary>
@@ -325,5 +428,89 @@ public partial class Enemy : Node2D
             EmitSignal(SignalName.Destroyed, this);
             // GameManager.OnEnemyDestroyed handles release to pool
         }
+    }
+
+    /// <summary>
+    /// Applies stun for the given duration. Re-stun refreshes the timer (it never
+    /// shortens an active stun) and does not stack.
+    /// </summary>
+    public void ApplyStun(float duration)
+    {
+        if (_isDead || duration <= 0f)
+            return;
+
+        _stunRemaining = Mathf.Max(_stunRemaining, duration);
+        RedrawVisual();
+    }
+
+    /// <summary>
+    /// Applies a burn DoT of the given dps for the given duration. Re-proc refreshes
+    /// the duration and does not stack.
+    /// </summary>
+    public void ApplyBurn(float dps, float duration)
+    {
+        if (_isDead || dps <= 0f || duration <= 0f)
+            return;
+
+        _burnDps = dps;
+        _burnRemaining = Mathf.Max(_burnRemaining, duration);
+        RedrawVisual();
+    }
+
+    /// <summary>
+    /// Brief brighter flash after a crit lands (presentation only).
+    /// </summary>
+    public void ApplyHitFlash()
+    {
+        if (_isDead)
+            return;
+
+        _hitFlashRemaining = GameConstants.HitFlashDuration;
+        RedrawVisual();
+    }
+
+    /// <summary>
+    /// Advances stun/burn/flash timers and applies burn damage for the elapsed time.
+    /// Called once per frame by GameManager's centralized status pass. Burn damage
+    /// ignores armor. Allocation-free: pure arithmetic plus TakeDamage, which only
+    /// emits a signal on death.
+    /// </summary>
+    public void TickStatuses(float delta)
+    {
+        if (_isDead)
+            return;
+
+        bool wasStunned = _stunRemaining > 0f;
+        bool wasBurning = _burnRemaining > 0f;
+        bool wasFlashing = _hitFlashRemaining > 0f;
+        if (!wasStunned && !wasBurning && !wasFlashing)
+            return;
+
+        if (_burnRemaining > 0f)
+        {
+            // Burn the portion of this frame the DoT was still active, then advance
+            // the timer. Total burn damage is dps * duration (2 dps x 2s = 4).
+            float burnTime = Mathf.Min(delta, _burnRemaining);
+            TakeDamage(_burnDps * burnTime, ignoreArmor: true);
+            _burnRemaining = Mathf.Max(0f, _burnRemaining - delta);
+        }
+
+        _stunRemaining = Mathf.Max(0f, _stunRemaining - delta);
+        _hitFlashRemaining = Mathf.Max(0f, _hitFlashRemaining - delta);
+
+        // The tint is a pure function of *which* statuses are active, so redraw only
+        // on a status-set transition (a status applied, or one expiring) — never on
+        // every frame a status is active.
+        if ((_stunRemaining > 0f) != wasStunned ||
+            (_burnRemaining > 0f) != wasBurning ||
+            (_hitFlashRemaining > 0f) != wasFlashing)
+        {
+            RedrawVisual();
+        }
+    }
+
+    private void RedrawVisual()
+    {
+        _circleContainer?.QueueRedraw();
     }
 }

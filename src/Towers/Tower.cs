@@ -67,6 +67,44 @@ public abstract partial class Tower : Node2D
     /// </summary>
     public virtual bool IsContinuous => false;
 
+    // Skill-mechanic values (Part 2). Base towers have no mechanics; variants override.
+    /// <summary>Number of extra enemies an arrow passes through (0 = none).</summary>
+    public virtual int PierceCount => 0;
+
+    /// <summary>Per-hit chance an arrow crits for double damage.</summary>
+    public virtual float CritChance => 0f;
+
+    /// <summary>Number of shells fired per volley (cannon cluster).</summary>
+    public virtual int ClusterCount => 1;
+
+    /// <summary>Per-hit chance a cannon shell stuns its target.</summary>
+    public virtual float StunChance => 0f;
+
+    /// <summary>Number of extra enemies a laser beam chains to.</summary>
+    public virtual int ChainJumps => 0;
+
+    /// <summary>Per-second chance a laser applies its burn DoT while in contact.</summary>
+    public virtual float IgniteChancePerSecond => 0f;
+
+    /// <summary>Maximum dps multiplier a laser ramps to while holding one target.</summary>
+    public virtual float RampMaxMultiplier => 1f;
+
+    private SkillRandom _rolls = SkillRandom.Default;
+
+    /// <summary>
+    /// Injectable roll source for skill-mechanic random rolls (crit, stun, ignite).
+    /// </summary>
+    public SkillRandom Rolls => _rolls;
+
+    /// <summary>
+    /// Replaces this tower's roll source (tests inject a scripted source). Null falls
+    /// back to the shared default.
+    /// </summary>
+    public void SetSkillRandom(SkillRandom? rolls)
+    {
+        _rolls = rolls ?? SkillRandom.Default;
+    }
+
     /// <summary>
     /// Tower range in pixels.
     /// </summary>

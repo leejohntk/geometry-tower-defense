@@ -14,6 +14,8 @@ public partial class CannonTower : Tower
     public override float FireRate => SkillStats.CannonFireRate(SkillRank(SkillTreeCatalog.CannonAttackSpeed));
     public override int Cost => GameConstants.CannonTowerCost;
     public override float ProjectileSpeedMultiplier => SkillStats.CannonProjectileSpeedMultiplier(SkillRank(SkillTreeCatalog.CannonPowderCharge));
+    public override int ClusterCount => SkillMechanics.CannonClusterCount(SkillRank(SkillTreeCatalog.CannonCluster));
+    public override float StunChance => SkillMechanics.CannonStunChance(SkillRank(SkillTreeCatalog.CannonStunChance));
 
     /// <summary>
     /// Final AoE radius (px) with the Splash Radius node applied.

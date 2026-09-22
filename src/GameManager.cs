@@ -52,6 +52,12 @@ public partial class GameManager : Node2D
     // Cached snapshot for AoE explosion damage (avoids collection-modified exceptions)
     private readonly List<Enemy> _aoeSnapshot = new();
 
+    // Cached snapshots for the status pass and the laser chain path (no per-frame
+    // allocation — these lists are cleared and reused every frame).
+    private readonly List<Enemy> _statusSnapshot = new();
+    private readonly List<Enemy> _chainHitEnemies = new();
+    private readonly List<Vector2> _chainTargets = new();
+
     // Player state
     private int _hp;
     private int _coins;
@@ -212,6 +218,9 @@ public partial class GameManager : Node2D
         // Apply continuous tower drain (laser) to their current targets
         UpdateTowerDrain((float)delta);
 
+        // Tick enemy stun/burn/flash statuses (movement pause is read in Enemy._Process)
+        UpdateEnemyStatuses((float)delta);
+
         // Update projectile collision detection
         UpdateProjectileCollisions();
 
@@ -250,6 +259,8 @@ public partial class GameManager : Node2D
 
     /// <summary>
     /// Towers fire at their current target, spawning the appropriate projectile type.
+    /// Cannon towers fire a cluster volley of (1 + cluster rank) shells spread across
+    /// a small arc; arrow towers fire a single piercing/crit-capable arrow.
     /// </summary>
     private void UpdateTowerFiring()
     {
@@ -264,30 +275,52 @@ public partial class GameManager : Node2D
 
             if (tower.TryFire(tower.CurrentTarget, out Vector2 targetPos))
             {
-                Projectile projectile;
-                if (tower is CannonTower)
+                if (tower is CannonTower cannon)
                 {
-                    var cannon = _cannonProjectilePool!.Acquire();
-                    cannon.Exploded += OnCannonExploded;
-                    projectile = cannon;
+                    SpawnCannonVolley(cannon, targetPos);
                 }
                 else
                 {
-                    projectile = _arrowProjectilePool!.Acquire();
+                    var arrow = _arrowProjectilePool!.Acquire();
+                    arrow.Initialize(tower, targetPos, tower.CurrentTarget);
+                    arrow.EnemyHit += OnProjectileHitEnemy;
+                    arrow.Dissipated += OnProjectileDissipated;
+                    _activeProjectiles.Add(arrow);
                 }
-
-                projectile.Initialize(tower, targetPos, tower.CurrentTarget);
-                projectile.EnemyHit += OnProjectileHitEnemy;
-                projectile.Dissipated += OnProjectileDissipated;
-                _activeProjectiles.Add(projectile);
             }
+        }
+    }
+
+    /// <summary>
+    /// Spawns the cannon's cluster volley: (1 + cluster rank) shells fanned out
+    /// symmetrically around the direct line to the target. Each shell explodes
+    /// independently with the tower's skill-boosted splash radius.
+    /// </summary>
+    private void SpawnCannonVolley(CannonTower cannon, Vector2 targetPos)
+    {
+        int count = cannon.ClusterCount;
+        Vector2 baseDirection = (targetPos - cannon.Position).Normalized();
+
+        for (int i = 0; i < count; i++)
+        {
+            float offset = (i - (count - 1) / 2f) * GameConstants.SkillCannonClusterSpreadPerShellRadians;
+            Vector2 direction = baseDirection.Rotated(offset);
+            Vector2 shellTarget = cannon.Position + direction * cannon.RangePixels;
+
+            var shell = _cannonProjectilePool!.Acquire();
+            shell.Exploded += OnCannonExploded;
+            shell.Initialize(cannon, shellTarget, cannon.CurrentTarget!);
+            shell.EnemyHit += OnProjectileHitEnemy;
+            shell.Dissipated += OnProjectileDissipated;
+            _activeProjectiles.Add(shell);
         }
     }
 
     /// <summary>
     /// Continuous towers (laser) drain their current target every frame. The target is
     /// the nearest in-range enemy already computed by UpdateTowerTargeting — no extra scan.
-    /// Laser damage ignores armor.
+    /// Laser damage ignores armor and layers on the Part-2 mechanics: ramp-up while
+    /// holding one target, chain jumps to nearby enemies, and the per-second ignite roll.
     /// </summary>
     private void UpdateTowerDrain(float delta)
     {
@@ -296,14 +329,91 @@ public partial class GameManager : Node2D
             if (!tower.IsContinuous)
                 continue;
 
-            var target = tower.CurrentTarget;
-            if (target == null || target.IsDead)
+            if (tower is not LaserTower laser)
                 continue;
 
-            if (!tower.IsTargetInRange(target))
+            var target = laser.CurrentTarget;
+            if (target == null || target.IsDead || !laser.IsTargetInRange(target))
+            {
+                laser.ResetBeam();
                 continue;
+            }
 
-            target.TakeDamage(tower.Dps * delta, ignoreArmor: true);
+            float rampMultiplier = laser.UpdateRamp(target, delta);
+            float tickDamage = laser.Dps * rampMultiplier * delta;
+            target.TakeDamage(tickDamage, ignoreArmor: true);
+
+            if (target.IsDead)
+            {
+                laser.ResetBeam();
+                continue;
+            }
+
+            ApplyChain(laser, target, tickDamage);
+
+            int igniteRolls = laser.ConsumeIgniteRolls(delta);
+            for (int i = 0; i < igniteRolls; i++)
+            {
+                if (laser.Rolls.Roll(laser.IgniteChancePerSecond))
+                    target.ApplyBurn(GameConstants.SkillLaserBurnDps, GameConstants.SkillLaserBurnDuration);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Jumps the beam from the primary target to up to N further enemies, each within
+    /// one chain range of the previous target and each at 60% of the previous tick's
+    /// damage. No enemy is hit twice by one chain. Uses cached lists only.
+    /// </summary>
+    private void ApplyChain(LaserTower laser, Enemy primary, float tickDamage)
+    {
+        _chainHitEnemies.Clear();
+        _chainHitEnemies.Add(primary);
+        _chainTargets.Clear();
+
+        int jumps = laser.ChainJumps;
+        if (jumps <= 0)
+        {
+            laser.SetChainTargets(System.Array.Empty<Vector2>());
+            return;
+        }
+
+        var from = primary;
+        float damage = tickDamage;
+        for (int i = 0; i < jumps; i++)
+        {
+            var next = LaserChain.FindNextTarget(from, _activeEnemies, _chainHitEnemies);
+            if (next == null)
+                break;
+
+            damage *= GameConstants.SkillLaserChainFalloff;
+            next.TakeDamage(damage, ignoreArmor: true);
+            _chainHitEnemies.Add(next);
+            _chainTargets.Add(next.Position);
+            from = next;
+        }
+
+        laser.SetChainTargets(_chainTargets);
+    }
+
+    /// <summary>
+    /// Ticks stun/burn/flash timers and applies burn damage for every active enemy.
+    /// Iterates a cached snapshot because a burn tick can kill an enemy, whose Destroyed
+    /// signal mutates the live enemy list mid-pass.
+    /// </summary>
+    private void UpdateEnemyStatuses(float delta)
+    {
+        _statusSnapshot.Clear();
+        foreach (var enemy in _activeEnemies)
+        {
+            if (!enemy.IsDead)
+                _statusSnapshot.Add(enemy);
+        }
+
+        foreach (var enemy in _statusSnapshot)
+        {
+            if (!enemy.IsDead)
+                enemy.TickStatuses(delta);
         }
     }
 
@@ -440,9 +550,9 @@ public partial class GameManager : Node2D
     }
 
     /// <summary>
-    /// Applies cannonball AoE damage and spawns the explosion visual at the same impact point.
-    /// Uses a snapshot to avoid modifying the active enemy list while iterating it
-    /// (TakeDamage emits Destroyed, which mutates the list).
+    /// Applies cannonball AoE damage (plus any stun rolls) and spawns the explosion
+    /// visual at the same impact point. Uses a snapshot to avoid modifying the active
+    /// enemy list while iterating it (TakeDamage emits Destroyed, which mutates the list).
     /// </summary>
     private void OnCannonExploded(CannonProjectile projectile, Vector2 impactPosition)
     {
@@ -455,11 +565,7 @@ public partial class GameManager : Node2D
                 _aoeSnapshot.Add(enemy);
         }
 
-        foreach (var enemy in _aoeSnapshot)
-        {
-            if (!enemy.IsDead)
-                enemy.TakeDamage(projectile.ExplosionDamage);
-        }
+        projectile.Explode(_aoeSnapshot, impactPosition, projectile.ExplosionDamage);
 
         SpawnExplosionEffect(impactPosition, radius);
     }

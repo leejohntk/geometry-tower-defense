@@ -1,4 +1,5 @@
 using Godot;
+using System.Collections.Generic;
 
 namespace GeometryTowerDefense;
 
@@ -15,9 +16,89 @@ public partial class LaserTower : Tower
     public override int Cost => GameConstants.LaserTowerCost;
     public override float Dps => SkillStats.LaserDps(SkillRank(SkillTreeCatalog.LaserDps));
     public override bool IsContinuous => true;
+    public override int ChainJumps => SkillMechanics.LaserChainJumps(SkillRank(SkillTreeCatalog.LaserChain));
+    public override float IgniteChancePerSecond => SkillMechanics.LaserIgniteChancePerSecond(SkillRank(SkillTreeCatalog.LaserIgnite));
+    public override float RampMaxMultiplier => SkillMechanics.LaserRampMaxMultiplier(SkillRank(SkillTreeCatalog.LaserRampUp));
     protected override Color RangeColor => new Color(0.8f, 0.3f, 1.0f);
 
     private Line2D? _beam;
+    private Line2D? _chainBeam;
+    private readonly List<Vector2> _chainTargets = new();
+    private Vector2[] _chainBeamBuffer = System.Array.Empty<Vector2>();
+
+    // Continuous-beam state: the held target (plus its identity generation), ramp
+    // progress, and the ignite-roll accumulator. All reset together when the held
+    // target changes, is reissued from the pool, or contact ends.
+    private Enemy? _heldTarget;
+    private int _heldTargetGeneration = 0;
+    private float _rampTime = 0f;
+    private float _igniteAccumulator = 0f;
+
+    /// <summary>
+    /// Clears the continuous-beam state (called every frame the beam is not in
+    /// contact with a valid target, so ramp and ignite restart on re-contact).
+    /// </summary>
+    public void ResetBeam()
+    {
+        _heldTarget = null;
+        _heldTargetGeneration = 0;
+        _rampTime = 0f;
+        _igniteAccumulator = 0f;
+    }
+
+    /// <summary>
+    /// Advances ramp state for the given target and returns the current dps multiplier.
+    /// Holding the same target ramps 1.0 → RampMaxMultiplier over
+    /// <see cref="GameConstants.SkillLaserRampTime"/>; switching targets (including a
+    /// pooled enemy reissued under the same reference) resets to 1.0 and also resets
+    /// the ignite accumulator.
+    /// </summary>
+    public float UpdateRamp(Enemy target, float delta)
+    {
+        if (!ReferenceEquals(target, _heldTarget) || target.Generation != _heldTargetGeneration)
+        {
+            _heldTarget = target;
+            _heldTargetGeneration = target.Generation;
+            _rampTime = 0f;
+            _igniteAccumulator = 0f;
+        }
+
+        _rampTime += delta;
+        float progress = Mathf.Clamp(_rampTime / GameConstants.SkillLaserRampTime, 0f, 1f);
+        return 1f + (RampMaxMultiplier - 1f) * progress;
+    }
+
+    /// <summary>
+    /// Accumulates continuous contact time and returns how many whole-second ignite
+    /// rolls are due this frame (0 or more). Bounded by elapsed seconds, never by
+    /// frame count: 60 frames at 1/60s produce exactly one roll, as does a single
+    /// 1.0s frame.
+    /// </summary>
+    public int ConsumeIgniteRolls(float delta)
+    {
+        // Guard against non-finite/negative deltas poisoning the accumulator: a NaN
+        // would disable ignite permanently and a negative delta would suppress rolls.
+        if (!(delta > 0f) || !float.IsFinite(delta))
+            return 0;
+
+        _igniteAccumulator += delta;
+        int rolls = (int)System.MathF.Floor(_igniteAccumulator);
+        if (rolls > 0)
+            _igniteAccumulator -= rolls;
+        return rolls;
+    }
+
+    /// <summary>
+    /// Stores the chain jump target positions (world space) for this frame's chain
+    /// beam visual. A pre-warmed list is reused; the call itself allocates nothing
+    /// per frame once capacity has been reached.
+    /// </summary>
+    public void SetChainTargets(IReadOnlyList<Vector2> targets)
+    {
+        _chainTargets.Clear();
+        for (int i = 0; i < targets.Count; i++)
+            _chainTargets.Add(targets[i]);
+    }
 
     public override void _Ready()
     {
@@ -50,6 +131,18 @@ public partial class LaserTower : Tower
         _beam.Points = new Vector2[] { Vector2.Zero, Vector2.Zero };
         _beam.Visible = false;
         AddChild(_beam);
+
+        // Thin magenta polyline from the primary target through each chain jump.
+        // The points buffer is pre-allocated to the largest possible chain (primary +
+        // max jumps) so the per-frame update never allocates.
+        _chainBeam = new Line2D();
+        _chainBeam.Name = "ChainBeam";
+        _chainBeam.Width = 2f;
+        _chainBeam.DefaultColor = new Color(0.95f, 0.5f, 1.0f, 0.8f);
+        _chainBeam.Visible = false;
+        AddChild(_chainBeam);
+        _chainBeamBuffer = new Vector2[GameConstants.SkillMaxRanks * GameConstants.SkillLaserChainPerRank + 1];
+        _chainTargets.Capacity = GameConstants.SkillMaxRanks;
     }
 
     public override void _Process(double delta)
@@ -71,5 +164,39 @@ public partial class LaserTower : Tower
         {
             _beam.Visible = false;
         }
+
+        UpdateChainBeam();
+    }
+
+    /// <summary>
+    /// Rebuilds the chain polyline from the current target through the stored jump
+    /// positions. Trailing unused points are collapsed onto the last used point so
+    /// they draw zero-length (invisible) segments; the buffer is reused every frame.
+    /// </summary>
+    private void UpdateChainBeam()
+    {
+        if (_chainBeam == null)
+            return;
+
+        var target = CurrentTarget;
+        if (target == null || target.IsDead || !IsTargetInRange(target) || _chainTargets.Count == 0)
+        {
+            _chainBeam.Visible = false;
+            return;
+        }
+
+        int maxPoints = _chainBeamBuffer.Length;
+        int used = System.Math.Min(_chainTargets.Count + 1, maxPoints);
+
+        _chainBeamBuffer[0] = target.Position - Position;
+        for (int i = 0; i < used - 1; i++)
+            _chainBeamBuffer[i + 1] = _chainTargets[i] - Position;
+
+        Vector2 last = _chainBeamBuffer[used - 1];
+        for (int i = used; i < maxPoints; i++)
+            _chainBeamBuffer[i] = last;
+
+        _chainBeam.Points = _chainBeamBuffer;
+        _chainBeam.Visible = true;
     }
 }

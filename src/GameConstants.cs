@@ -90,6 +90,32 @@ public static class GameConstants
     public const float SkillLaserDpsPerRank = 0.8f;
     public const float SkillLaserRangePerRank = 0.5f;         // cells
 
+    // Arrow mechanic nodes (Part 2) — Pierce / Crit Chance.
+    public const int SkillArrowPiercePerRank = 1;             // enemies passed through per rank
+    public const float SkillArrowCritChancePerRank = 0.08f;   // crit chance per rank
+
+    // Cannon mechanic nodes (Part 2) — Cluster / Stun Chance.
+    public const int SkillCannonClusterPerRank = 1;           // extra shells per rank
+    public const float SkillCannonStunChancePerRank = 0.06f;  // stun chance per rank
+    public const float SkillCannonStunDuration = 1.0f;        // seconds
+    // Angular offset between adjacent cluster shells (radians). The volley fans out
+    // symmetrically around the direct line to the target; rank 0 still fires a single
+    // straight shell so the mechanic is invisible until purchased.
+    public const float SkillCannonClusterSpreadPerShellRadians = 0.08f;
+
+    // Laser mechanic nodes (Part 2) — Ignite (burn) / Chain / Ramp-Up.
+    public const float SkillLaserIgniteChancePerRank = 0.05f; // ignite roll chance per second, per rank
+    public const float SkillLaserBurnDps = 2.0f;              // burn damage per second (ignores armor)
+    public const float SkillLaserBurnDuration = 2.0f;         // seconds per proc (2 dps x 2s = 4 total)
+    public const int SkillLaserChainPerRank = 1;              // extra beam jumps per rank
+    public const float SkillLaserChainRange = 1.5f;           // cells between consecutive jump targets
+    public const float SkillLaserChainFalloff = 0.60f;        // damage multiplier per jump
+    public const float SkillLaserRampPerRank = 0.20f;         // max dps multiplier = 1 + 0.20 * rank
+    public const float SkillLaserRampTime = 2.0f;             // seconds of continuous contact to full ramp
+
+    // Crit hit flash: brief brightening of an enemy after a crit lands (presentation).
+    public const float HitFlashDuration = 0.1f;               // seconds
+
     // Cannon Explosion Effect — brief expanding circle at the projectile impact point.
     // The visual expands to exactly CannonTowerAoeRadius so the player sees the true
     // damage extent; GameManager drives both the damage and the visual from the same constant.
