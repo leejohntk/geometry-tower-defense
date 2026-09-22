@@ -112,9 +112,9 @@ public partial class GameManager : Node2D
     public bool IsPlacingTower => PlacingTowerType.HasValue;
 
     /// <summary>
-    /// The persistent skill tree. Set by Main before play. Awards SP on kills and
-    /// layers skill ranks onto newly placed towers. Nullable for tests that only
-    /// exercise the in-level economy.
+    /// The persistent skill tree. Set by Main before play. Awards SP on level outcomes
+    /// (victory/defeat) and layers skill ranks onto newly placed towers. Nullable for
+    /// tests that only exercise the in-level economy.
     /// </summary>
     public SkillTree? SkillTree { get; set; }
 
@@ -384,6 +384,11 @@ public partial class GameManager : Node2D
 
         if (_state == GameState.GameOver)
         {
+            // Award defeat SP once before flushing (this block runs on the single
+            // enemy whose arrival drops HP to 0).
+            if (_level != null)
+                SkillTree?.AwardSkillPoints(GameConstants.SkillPointDefeatReward(_level.Id));
+
             // Flush pending skill-tree saves before leaving play.
             SkillTree?.Flush();
             EmitSignal(SignalName.GameOver);
@@ -401,7 +406,6 @@ public partial class GameManager : Node2D
         enemy.Destroyed -= OnEnemyDestroyed;
 
         _coins += enemy.CoinDrop;
-        SkillTree?.AwardSkillPoints(enemy.SkillPointValue);
 
         EmitSignal(SignalName.CoinsChanged, _coins);
         EmitSignal(SignalName.TowerPlacementStateChanged, _coins >= GameConstants.ArrowTowerCost);
@@ -508,6 +512,11 @@ public partial class GameManager : Node2D
     private void OnAllWavesCompleted()
     {
         _state = GameState.Victory;
+
+        // Award victory SP once before flushing.
+        if (_level != null)
+            SkillTree?.AwardSkillPoints(GameConstants.SkillPointVictoryReward(_level.Id));
+
         // Flush pending skill-tree saves before leaving play.
         SkillTree?.Flush();
         EmitSignal(SignalName.Victory);

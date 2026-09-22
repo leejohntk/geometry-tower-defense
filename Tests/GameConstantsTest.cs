@@ -123,9 +123,8 @@ public class GameConstantsTest
     [TestCase]
     public void SkillTreeConstants_AreCorrect()
     {
-        AssertThat(GameConstants.SkillPointBasicPerKill).IsEqual(5);
-        AssertThat(GameConstants.SkillPointSwarmPerKill).IsEqual(2);
-        AssertThat(GameConstants.SkillPointArmoredPerKill).IsEqual(8);
+        AssertThat(GameConstants.SkillPointVictoryMultiplier).IsEqual(2);
+        AssertThat(GameConstants.SkillPointLossDivisor).IsEqual(2);
         AssertThat(GameConstants.SkillNodeRankCost).IsEqual(10);
         AssertThat(GameConstants.SkillMaxRanks).IsEqual(5);
 
@@ -140,5 +139,23 @@ public class GameConstantsTest
 
         AssertThat(GameConstants.SkillLaserDpsPerRank).IsEqual(0.8f);
         AssertThat(GameConstants.SkillLaserRangePerRank).IsEqual(0.5f);
+    }
+
+    [TestCase]
+    public void SkillPointVictoryReward_IsTwiceTheLevel()
+    {
+        AssertThat(GameConstants.SkillPointVictoryReward(1)).IsEqual(2);
+        AssertThat(GameConstants.SkillPointVictoryReward(2)).IsEqual(4);
+        AssertThat(GameConstants.SkillPointVictoryReward(3)).IsEqual(6);
+        AssertThat(GameConstants.SkillPointVictoryReward(4)).IsEqual(8);
+    }
+
+    [TestCase]
+    public void SkillPointDefeatReward_IsHalfAVictory()
+    {
+        AssertThat(GameConstants.SkillPointDefeatReward(1)).IsEqual(1);
+        AssertThat(GameConstants.SkillPointDefeatReward(2)).IsEqual(2);
+        AssertThat(GameConstants.SkillPointDefeatReward(3)).IsEqual(3);
+        AssertThat(GameConstants.SkillPointDefeatReward(4)).IsEqual(4);
     }
 }

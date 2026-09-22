@@ -101,6 +101,42 @@ public class SkillTreeCatalogTest
         AssertThat(SkillTreeCatalog.Find("does.not.exist")).IsNull();
     }
 
+    [TestCase]
+    public void GetPrerequisite_FirstTrunkNodes_HaveNoPrerequisite()
+    {
+        AssertThat(SkillTreeCatalog.GetPrerequisite(SkillTreeCatalog.ArrowDamage)).IsNull();
+        AssertThat(SkillTreeCatalog.GetPrerequisite(SkillTreeCatalog.CannonPowderCharge)).IsNull();
+        AssertThat(SkillTreeCatalog.GetPrerequisite(SkillTreeCatalog.LaserDps)).IsNull();
+    }
+
+    [TestCase]
+    public void GetPrerequisite_SubsequentTrunkNodes_RequirePreviousTrunk()
+    {
+        AssertThat(SkillTreeCatalog.GetPrerequisite(SkillTreeCatalog.ArrowAttackSpeed)).IsEqual(SkillTreeCatalog.ArrowDamage);
+        AssertThat(SkillTreeCatalog.GetPrerequisite(SkillTreeCatalog.ArrowRange)).IsEqual(SkillTreeCatalog.ArrowAttackSpeed);
+        AssertThat(SkillTreeCatalog.GetPrerequisite(SkillTreeCatalog.CannonAttackSpeed)).IsEqual(SkillTreeCatalog.CannonPowderCharge);
+        AssertThat(SkillTreeCatalog.GetPrerequisite(SkillTreeCatalog.CannonSplashRadius)).IsEqual(SkillTreeCatalog.CannonAttackSpeed);
+        AssertThat(SkillTreeCatalog.GetPrerequisite(SkillTreeCatalog.LaserRange)).IsEqual(SkillTreeCatalog.LaserDps);
+        AssertThat(SkillTreeCatalog.GetPrerequisite(SkillTreeCatalog.LaserIgnite)).IsEqual(SkillTreeCatalog.LaserRange);
+    }
+
+    [TestCase]
+    public void GetPrerequisite_SeedNodes_RequireLastTrunk()
+    {
+        AssertThat(SkillTreeCatalog.GetPrerequisite(SkillTreeCatalog.ArrowPierce)).IsEqual(SkillTreeCatalog.ArrowRange);
+        AssertThat(SkillTreeCatalog.GetPrerequisite(SkillTreeCatalog.ArrowCritChance)).IsEqual(SkillTreeCatalog.ArrowRange);
+        AssertThat(SkillTreeCatalog.GetPrerequisite(SkillTreeCatalog.CannonCluster)).IsEqual(SkillTreeCatalog.CannonSplashRadius);
+        AssertThat(SkillTreeCatalog.GetPrerequisite(SkillTreeCatalog.CannonStunChance)).IsEqual(SkillTreeCatalog.CannonSplashRadius);
+        AssertThat(SkillTreeCatalog.GetPrerequisite(SkillTreeCatalog.LaserChain)).IsEqual(SkillTreeCatalog.LaserIgnite);
+        AssertThat(SkillTreeCatalog.GetPrerequisite(SkillTreeCatalog.LaserRampUp)).IsEqual(SkillTreeCatalog.LaserIgnite);
+    }
+
+    [TestCase]
+    public void GetPrerequisite_UnknownId_ReturnsNull()
+    {
+        AssertThat(SkillTreeCatalog.GetPrerequisite("does.not.exist")).IsNull();
+    }
+
     private static int CountNodes(System.Func<SkillNodeDefinition, bool> predicate)
     {
         int count = 0;

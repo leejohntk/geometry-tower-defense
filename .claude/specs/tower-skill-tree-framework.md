@@ -16,15 +16,14 @@ Builds the per-tower skill tree system: persistent currency, the tree data model
 
 ## Currency Design
 
-New persistent currency: **Skill Points (SP)**. Awarded on enemy kill, in addition to the existing `CoinDrop`.
+New persistent currency: **Skill Points (SP)**. Awarded per **successful level run**, not per kill.
 
-| Enemy | SP per kill |
-|-------|-------------|
-| Basic | 5 |
-| Swarm (sub-unit) | 2 (full 3-unit cluster = 6 SP) |
-| Armored | 8 |
+| Outcome | SP |
+|---------|----|
+| Victory on level N | `2 × N` (L1=2, L2=4, L3=6, L4=8) |
+| Defeat on level N | `N` (half of a win, partial credit) |
 
-Ordering: **Basic (5) < Swarm cluster (6) < Armored (8)**; each swarm sub-unit (2) < basic (5). Node cost: **flat 10 SP per rank** (tunable).
+Replay pays every time (no cap), so players can grind earlier levels and experiment with builds. In-level coins (`CoinDrop`) are unchanged and still per-kill. Node cost: **flat 10 SP per rank** (tunable).
 
 ## Skill Tree Catalog
 
@@ -115,9 +114,8 @@ Tower final stats layer skill modifiers onto the base constants. `RangeCells` be
 
 | Constant | Value | Notes |
 |----------|-------|-------|
-| `SkillPointBasicPerKill` | 5 | |
-| `SkillPointSwarmPerKill` | 2 | ×3 = 6 per full cluster |
-| `SkillPointArmoredPerKill` | 8 | |
+| `SkillPointVictoryMultiplier` | 2 | win = 2 × level id |
+| `SkillPointLossDivisor` | 2 | loss = victory / 2 (half credit) |
 | `SkillNodeRankCost` | 10 | flat, SP per rank |
 | `SkillMaxRanks` | 5 | |
 | Arrow: `SkillArrowDamagePerRank` | 2 | |

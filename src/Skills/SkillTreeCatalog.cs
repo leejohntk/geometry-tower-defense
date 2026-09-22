@@ -119,4 +119,42 @@ public static class SkillTreeCatalog
                 yield return node;
         }
     }
+
+    /// <summary>
+    /// Returns the id of the node that must reach <see cref="GameConstants.SkillUnlockRank"/>
+    /// before the given node can be bought, or null when there is no prerequisite.
+    /// Derived uniformly from the tower's tree shape — never per-node hardcoding:
+    /// the first trunk node is always unlocked, each later trunk node requires the
+    /// previous trunk, and each seed requires the tower's last trunk. Unknown ids and
+    /// seeds on a trunk-less tower return null.
+    /// </summary>
+    public static string? GetPrerequisite(string nodeId)
+    {
+        var def = Find(nodeId);
+        if (def == null)
+            return null;
+
+        var trunks = new List<SkillNodeDefinition>();
+        foreach (var node in ForTower(def.TowerType))
+        {
+            if (node.Kind == SkillNodeKind.Trunk)
+                trunks.Add(node);
+        }
+
+        if (trunks.Count == 0)
+            return null;
+
+        if (def.Kind == SkillNodeKind.Trunk)
+        {
+            for (int i = 0; i < trunks.Count; i++)
+            {
+                if (trunks[i].Id == nodeId)
+                    return i == 0 ? null : trunks[i - 1].Id;
+            }
+            return null; // defensive: a known trunk node is always in the list
+        }
+
+        // Seed node: gated by the tower's last trunk.
+        return trunks[^1].Id;
+    }
 }

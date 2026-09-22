@@ -68,11 +68,12 @@ public static class GameConstants
     public const int ProjectileSize = 12;
 
     // Skill Tree — persistent meta-progression currency (Skill Points) and node tuning.
-    public const int SkillPointBasicPerKill = 5;
-    public const int SkillPointSwarmPerKill = 2;    // x3 = 6 per full cluster
-    public const int SkillPointArmoredPerKill = 8;
+    // SP is awarded per level outcome: victory = 2 x level, defeat = level (half a win).
+    public const int SkillPointVictoryMultiplier = 2;
+    public const int SkillPointLossDivisor = 2;
     public const int SkillNodeRankCost = 10;        // flat SP cost per rank
     public const int SkillMaxRanks = 5;
+    public const int SkillUnlockRank = 1;           // rank a prerequisite must reach to unlock its children
 
     // Arrow stat nodes
     public const int SkillArrowDamagePerRank = 2;
@@ -129,4 +130,8 @@ public static class GameConstants
         TowerType.Laser => LaserTowerRange,
         _ => ArrowTowerRange
     };
+
+    // Skill Point rewards for a level outcome. Pure helpers so the reward math is unit-testable without Godot.
+    public static int SkillPointVictoryReward(int levelId) => levelId * SkillPointVictoryMultiplier;
+    public static int SkillPointDefeatReward(int levelId) => levelId * SkillPointVictoryMultiplier / SkillPointLossDivisor;
 }

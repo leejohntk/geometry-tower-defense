@@ -39,12 +39,29 @@ public sealed class SkillTreeState
     }
 
     /// <summary>
-    /// True if the node exists, is enabled, is below max rank, and is affordable.
+    /// True if the node has no prerequisite (the first trunk node, or a seed on a
+    /// trunk-less tower, or an unknown id) or its prerequisite has reached the unlock
+    /// rank. This is a structural buy-time gate; it does not care whether the node
+    /// itself is enabled.
+    /// </summary>
+    public bool IsUnlocked(string nodeId)
+    {
+        var prerequisite = SkillTreeCatalog.GetPrerequisite(nodeId);
+        if (prerequisite == null)
+            return true;
+        return GetRank(prerequisite) >= GameConstants.SkillUnlockRank;
+    }
+
+    /// <summary>
+    /// True if the node exists, is enabled, is unlocked, is below max rank, and is
+    /// affordable.
     /// </summary>
     public bool CanBuyRank(string nodeId)
     {
         var def = SkillTreeCatalog.Find(nodeId);
         if (def == null || !def.Enabled)
+            return false;
+        if (!IsUnlocked(nodeId))
             return false;
         if (GetRank(nodeId) >= GameConstants.SkillMaxRanks)
             return false;

@@ -2,14 +2,15 @@
 
 Implementer must NOT see this file. Orchestrator runs these during verification.
 
-## H1 — SP tiers match human ordering
-- Basic kill awards 5 SP. Full swarm cluster (3 sub-units) awards 6 SP. Armored kill awards 8 SP.
-- Assert 5 < 6 < 8, and each swarm sub-unit (2) < basic (5).
-- SP is awarded in `OnEnemyDestroyed` in addition to coins; coins are unchanged (basic still 1 coin).
+## H1 — Victory awards 2×level, defeat awards half (level)
+- Clearing level 1 awards 2 SP; level 2 → 4; level 3 → 6; level 4 → 8.
+- Losing level 1 awards 1 SP; level 2 → 2; level 3 → 3; level 4 → 4 (half of a win).
+- Award happens on the victory/defeat transition, NOT per kill. In-level coins per kill are unchanged.
 
-## H2 — SP never double-counts on pooled reuse
-- Acquire enemy → configure Basic → destroy (SP +5) → reuse same pooled instance as Basic → destroy again (SP +5 exactly once more). No stale/duplicate accumulation.
-- A swarm member destroyed mid-formation awards 2 SP, not 6 (only a full cluster summed = 6).
+## H2 — No per-kill SP; award fires exactly once per run
+- Destroying enemies never changes the SP balance (per-kill award removed).
+- A run ending in victory awards SP exactly once (not per enemy).
+- A run ending in defeat awards SP exactly once — the killing-blow enemy that drops HP to 0 does not double-award, and later enemies are ignored because `_Process` returns early on GameOver.
 
 ## H3 — rank cap at 5, no overflow
 - `BuyRank(node)` at rank 5 returns false, does not charge SP, rank stays 5.
