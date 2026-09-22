@@ -248,8 +248,10 @@ public partial class GridManager : Node2D
     /// Show the placement preview at the given grid position for the given tower type.
     /// Green highlight + tower ghost + range circle for valid cells,
     /// red highlight (no tower) for invalid cells.
+    /// <paramref name="rangeCells"/> is the tower's final range (base + skill ranks),
+    /// computed by the caller so GridManager stays unaware of the skill system.
     /// </summary>
-    public void ShowPlacementPreview(int row, int col, bool canPlace, TowerType towerType)
+    public void ShowPlacementPreview(int row, int col, bool canPlace, TowerType towerType, float rangeCells)
     {
         if (_previewHighlight == null || _previewTower == null || _previewTowerCircle == null ||
             _previewTowerLaser == null || _previewRange == null)
@@ -282,8 +284,9 @@ public partial class GridManager : Node2D
         if (canPlace && towerType == TowerType.Laser)
             _previewTowerLaser.QueueRedraw();
 
-        // Range indicator — only on valid spots
-        float rangePx = GameConstants.CellDistanceInPixels(GameConstants.TowerRange(towerType));
+        // Range indicator — only on valid spots. Recompute the cached radius every
+        // call so a tower-type (or skill-rank) change is always reflected.
+        float rangePx = GameConstants.CellDistanceInPixels(rangeCells);
         _previewRangePixels = rangePx;
         _previewRange.Size = new Vector2(rangePx * 2, rangePx * 2);
         _previewRange.Position = new Vector2(center.X - rangePx, center.Y - rangePx);

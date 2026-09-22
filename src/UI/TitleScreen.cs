@@ -1,4 +1,5 @@
 using Godot;
+using System;
 
 namespace GeometryTowerDefense;
 
@@ -9,6 +10,9 @@ public partial class TitleScreen : Control
 {
     [Signal]
     public delegate void LevelSelectedEventHandler(int levelId);
+
+    [Signal]
+    public delegate void SkillTreePressedEventHandler();
 
     public override void _Ready()
     {
@@ -42,16 +46,19 @@ public partial class TitleScreen : Control
         AddChild(subtitle);
 
         // Level selection buttons
-        CreateLevelButton(Levels.Level1.Id, "Level 1", 40);
-        CreateLevelButton(Levels.Level2.Id, "Level 2", 110);
-        CreateLevelButton(Levels.Level3.Id, "Level 3", 180);
-        CreateLevelButton(Levels.Level4.Id, "Level 4", 250);
+        CreateMenuButton("Level 1", 40, () => EmitSignal(SignalName.LevelSelected, Levels.Level1.Id));
+        CreateMenuButton("Level 2", 110, () => EmitSignal(SignalName.LevelSelected, Levels.Level2.Id));
+        CreateMenuButton("Level 3", 180, () => EmitSignal(SignalName.LevelSelected, Levels.Level3.Id));
+        CreateMenuButton("Level 4", 250, () => EmitSignal(SignalName.LevelSelected, Levels.Level4.Id));
+
+        // Skill tree navigation button
+        CreateMenuButton("Skill Tree", 320, () => EmitSignal(SignalName.SkillTreePressed));
 
         // Instructions text
         var instructions = new Label();
         instructions.Text = "Select a level to begin.\nPlace towers to defend your base. Survive 5 waves to win!";
         instructions.HorizontalAlignment = HorizontalAlignment.Center;
-        instructions.Position = new Vector2(0, viewportSize.Y / 2f + 330);
+        instructions.Position = new Vector2(0, viewportSize.Y / 2f + 400);
         instructions.Size = new Vector2(viewportSize.X, 60);
         instructions.AddThemeFontSizeOverride("font_size", 14);
         instructions.AddThemeColorOverride("font_color", new Color(0.5f, 0.5f, 0.7f));
@@ -59,9 +66,10 @@ public partial class TitleScreen : Control
     }
 
     /// <summary>
-    /// Creates a level-select button with the shared layout used by all levels.
+    /// Creates a centered menu button with the shared layout used by the level
+    /// buttons and the skill-tree navigation button.
     /// </summary>
-    private void CreateLevelButton(int levelId, string label, float yOffset)
+    private void CreateMenuButton(string label, float yOffset, Action onPressed)
     {
         var viewportSize = GetViewportRect().Size;
 
@@ -69,7 +77,7 @@ public partial class TitleScreen : Control
         button.Text = label;
         button.Position = new Vector2(viewportSize.X / 2f - 120, viewportSize.Y / 2f + yOffset);
         button.Size = new Vector2(240, 50);
-        button.Pressed += () => EmitSignal(SignalName.LevelSelected, levelId);
+        button.Pressed += onPressed;
         button.AddThemeFontSizeOverride("font_size", 22);
         AddChild(button);
     }

@@ -67,6 +67,29 @@ public static class GameConstants
     public const float ProjectileSpeed = 8f;
     public const int ProjectileSize = 12;
 
+    // Skill Tree — persistent meta-progression currency (Skill Points) and node tuning.
+    // SP is awarded per level outcome: victory = 2 x level, defeat = level (half a win).
+    public const int SkillPointVictoryMultiplier = 2;
+    public const int SkillPointLossDivisor = 2;
+    public const int SkillNodeRankCost = 10;        // flat SP cost per rank
+    public const int SkillMaxRanks = 5;
+    public const int SkillUnlockRank = 1;           // rank a prerequisite must reach to unlock its children
+
+    // Arrow stat nodes
+    public const int SkillArrowDamagePerRank = 2;
+    public const float SkillArrowAttackSpeedPerRank = 0.10f; // fire interval / (1 + 0.10*r)
+    public const float SkillArrowRangePerRank = 0.5f;        // cells
+
+    // Cannon stat nodes
+    public const int SkillCannonPowderDamagePerRank = 1;
+    public const float SkillCannonPowderSpeedPerRank = 0.10f; // projectile speed
+    public const float SkillCannonAttackSpeedPerRank = 0.10f; // fire interval / (1 + 0.10*r)
+    public const int SkillCannonSplashRadiusPerRank = 8;      // px
+
+    // Laser stat nodes
+    public const float SkillLaserDpsPerRank = 0.8f;
+    public const float SkillLaserRangePerRank = 0.5f;         // cells
+
     // Cannon Explosion Effect — brief expanding circle at the projectile impact point.
     // The visual expands to exactly CannonTowerAoeRadius so the player sees the true
     // damage extent; GameManager drives both the damage and the visual from the same constant.
@@ -101,10 +124,14 @@ public static class GameConstants
         _ => ArrowTowerCost
     };
 
-    public static int TowerRange(TowerType type) => type switch
+    public static float TowerRange(TowerType type) => type switch
     {
         TowerType.Cannon => CannonTowerRange,
         TowerType.Laser => LaserTowerRange,
         _ => ArrowTowerRange
     };
+
+    // Skill Point rewards for a level outcome. Pure helpers so the reward math is unit-testable without Godot.
+    public static int SkillPointVictoryReward(int levelId) => levelId * SkillPointVictoryMultiplier;
+    public static int SkillPointDefeatReward(int levelId) => levelId * SkillPointVictoryMultiplier / SkillPointLossDivisor;
 }

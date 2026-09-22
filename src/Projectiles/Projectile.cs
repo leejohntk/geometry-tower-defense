@@ -67,7 +67,7 @@ public abstract partial class Projectile : Node2D
 
         _damage = tower.Damage;
         _maxRangePixels = tower.RangePixels;
-        _speed = GameConstants.ProjectileSpeed * GameConstants.CellSize;
+        _speed = GameConstants.ProjectileSpeed * GameConstants.CellSize * tower.ProjectileSpeedMultiplier;
 
         Position = tower.Position;
         _direction = (targetPosition - tower.Position).Normalized();

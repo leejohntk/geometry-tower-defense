@@ -10,11 +10,10 @@ namespace GeometryTowerDefense;
 public partial class LaserTower : Tower
 {
     public override TowerType Type => TowerType.Laser;
-    public override int RangeCells => GameConstants.LaserTowerRange;
     public override int Damage => 0;
     public override float FireRate => 0f;
     public override int Cost => GameConstants.LaserTowerCost;
-    public override float Dps => GameConstants.LaserTowerDps;
+    public override float Dps => SkillStats.LaserDps(SkillRank(SkillTreeCatalog.LaserDps));
     public override bool IsContinuous => true;
     protected override Color RangeColor => new Color(0.8f, 0.3f, 1.0f);
 

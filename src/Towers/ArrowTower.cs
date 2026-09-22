@@ -9,9 +9,8 @@ namespace GeometryTowerDefense;
 public partial class ArrowTower : Tower
 {
     public override TowerType Type => TowerType.Arrow;
-    public override int RangeCells => GameConstants.ArrowTowerRange;
-    public override int Damage => GameConstants.ArrowTowerDamage;
-    public override float FireRate => GameConstants.ArrowTowerFireRate;
+    public override int Damage => SkillStats.ArrowDamage(SkillRank(SkillTreeCatalog.ArrowDamage));
+    public override float FireRate => SkillStats.ArrowFireRate(SkillRank(SkillTreeCatalog.ArrowAttackSpeed));
     public override int Cost => GameConstants.ArrowTowerCost;
     protected override Color RangeColor => new Color(0.2f, 0.5f, 1.0f);
 

@@ -15,9 +15,14 @@ public partial class CannonProjectile : Projectile
     public delegate void ExplodedEventHandler(CannonProjectile projectile, Vector2 impactPosition);
 
     /// <summary>
-    /// Radius (in pixels) within which the explosion damages enemies.
+    /// Radius (in pixels) within which the explosion damages enemies. When the source
+    /// tower is known this is the tower's skill-modified splash radius; otherwise it
+    /// falls back to the base constant. Read generically via <see cref="Tower.SplashRadius"/>
+    /// so future splash-like towers (Part 2) need no concrete-type test here.
     /// </summary>
-    public float ExplosionRadius => GameConstants.CannonTowerAoeRadius;
+    public float ExplosionRadius => SourceTower is { SplashRadius: > 0f } tower
+        ? tower.SplashRadius
+        : GameConstants.CannonTowerAoeRadius;
 
     /// <summary>
     /// Damage applied to every enemy within the explosion radius.
@@ -58,12 +63,14 @@ public partial class CannonProjectile : Projectile
     /// </summary>
     public void Explode(IReadOnlyList<Enemy> enemies, Vector2 impactPosition, float damage)
     {
+        // Hoisted out of the loop: ExplosionRadius walks a virtual chain, so read it once.
+        float radius = ExplosionRadius;
         foreach (var enemy in enemies)
         {
             if (enemy.IsDead)
                 continue;
 
-            if (IsWithinRadius(impactPosition, ExplosionRadius, enemy.Position))
+            if (IsWithinRadius(impactPosition, radius, enemy.Position))
                 enemy.TakeDamage(damage);
         }
     }

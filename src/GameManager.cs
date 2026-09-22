@@ -112,6 +112,13 @@ public partial class GameManager : Node2D
     public bool IsPlacingTower => PlacingTowerType.HasValue;
 
     /// <summary>
+    /// The persistent skill tree. Set by Main before play. Awards SP on level outcomes
+    /// (victory/defeat) and layers skill ranks onto newly placed towers. Nullable for
+    /// tests that only exercise the in-level economy.
+    /// </summary>
+    public SkillTree? SkillTree { get; set; }
+
+    /// <summary>
     /// Number of active (alive) enemies.
     /// </summary>
     public int ActiveEnemyCount => _activeEnemies.Count;
@@ -189,7 +196,12 @@ public partial class GameManager : Node2D
     public override void _Process(double delta)
     {
         if (_state != GameState.Playing)
+        {
+            // Flush any pending skill-tree save even once play has ended (covers the
+            // game-over/victory frames and anything still dirty from the last frame).
+            SkillTree?.Flush();
             return;
+        }
 
         // Update targeting for all towers
         UpdateTowerTargeting();
@@ -202,6 +214,9 @@ public partial class GameManager : Node2D
 
         // Update projectile collision detection
         UpdateProjectileCollisions();
+
+        // Persist skill-tree changes at most once per frame.
+        SkillTree?.Flush();
     }
 
     /// <summary>
@@ -369,6 +384,13 @@ public partial class GameManager : Node2D
 
         if (_state == GameState.GameOver)
         {
+            // Award defeat SP once before flushing (this block runs on the single
+            // enemy whose arrival drops HP to 0).
+            if (_level != null)
+                SkillTree?.AwardSkillPoints(GameConstants.SkillPointDefeatReward(_level.Id));
+
+            // Flush pending skill-tree saves before leaving play.
+            SkillTree?.Flush();
             EmitSignal(SignalName.GameOver);
         }
 
@@ -490,6 +512,13 @@ public partial class GameManager : Node2D
     private void OnAllWavesCompleted()
     {
         _state = GameState.Victory;
+
+        // Award victory SP once before flushing.
+        if (_level != null)
+            SkillTree?.AwardSkillPoints(GameConstants.SkillPointVictoryReward(_level.Id));
+
+        // Flush pending skill-tree saves before leaving play.
+        SkillTree?.Flush();
         EmitSignal(SignalName.Victory);
     }
 
@@ -543,6 +572,7 @@ public partial class GameManager : Node2D
             _ => new ArrowTower()
         };
         tower.Initialize(row, col);
+        tower.SetSkillTree(SkillTree?.State);
         _activeTowers.Add(tower);
         AddChild(tower);
 
