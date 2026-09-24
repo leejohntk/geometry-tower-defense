@@ -14,6 +14,12 @@ public abstract partial class Projectile : Node2D
     [Signal]
     public delegate void EnemyHitEventHandler(Projectile projectile, Enemy enemy);
 
+    // Signal emitted when a hit lands but the projectile survives it and flies on
+    // (pierce). Presentation only: GameManager spawns a spark at the passed-through
+    // enemy. The consuming hit emits EnemyHit instead and needs no spark.
+    [Signal]
+    public delegate void PiercedEventHandler(Projectile projectile, Enemy enemy);
+
     // Signal emitted when projectile dissipates (max range or miss)
     [Signal]
     public delegate void DissipatedEventHandler(Projectile projectile);
@@ -137,6 +143,13 @@ public abstract partial class Projectile : Node2D
             _hasHit = true;
             // Signal for lifecycle management (pool release, list cleanup).
             EmitSignal(SignalName.EnemyHit, this, enemy);
+        }
+        else
+        {
+            // Pierce: this hit did not consume the projectile, so report the
+            // pass-through for its per-hit spark. Emitted only here — the decision
+            // that the arrow continues is made in exactly one place.
+            EmitSignal(SignalName.Pierced, this, enemy);
         }
     }
 

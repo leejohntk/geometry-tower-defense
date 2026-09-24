@@ -116,6 +116,59 @@ public static class GameConstants
     // Crit hit flash: brief brightening of an enemy after a crit lands (presentation).
     public const float HitFlashDuration = 0.1f;               // seconds
 
+    // Burn (ignite) visuals — a hot flash the instant the DoT procs (visually distinct
+    // from the white crit flash) plus a pulsing tint while it drains, so the drain reads
+    // as active instead of a static orange. The pulse is quantized into BurnPulseSteps
+    // intensity levels per BurnPulsePeriod, so a burning enemy redraws only
+    // BurnPulseSteps / BurnPulsePeriod times per second (~17) instead of every frame.
+    // Step 0 is the trough, whose tint is exactly the static burn tint used before the
+    // pulse existed, so the un-pulsed look is the pulse's resting state.
+    public const float BurnProcFlashDuration = 0.18f;         // seconds
+    public const float BurnProcFlashStrength = 0.8f;          // how far the proc flash pushes the fill
+    public const float BurnPulsePeriod = 0.3f;                // seconds per pulse cycle
+    public const int BurnPulseSteps = 5;                      // discrete levels per cycle
+    // The tint strength throbs with the pulse too: the trough matches the pre-pulse
+    // static tint exactly, the peak pushes further toward the hot color.
+    public const float BurnPulseTintStrengthMin = 0.5f;       // matches the static burn tint
+    public const float BurnPulseTintStrengthMax = 0.8f;       // peak of the throb
+    public static readonly Color BurnProcFlashColor = new Color(1f, 0.95f, 0.5f);   // hot yellow, distinct from the white crit flash
+    public static readonly Color BurnPulseCoolColor = new Color(1f, 0.5f, 0f);      // pulse trough
+    public static readonly Color BurnPulseHotColor = new Color(1f, 0.85f, 0.3f);    // pulse peak
+
+    // Pierce spark — brief radiating burst at each enemy an arrow passes through, so
+    // every pierced hit reads instead of the arrow silently continuing. Deliberately
+    // much smaller and shorter than the cannon explosion: a pierce must never look
+    // like a splash.
+    public const float PierceSparkDuration = 0.2f;            // seconds
+    public const float PierceSparkRadius = 14f;               // spokes' outer radius (px) at full expansion
+    public const float PierceSparkInnerRadiusRatio = 0.35f;   // spokes' inner end, fraction of outer radius
+    public const float PierceSparkStrokeWidth = 2.0f;         // spoke width, pixels
+    public const int PierceSparkSpokes = 4;                   // radial lines (X-shaped burst)
+    public static readonly Color PierceSparkColor = new Color(1f, 0.85f, 0.3f);     // arrow yellow
+
+    // Laser ramp-up feedback — the beam widens and brightens as its dps multiplier
+    // climbs from 1.0x to the tower's max, making the ramp visible. The "Min" values
+    // are exactly the un-ramped beam look, so a non-ramping laser is unchanged.
+    public const float LaserBeamWidthMin = 3f;                // pixels at 1.0x
+    public const float LaserBeamWidthMax = 6.5f;              // pixels at max ramp
+    public const float LaserChainBeamWidthMin = 2f;           // pixels at 1.0x
+    public const float LaserChainBeamWidthMax = 4f;           // pixels at max ramp
+    public static readonly Color LaserBeamColorMin = new Color(0.9f, 0.4f, 1.0f, 0.9f);
+    public static readonly Color LaserBeamColorMax = new Color(1f, 0.85f, 1f, 1f);
+    public static readonly Color LaserChainBeamColorMin = new Color(0.95f, 0.5f, 1.0f, 0.8f);
+    public static readonly Color LaserChainBeamColorMax = new Color(1f, 0.9f, 1f, 1f);
+
+    // Cannon cluster muzzle flash — a short ring plus radial spikes at the barrel,
+    // shown only when a volley fires more than one shell, so a cluster shot is
+    // distinguishable from a single one. Purely visual state on the tower node: no
+    // pool, no per-shot allocation, and nothing draws while idle.
+    public const float CannonMuzzleFlashDuration = 0.22f;     // seconds
+    public const float CannonMuzzleFlashRingScale = 1.6f;     // x barrel radius at full expansion
+    public const float CannonMuzzleFlashStrokeWidth = 3.0f;   // ring/spoke width, pixels
+    public const float CannonMuzzleFlashSpikeLength = 8f;     // px the spikes reach past the ring
+    public const int CannonMuzzleFlashSpikes = 6;
+    public static readonly Color CannonMuzzleFlashColor = new Color(1f, 0.93f, 0.45f); // hot yellow
+
     // Cannon Explosion Effect — brief expanding circle at the projectile impact point.
     // The visual expands to exactly CannonTowerAoeRadius so the player sees the true
     // damage extent; GameManager drives both the damage and the visual from the same constant.

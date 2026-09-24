@@ -34,6 +34,10 @@ public partial class LaserTower : Tower
     private float _rampTime = 0f;
     private float _igniteAccumulator = 0f;
 
+    // Latest dps multiplier from UpdateRamp, mirrored here so the beam visual can read
+    // it without recomputing the ramp. 1.0 (un-ramped) whenever contact starts or ends.
+    private float _rampMultiplier = 1f;
+
     /// <summary>
     /// Clears the continuous-beam state (called every frame the beam is not in
     /// contact with a valid target, so ramp and ignite restart on re-contact).
@@ -44,6 +48,7 @@ public partial class LaserTower : Tower
         _heldTargetGeneration = 0;
         _rampTime = 0f;
         _igniteAccumulator = 0f;
+        _rampMultiplier = 1f;
     }
 
     /// <summary>
@@ -65,7 +70,22 @@ public partial class LaserTower : Tower
 
         _rampTime += delta;
         float progress = Mathf.Clamp(_rampTime / GameConstants.SkillLaserRampTime, 0f, 1f);
-        return 1f + (RampMaxMultiplier - 1f) * progress;
+        _rampMultiplier = 1f + (RampMaxMultiplier - 1f) * progress;
+        return _rampMultiplier;
+    }
+
+    /// <summary>
+    /// Normalized ramp progress for the beam visual: 0 at the base 1.0x multiplier,
+    /// 1 at the tower's max multiplier, clamped in between. A tower with no ramp nodes
+    /// (max 1.0x) or a non-finite multiplier reads as 0, i.e. the un-ramped beam.
+    /// Pure so the beam scaling is testable without a scene.
+    /// </summary>
+    public static float RampProgress(float rampMultiplier, float maxMultiplier)
+    {
+        if (!float.IsFinite(rampMultiplier) || !float.IsFinite(maxMultiplier) || maxMultiplier <= 1f)
+            return 0f;
+
+        return Mathf.Clamp((rampMultiplier - 1f) / (maxMultiplier - 1f), 0f, 1f);
     }
 
     /// <summary>
@@ -126,8 +146,8 @@ public partial class LaserTower : Tower
         // Beam line drawn from the tower center to the current target.
         _beam = new Line2D();
         _beam.Name = "Beam";
-        _beam.Width = 3f;
-        _beam.DefaultColor = new Color(0.9f, 0.4f, 1.0f, 0.9f);
+        _beam.Width = GameConstants.LaserBeamWidthMin;
+        _beam.DefaultColor = GameConstants.LaserBeamColorMin;
         _beam.Points = new Vector2[] { Vector2.Zero, Vector2.Zero };
         _beam.Visible = false;
         AddChild(_beam);
@@ -137,8 +157,8 @@ public partial class LaserTower : Tower
         // max jumps) so the per-frame update never allocates.
         _chainBeam = new Line2D();
         _chainBeam.Name = "ChainBeam";
-        _chainBeam.Width = 2f;
-        _chainBeam.DefaultColor = new Color(0.95f, 0.5f, 1.0f, 0.8f);
+        _chainBeam.Width = GameConstants.LaserChainBeamWidthMin;
+        _chainBeam.DefaultColor = GameConstants.LaserChainBeamColorMin;
         _chainBeam.Visible = false;
         AddChild(_chainBeam);
         _chainBeamBuffer = new Vector2[GameConstants.SkillMaxRanks * GameConstants.SkillLaserChainPerRank + 1];
@@ -158,6 +178,7 @@ public partial class LaserTower : Tower
             // Beam endpoints are in this node's local space; the tower is at its origin.
             _beam.SetPointPosition(0, Vector2.Zero);
             _beam.SetPointPosition(1, target.Position - Position);
+            ApplyBeamRamp();
             _beam.Visible = true;
         }
         else
@@ -166,6 +187,33 @@ public partial class LaserTower : Tower
         }
 
         UpdateChainBeam();
+    }
+
+    /// <summary>
+    /// Scales both beams' width and color with the current ramp multiplier
+    /// (1.0x → the tower's max), so the dps climb is visible. At 1.0x this is exactly
+    /// the un-ramped beam look. Line2D's setters are no-ops when the value is unchanged
+    /// and neither Lerp allocates, so this is free to run every frame the beam is up.
+    /// </summary>
+    private void ApplyBeamRamp()
+    {
+        float ramp = RampProgress(_rampMultiplier, RampMaxMultiplier);
+
+        if (_beam != null)
+        {
+            _beam.Width = Mathf.Lerp(
+                GameConstants.LaserBeamWidthMin, GameConstants.LaserBeamWidthMax, ramp);
+            _beam.DefaultColor = GameConstants.LaserBeamColorMin
+                .Lerp(GameConstants.LaserBeamColorMax, ramp);
+        }
+
+        if (_chainBeam != null)
+        {
+            _chainBeam.Width = Mathf.Lerp(
+                GameConstants.LaserChainBeamWidthMin, GameConstants.LaserChainBeamWidthMax, ramp);
+            _chainBeam.DefaultColor = GameConstants.LaserChainBeamColorMin
+                .Lerp(GameConstants.LaserChainBeamColorMax, ramp);
+        }
     }
 
     /// <summary>

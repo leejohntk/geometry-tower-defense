@@ -39,12 +39,14 @@ public partial class GameManager : Node2D
     private readonly List<Tower> _activeTowers = new();
     private readonly List<Projectile> _activeProjectiles = new();
     private readonly List<ExplosionEffect> _activeExplosionEffects = new();
+    private readonly List<PierceSparkEffect> _activePierceSparks = new();
 
     // Object pools
     private ObjectPool<Enemy>? _enemyPool;
     private ObjectPool<ArrowProjectile>? _arrowProjectilePool;
     private ObjectPool<CannonProjectile>? _cannonProjectilePool;
     private ObjectPool<ExplosionEffect>? _explosionEffectPool;
+    private ObjectPool<PierceSparkEffect>? _pierceSparkPool;
 
     // Cached list for collision detection (avoids per-frame allocation)
     private readonly List<(Projectile, Enemy)> _projectileCollisionPairs = new();
@@ -197,6 +199,10 @@ public partial class GameManager : Node2D
 
         // Explosion effects are spawned per cannonball impact.
         _explosionEffectPool = new ObjectPool<ExplosionEffect>(8, this);
+
+        // Pierce sparks are spawned per passed-through enemy, so several can be alive
+        // at once for a single fully-piercing arrow (pool grows on demand if exceeded).
+        _pierceSparkPool = new ObjectPool<PierceSparkEffect>(12, this);
     }
 
     public override void _Process(double delta)
@@ -283,9 +289,7 @@ public partial class GameManager : Node2D
                 {
                     var arrow = _arrowProjectilePool!.Acquire();
                     arrow.Initialize(tower, targetPos, tower.CurrentTarget);
-                    arrow.EnemyHit += OnProjectileHitEnemy;
-                    arrow.Dissipated += OnProjectileDissipated;
-                    _activeProjectiles.Add(arrow);
+                    RegisterProjectile(arrow);
                 }
             }
         }
@@ -310,10 +314,33 @@ public partial class GameManager : Node2D
             var shell = _cannonProjectilePool!.Acquire();
             shell.Exploded += OnCannonExploded;
             shell.Initialize(cannon, shellTarget, cannon.CurrentTarget!);
-            shell.EnemyHit += OnProjectileHitEnemy;
-            shell.Dissipated += OnProjectileDissipated;
-            _activeProjectiles.Add(shell);
+            RegisterProjectile(shell);
         }
+    }
+
+    /// <summary>
+    /// Subscribes a freshly spawned projectile's lifecycle signals and tracks it in the
+    /// active list. Pierce is wired for every projectile type: only a projectile with
+    /// spare hits ever emits it (the cannon's pierce count is 0), so a splash shot is
+    /// unaffected.
+    /// </summary>
+    private void RegisterProjectile(Projectile projectile)
+    {
+        projectile.EnemyHit += OnProjectileHitEnemy;
+        projectile.Pierced += OnProjectilePierced;
+        projectile.Dissipated += OnProjectileDissipated;
+        _activeProjectiles.Add(projectile);
+    }
+
+    /// <summary>
+    /// Inverse of <see cref="RegisterProjectile"/>: unhooks every signal and untracks
+    /// the projectile.
+    /// </summary>
+    private void UnregisterProjectile(Projectile projectile)
+    {
+        projectile.EnemyHit -= OnProjectileHitEnemy;
+        projectile.Pierced -= OnProjectilePierced;
+        projectile.Dissipated -= OnProjectileDissipated;
     }
 
     /// <summary>
@@ -532,19 +559,27 @@ public partial class GameManager : Node2D
     private void OnProjectileHitEnemy(Projectile projectile, Enemy enemy)
     {
         _activeProjectiles.Remove(projectile);
-        projectile.EnemyHit -= OnProjectileHitEnemy;
-        projectile.Dissipated -= OnProjectileDissipated;
+        UnregisterProjectile(projectile);
 
         // Damage is already applied synchronously in Projectile.HitEnemy.
         // This handler only manages lifecycle (pool release, list cleanup).
         ReleaseProjectile(projectile);
     }
 
+    /// <summary>
+    /// A hit landed but the projectile survived it (pierce), so it flies on to the next
+    /// enemy. Damage is already applied synchronously in Projectile.HitEnemy; this only
+    /// spawns the per-hit spark at the enemy it passed through.
+    /// </summary>
+    private void OnProjectilePierced(Projectile projectile, Enemy enemy)
+    {
+        SpawnPierceSpark(enemy.Position);
+    }
+
     private void OnProjectileDissipated(Projectile projectile)
     {
         _activeProjectiles.Remove(projectile);
-        projectile.EnemyHit -= OnProjectileHitEnemy;
-        projectile.Dissipated -= OnProjectileDissipated;
+        UnregisterProjectile(projectile);
 
         ReleaseProjectile(projectile);
     }
@@ -588,6 +623,26 @@ public partial class GameManager : Node2D
         _activeExplosionEffects.Remove(effect);
         effect.Finished -= OnExplosionEffectFinished;
         _explosionEffectPool?.Release(effect);
+    }
+
+    /// <summary>
+    /// Spawns a pooled pierce spark where an arrow passed through an enemy, so each
+    /// pierced hit is visible. Sized from the pierce constants (never the cannon's AoE
+    /// radius), so the spark can't be mistaken for a splash.
+    /// </summary>
+    private void SpawnPierceSpark(Vector2 position)
+    {
+        var effect = _pierceSparkPool!.Acquire();
+        effect.Finished += OnPierceSparkFinished;
+        _activePierceSparks.Add(effect);
+        effect.Play(position);
+    }
+
+    private void OnPierceSparkFinished(PierceSparkEffect effect)
+    {
+        _activePierceSparks.Remove(effect);
+        effect.Finished -= OnPierceSparkFinished;
+        _pierceSparkPool?.Release(effect);
     }
 
     private void ReleaseProjectile(Projectile projectile)
@@ -708,8 +763,7 @@ public partial class GameManager : Node2D
         {
             if (IsInstanceValid(projectile))
             {
-                projectile.EnemyHit -= OnProjectileHitEnemy;
-                projectile.Dissipated -= OnProjectileDissipated;
+                UnregisterProjectile(projectile);
                 ReleaseProjectile(projectile);
             }
         }
@@ -725,6 +779,17 @@ public partial class GameManager : Node2D
             }
         }
         _activeExplosionEffects.Clear();
+
+        // Release in-flight pierce sparks back to pool (pools persist across restarts)
+        foreach (var spark in _activePierceSparks)
+        {
+            if (IsInstanceValid(spark))
+            {
+                spark.Finished -= OnPierceSparkFinished;
+                _pierceSparkPool?.Release(spark);
+            }
+        }
+        _activePierceSparks.Clear();
 
         // Free towers (not pooled)
         foreach (var tower in _activeTowers)

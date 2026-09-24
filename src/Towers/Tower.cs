@@ -168,7 +168,19 @@ public abstract partial class Tower : Node2D
         _fireCooldownTimer = FireRate;
         targetPos = target.Position;
 
+        // Let variants layer fire-time presentation on a successful shot (the shot
+        // itself is spawned by GameManager from the returned target position).
+        OnFired(targetPos);
+
         return true;
+    }
+
+    /// <summary>
+    /// Called once per successful <see cref="TryFire"/>, after the cooldown is armed.
+    /// Default is a no-op; variants override it for fire-time feedback.
+    /// </summary>
+    protected virtual void OnFired(Vector2 targetPos)
+    {
     }
 
     /// <summary>

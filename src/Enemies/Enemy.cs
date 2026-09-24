@@ -53,6 +53,13 @@ public partial class Enemy : Node2D
     private float _burnDps = 0f;
     private float _hitFlashRemaining = 0f;
 
+    // Burn presentation: a hot flash on proc, plus a quantized pulse phase/step for the
+    // tint while the DoT drains. The step (not the phase) is what the draw reads, so the
+    // burning tint only redraws when the quantized level changes — see TickStatuses.
+    private float _burnFlashRemaining = 0f;
+    private float _burnPulsePhase = 0f;
+    private int _burnPulseStep = 0;
+
     // Cached armored geometry + fill-color array so the per-frame redraw allocates
     // nothing. The diamond/inset points depend on _diameter and are rebuilt in
     // UpdateVisual (which runs on Configure); the color array is reused and its
@@ -120,6 +127,18 @@ public partial class Enemy : Node2D
     /// Seconds of burn remaining.
     /// </summary>
     public float BurnRemaining => _burnRemaining;
+
+    /// <summary>
+    /// Seconds of burn-proc flash remaining. Non-zero for a brief moment after a burn
+    /// is applied, so the proc itself is visible.
+    /// </summary>
+    public float BurnFlashRemaining => _burnFlashRemaining;
+
+    /// <summary>
+    /// Current quantized burn-pulse step (0..BurnPulseSteps-1). The burning tint is a
+    /// pure function of this step, so it only changes when the step does.
+    /// </summary>
+    public int BurnPulseStep => _burnPulseStep;
 
     /// <summary>
     /// Constant offset from the path anchor applied to Position every tick.
@@ -269,7 +288,8 @@ public partial class Enemy : Node2D
 
     /// <summary>
     /// Fill color with the status overlays applied: stun desaturates toward grey,
-    /// burn tints toward orange, and a crit flash brightens toward white.
+    /// burn tints toward orange (pulsing while it drains), the burn proc flashes hot
+    /// yellow/orange, and a crit flash brightens toward white.
     /// </summary>
     private Color EffectiveFillColor()
     {
@@ -283,12 +303,41 @@ public partial class Enemy : Node2D
         }
 
         if (_burnRemaining > 0f)
-            color = color.Lerp(new Color(1f, 0.5f, 0f, color.A), 0.5f);
+            color = BurnTint(color, _burnPulseStep);
+
+        if (_burnFlashRemaining > 0f)
+        {
+            color = color.Lerp(
+                GameConstants.BurnProcFlashColor with { A = color.A },
+                GameConstants.BurnProcFlashStrength);
+        }
 
         if (_hitFlashRemaining > 0f)
             color = color.Lerp(new Color(1f, 1f, 1f, color.A), 0.6f);
 
         return color;
+    }
+
+    /// <summary>
+    /// Applies the burn tint for a quantized pulse step to a fill color. The tint follows
+    /// the pulse step rather than a raw timer, so the draw stays a pure function of state
+    /// (see <see cref="TickStatuses"/>): the color only changes when the step changes.
+    /// Pure, so the pulse's visual contract is testable — step 0 (the trough) is exactly
+    /// the static burn tint the enemy showed before the pulse existed, and later steps are
+    /// hotter, which is what makes the drain read as active.
+    /// </summary>
+    public static Color BurnTint(Color fill, int pulseStep)
+    {
+        float pulse = BurnPulseIntensity(pulseStep);
+
+        Color tint = GameConstants.BurnPulseCoolColor
+            .Lerp(GameConstants.BurnPulseHotColor, pulse);
+        float strength = Mathf.Lerp(
+            GameConstants.BurnPulseTintStrengthMin,
+            GameConstants.BurnPulseTintStrengthMax,
+            pulse);
+
+        return fill.Lerp(tint with { A = fill.A }, strength);
     }
 
     /// <summary>
@@ -406,6 +455,9 @@ public partial class Enemy : Node2D
         _burnRemaining = 0f;
         _burnDps = 0f;
         _hitFlashRemaining = 0f;
+        _burnFlashRemaining = 0f;
+        _burnPulsePhase = 0f;
+        _burnPulseStep = 0;
     }
 
     /// <summary>
@@ -445,7 +497,8 @@ public partial class Enemy : Node2D
 
     /// <summary>
     /// Applies a burn DoT of the given dps for the given duration. Re-proc refreshes
-    /// the duration and does not stack.
+    /// the duration and does not stack. A proc (first or refresh) also flashes the
+    /// enemy briefly and restarts the pulse phase so the moment it lands is visible.
     /// </summary>
     public void ApplyBurn(float dps, float duration)
     {
@@ -454,6 +507,9 @@ public partial class Enemy : Node2D
 
         _burnDps = dps;
         _burnRemaining = Mathf.Max(_burnRemaining, duration);
+        _burnFlashRemaining = GameConstants.BurnProcFlashDuration;
+        _burnPulsePhase = 0f;
+        _burnPulseStep = 0;
         RedrawVisual();
     }
 
@@ -483,8 +539,11 @@ public partial class Enemy : Node2D
         bool wasStunned = _stunRemaining > 0f;
         bool wasBurning = _burnRemaining > 0f;
         bool wasFlashing = _hitFlashRemaining > 0f;
-        if (!wasStunned && !wasBurning && !wasFlashing)
+        bool wasBurnFlashing = _burnFlashRemaining > 0f;
+        if (!wasStunned && !wasBurning && !wasFlashing && !wasBurnFlashing)
             return;
+
+        bool redraw = false;
 
         if (_burnRemaining > 0f)
         {
@@ -493,20 +552,76 @@ public partial class Enemy : Node2D
             float burnTime = Mathf.Min(delta, _burnRemaining);
             TakeDamage(_burnDps * burnTime, ignoreArmor: true);
             _burnRemaining = Mathf.Max(0f, _burnRemaining - delta);
+
+            // Burn is the one status whose tint is not a pure function of "active or
+            // not": it pulses so the drain reads as ongoing. Advance the phase and
+            // redraw only when the quantized step changes — BurnPulseSteps redraws per
+            // BurnPulsePeriod (~17 Hz while burning), never once per frame.
+            _burnPulsePhase += delta;
+            int step = BurnPulseStepAt(_burnPulsePhase);
+            if (step != _burnPulseStep)
+            {
+                _burnPulseStep = step;
+                redraw = true;
+            }
         }
 
         _stunRemaining = Mathf.Max(0f, _stunRemaining - delta);
         _hitFlashRemaining = Mathf.Max(0f, _hitFlashRemaining - delta);
+        _burnFlashRemaining = Mathf.Max(0f, _burnFlashRemaining - delta);
 
-        // The tint is a pure function of *which* statuses are active, so redraw only
-        // on a status-set transition (a status applied, or one expiring) — never on
-        // every frame a status is active.
+        // The tint is otherwise a pure function of *which* statuses are active, so
+        // redraw only on a status-set transition (a status applied, or one expiring) —
+        // never on every frame a status is active. The burn pulse above is the only
+        // additional redraw source, and it is quantized to discrete steps.
         if ((_stunRemaining > 0f) != wasStunned ||
             (_burnRemaining > 0f) != wasBurning ||
-            (_hitFlashRemaining > 0f) != wasFlashing)
+            (_hitFlashRemaining > 0f) != wasFlashing ||
+            (_burnFlashRemaining > 0f) != wasBurnFlashing)
         {
-            RedrawVisual();
+            redraw = true;
         }
+
+        if (redraw)
+            RedrawVisual();
+    }
+
+    /// <summary>
+    /// Discrete pulse step (0..BurnPulseSteps-1) for a burn pulse phase in seconds.
+    /// The phase is wrapped into one cycle here, so an unbounded phase still yields a
+    /// bounded step. Pure and allocation-free so the burning tint can be a function of
+    /// the step alone.
+    /// </summary>
+    public static int BurnPulseStepAt(float phase)
+    {
+        int steps = GameConstants.BurnPulseSteps;
+        float period = GameConstants.BurnPulsePeriod;
+
+        if (steps <= 1 || !(period > 0f) || !float.IsFinite(phase))
+            return 0;
+
+        float cycle = phase - period * System.MathF.Floor(phase / period);
+        if (!(cycle >= 0f)) // NaN guard
+            return 0;
+
+        int step = (int)(cycle / period * steps);
+        return step >= steps ? steps - 1 : step;
+    }
+
+    /// <summary>
+    /// Burn-pulse intensity (0..1) for a discrete pulse step: a sine of the step's
+    /// position in the cycle, quantized to BurnPulseSteps levels. Step 0 is the trough
+    /// (intensity 0), which makes the pulse's resting tint the static burn tint.
+    /// </summary>
+    public static float BurnPulseIntensity(int step)
+    {
+        int steps = GameConstants.BurnPulseSteps;
+        if (steps <= 1)
+            return 0f;
+
+        int clamped = Mathf.Clamp(step, 0, steps - 1);
+        float progress = (float)clamped / steps;
+        return 0.5f - 0.5f * System.MathF.Cos(System.MathF.Tau * progress);
     }
 
     private void RedrawVisual()
