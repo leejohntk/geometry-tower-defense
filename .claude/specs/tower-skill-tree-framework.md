@@ -10,7 +10,7 @@ Part 1 of 2. Part 2 (`tower-skill-tree-mechanics`) activates the mechanic nodes.
 
 Builds the per-tower skill tree system: persistent currency, the tree data model, persistence, the title-screen skill tree UI, and the **stat nodes** (pure number upgrades). The **mechanic nodes** (pierce, crit, cluster, stun, ignite, chain, ramp-up) are rendered in the tree but disabled with a "coming soon" label — they activate in Part 2.
 
-- **Persistent currency** — "Skill Points" (SP), earned per kill, tiered by enemy kind. Separate from in-level coins (coins unchanged). Persists across levels and sessions.
+- **Persistent currency** — "Skill Points" (SP), awarded per completed level run: victory pays `2 × level id`, defeat pays half that. Separate from in-level coins, which remain per-kill and unchanged. Persists across levels and sessions.
 - **Three trees** — Arrow, Cannon, Laser. Each tree = a trunk of stat nodes + two seed (mechanic) nodes. Both seeds present, no lockout.
 - **Five ranks max** per node, bought with SP.
 

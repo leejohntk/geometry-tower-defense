@@ -65,7 +65,7 @@ First run with **subagent transcripts** in the evidence base (`36b5e55a-…/suba
 - **`--run-stdout` in CLAUDE.md is not a Godot flag** — `godot --help | grep -c run-stdout` → 0; the flag is silently ignored, exits 0. Worse, the documented form has no exit condition, so a headless game never quits and an agent following the doc literally hangs. Agents converged on `--headless --quit-after 120` unaided. Proposal P6.
 - **`timeout` does not exist on this host** — `timeout 600 dotnet test …` → `command not found: timeout`; no `gtimeout` either (darwin). One wasted round trip. Proposal P7.
 - **`state.json` is written ~46 times per feature pair** (39 Edit + 7 Write + 4 Read) in a fixed two-step ritual: a `phase` edit, then a `blocked_on` edit ~7 s later. One Edit failed on a stale assumed value (2026-09-22T00:21:16.835Z), recovered by `grep -n '"phase"\|"blocked_on"'`. Proposal P5.
-- **Run #4's P1/P2 verified landed** (PR #17): zero `reset --hard` this window (three in run #4's), clean fast-forward merges, bookkeeping folded onto the feature branch pre-merge. P2's removal of the post-merge writes is what created the staleness in "What's Broken" — the fix traded one problem for another.
+- **Run #4's P1/P2 verified landed** (PR #17): zero `reset --hard` this window (three in run #4's), clean fast-forward merges, bookkeeping folded onto the feature branch pre-merge. P2's removal of the post-merge writes is what created the staleness in "What's Broken" — the fix traded one problem for another. **Long-term rule the human set 2026-09-23:** memory/config files must be updated **pre-merge** on the feature branch; post-merge stray PRs to sync them are not acceptable. Distillation runs are the deliberate exception and keep their own `chore/distillation-N` PRs.
 - **Holdout discipline held** — 0 of 12 implementer transcripts contained an `H<n>_*` scenario name; the frontmatter deny fires. Security lens and reviewer `Bash`-freedom (run #3's M3) both hold.
 - **Review produced real value** — `src/Grid/GridManager.cs:286`, placement preview uses base range instead of the skill-modified range after Range ranks are bought. Lenses used `Warning:`/`Info:` casing instead of the protocol's `WARNING`/`INFO` (cosmetic).
 - **No code thrash** — 2 error classes across 27 subagents, 6 compiler errors total (`CS0246 List<> missing using`, `CS1503 void→string?`). No fix-then-break cycles.
@@ -74,22 +74,30 @@ First run with **subagent transcripts** in the evidence base (`36b5e55a-…/suba
 
 *(Run #4's P1 and P2 were approved and landed as PR #17 — closed.)*
 
-**P3 (MEDIUM) — `skills/implement-feature/SKILL.md`, Phase 8.** Batch playtest feedback: collect every issue from one playtest pass into a single fix list and spawn **one** implementer for the batch; re-spawn only for a genuinely new defect found after the batch lands. Grounded in 8 spawns that all hit the same file.
+**P3 — APPLIED 2026-09-23 (human-approved).** `skills/implement-feature/SKILL.md` Phase 8 now says to batch: collect every issue from one playtest pass into a single fix list and spawn **one** implementer for the whole batch, re-spawning only for a genuinely new defect found after the batch lands. The 8-spawns-one-file evidence is quoted inline as the rationale.
 
-**P4 (MEDIUM) — `skills/implement-feature/SKILL.md`, Merge Cleanup.** Restore the post-merge status flip, on a branch. After step 5 add:
-```
-5b. Flip `.claude/memory/current-feature.md` to the merged/idle status and commit it on a
-    short-lived `chore/post-merge-{feature}` branch + PR. Never `git commit` on `main`
-    (see `.claude/rules/no-push-to-main.md`). Until this runs, `current-feature.md` keeps
-    reporting the merged feature as `awaiting_playtest`.
-```
-This is run #4's P2 option (a); PR #17 implemented neither option, it just deleted the steps.
+**P4 — REJECTED by human 2026-09-23. Do not re-propose.** The original proposal was to restore the
+post-merge status flip on a short-lived `chore/post-merge-{feature}` branch + PR. Rejected because it
+would create a stray PR after **every** feature merge to maintain a line nobody reads. Investigation
+that settled it:
+- `session-start.sh:40` surfaces this file with `head -5` — frontmatter only. The `Status:` line was
+  line 10 and was **never shown** at session start.
+- `.claude/state.json` is already the authoritative phase owner: gitignored (`.gitignore:29`), read
+  by `session-start.sh:28`, and deleted at merge → the next session prints `No state.json — clean
+  start.` Correct by construction, no rule required.
+- The `Status:` line was therefore a redundant second copy of a fact `state.json` already owned.
 
-**P5 (MEDIUM) — `skills/implement-feature/SKILL.md`, state updates.** Wherever the skill says to update `.claude/state.json`, add: "read it once, then write the whole file with a **single** `Write` when both `phase` and `blocked_on` change." Removes the two-`Edit` ritual and the stale-content failure mode.
+**Resolution applied instead:** the volatile `Status:` line was deleted from
+`current-feature.md`, whose frontmatter description now states that live phase lives in
+`state.json` and the file records history only. This eliminates the staleness class rather than
+managing it — no new rule, no stray PR. General principle for future runs: when a staleness gap
+appears, prefer deleting the redundant state over adding bookkeeping to sync it.
 
-**P6 (MEDIUM — CLAUDE.md, outside distiller write scope) — Build & Run.** Replace `godot --headless --run-stdout` with `godot --headless --quit-after 300`. The current flag does not exist and the command has no exit condition.
+**P5 — APPLIED 2026-09-23 (human-approved).** `skills/implement-feature/SKILL.md` gained a "State file updates (applies to every phase below)" section: read `state.json` once, then write the whole file with a **single** `Write` — never one `Edit` for `phase` plus a second for `blocked_on`. Documents the ~46-writes-per-feature-pair cost and the stale-content `Edit` failure it removes.
 
-**P7 (LOW–MEDIUM) — host facts.** Record in `rules/verification-gates.md` or `memory/godot-mcp.md` that the agent shell is macOS `darwin`: no `timeout`, no `gtimeout`; bound long runs with `--quit-after <frames>` instead.
+**P6 — APPLIED 2026-09-23 (human-approved).** Build & Run now reads `godot --headless --quit-after 300` with a comment explaining that the game loop never exits on its own so an unbounded invocation hangs. `--quit-after <int>` verified present in `godot --help`; `--run-stdout` verified absent (count 0). No remaining `run-stdout` references in `CLAUDE.md`.
+
+**P7 — APPLIED 2026-09-23 (human-approved).** `rules/verification-gates.md` gained a "Host: macOS (darwin)" section above Gate 1: no `timeout` / `gtimeout` (use the Bash tool's own timeout parameter), and bound headless Godot runs with `--quit-after <frames>` since the game loop never exits on its own (`--run-stdout` is not a flag).
 
 **H3 (HIGH — blocked, human must implement) — re-escalated from runs #3 and #4.**
 Guard destructive git ops in `pre-tool-use.sh`: deny `git reset --hard`, `git clean -f`, `git checkout -- .`, `git restore` (when the working tree is dirty). Only the guidance version (M6, "Destructive Git Ops" in `harness-safety.md`) has landed; the deterministic hook guard does not exist. Lower pressure this window — zero occurrences — but still open.

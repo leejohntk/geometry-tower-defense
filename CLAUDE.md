@@ -20,7 +20,9 @@ dotnet build
 dotnet test
 
 # Run game (headless, for agent verification)
-godot --headless --run-stdout
+# --quit-after bounds the run: the game loop never exits on its own, so an
+# unbounded invocation hangs. 300 iterations is a few seconds at 60 fps.
+godot --headless --quit-after 300
 
 # Run game (for human playtest — launches window)
 godot

@@ -1,13 +1,16 @@
 ---
 name: current-feature
-description: Active feature tracking — what's being worked on, state, branch, progress
+description: Feature log — what shipped, gates, and outstanding follow-ups. Live phase lives in state.json
 metadata:
   type: project
 ---
 
 # Current Feature
 
-**Status:** idle — no feature active, `state.json` deleted
+**Live phase lives in `.claude/state.json`** — that file is the single source of truth for what is
+active right now (and is deleted at merge, which means "idle"). This file records *history*: what
+shipped, its gates, and open follow-ups. Do not track phase here — it goes stale the moment a PR
+merges.
 
 **Last feature:** tower-skill-tree-mechanics (Part 2 of 2) — all gates green, **merged as PR #19** (`149ccd4`)
 **Branch:** `main` (feature branch deleted)
@@ -36,9 +39,13 @@ Holdouts moved to `.claude/holdouts/regression/tower-skill-tree-mechanics/`.
 - **Spec doc drift (part 1)** — the tower-skill-tree-framework spec's Description line claims Skill
   Points are awarded per kill, tiered by enemy kind; its own Currency Design section and the shipped
   code award them per level outcome (victory = `levelId * 2`, defeat = half). Correct that spec line.
-- **Harness staleness (distillation run #5, 2026-09-23)** — this file's status is only flipped
-  pre-merge, so it misreported `awaiting_playtest` after PR #19 merged. Corrected by hand; the
-  structural fix is queued as proposal P4 in `harness-feedback.md`.
+- **Harness staleness — RESOLVED 2026-09-23 (distillation run #5).** This file used to carry its
+  own `Status:` line (`awaiting_playtest` etc.), which was written pre-merge and therefore
+  misreported after every merge — and was never surfaced anyway (`session-start.sh` does
+  `head -5`, which shows only the frontmatter). The line is removed; `.claude/state.json` is the
+  sole phase owner. Proposal P4 (a post-merge `chore/post-merge-*` branch to flip the status) was
+  **rejected** — it would have created a stray PR after every feature merge to maintain a
+  redundant line.
 
 ## Recent Features
 

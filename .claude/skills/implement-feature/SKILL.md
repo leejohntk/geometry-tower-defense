@@ -24,6 +24,15 @@ allowed-tools:
 
 Orchestrator runs this skill when human approves spec + holdouts.
 
+## State file updates (applies to every phase below)
+
+`.claude/state.json` is tiny. Whenever this skill says "update state", **read it once, then write the
+whole file with a single `Write`** — do not issue one `Edit` for `phase` and a second `Edit` for
+`blocked_on`. The two-`Edit` ritual cost ~46 writes per feature pair and produced a failed `Edit`
+against stale assumed content. One read + one `Write` is atomic, cheap, and cannot drift.
+
+Note: this file is gitignored, so it never needs committing and never appears in a PR.
+
 ## Phase 1: Spec
 
 Human describes feature. Orchestrator writes the spec to `.claude/specs/{feature}.md` (template: `.claude/templates/spec-template.md`) and commits it on the feature branch. Orchestrator drafts holdout scenarios in `.claude/holdouts/{feature}/`. Human reviews both and says "approved."
@@ -82,7 +91,15 @@ Human describes feature. Orchestrator writes the spec to `.claude/specs/{feature
 
 Human playtests. Two outcomes:
 - **Approved:** Human says "merge it." Agent runs merge cleanup (see below).
-- **Issues found:** Human provides feedback. Orchestrator spawns implementer fix. Loop back to Phase 3.
+- **Issues found:** Human provides feedback. **Batch it** — collect *every* issue from that playtest
+  pass into a single fix list and spawn **one** implementer for the whole batch. Do not spawn one
+  implementer per issue. Re-spawn only for a genuinely new defect discovered *after* the batch lands
+  (e.g. a regression the batch introduced, or something the human only sees once the batch is in).
+  Loop back to Phase 3.
+
+  Rationale: `tower-skill-tree-framework` needed 8 fix spawns, **all 8 editing the same file**
+  (`src/UI/SkillTreeScreen.cs`), each paying a full build/test/gate cycle. Several of those issues
+  arrived in the same message and could have ridden one spawn.
 
 ## Merge Cleanup (post-approval)
 
