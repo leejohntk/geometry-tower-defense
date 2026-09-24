@@ -95,7 +95,7 @@ appears, prefer deleting the redundant state over adding bookkeeping to sync it.
 
 **P5 (MEDIUM) — `skills/implement-feature/SKILL.md`, state updates.** Wherever the skill says to update `.claude/state.json`, add: "read it once, then write the whole file with a **single** `Write` when both `phase` and `blocked_on` change." Removes the two-`Edit` ritual and the stale-content failure mode.
 
-**P6 (MEDIUM — CLAUDE.md, outside distiller write scope) — Build & Run.** Replace `godot --headless --run-stdout` with `godot --headless --quit-after 300`. The current flag does not exist and the command has no exit condition.
+**P6 — APPLIED 2026-09-23 (human-approved).** Build & Run now reads `godot --headless --quit-after 300` with a comment explaining that the game loop never exits on its own so an unbounded invocation hangs. `--quit-after <int>` verified present in `godot --help`; `--run-stdout` verified absent (count 0). No remaining `run-stdout` references in `CLAUDE.md`.
 
 **P7 (LOW–MEDIUM) — host facts.** Record in `rules/verification-gates.md` or `memory/godot-mcp.md` that the agent shell is macOS `darwin`: no `timeout`, no `gtimeout`; bound long runs with `--quit-after <frames>` instead.
 
