@@ -7,10 +7,10 @@ metadata:
 
 # Current Feature
 
-**Status:** awaiting_playtest
+**Status:** idle — no feature active, `state.json` deleted
 
-**Feature:** tower-skill-tree-mechanics (Part 2 of 2) — all gates green, PR open
-**Branch:** feature/tower-skill-tree-mechanics (PR #19)
+**Last feature:** tower-skill-tree-mechanics (Part 2 of 2) — all gates green, **merged as PR #19** (`149ccd4`)
+**Branch:** `main` (feature branch deleted)
 **Spec:** `.claude/specs/tower-skill-tree-mechanics.md` (approved 2026-09-22)
 
 Activates the 7 mechanic nodes Part 1 shipped disabled: Arrow Pierce + Crit Chance, Cannon
@@ -27,17 +27,22 @@ Spec + holdouts committed on the feature branch (`90cff40`). Part 1 merged as PR
 final post-simplify artifact · `/simplify` done (1 cleanup applied, 7 declined with reasons).
 Holdouts moved to `.claude/holdouts/regression/tower-skill-tree-mechanics/`.
 
-**Follow-up owed (doc drift, not code):** the part 1 framework spec's Description line claims Skill
-Points are awarded per kill, tiered by enemy kind — its own Currency Design section and the shipped
-code award them per level outcome (victory = `levelId * 2`, defeat = half). Correct that spec line.
-
 ## Feature Queue
 
 - (empty — serial execution, rule 7: human queues the next idea while this one runs)
 
+## Post-Merge Follow-Up
+
+- **Spec doc drift (part 1)** — the tower-skill-tree-framework spec's Description line claims Skill
+  Points are awarded per kill, tiered by enemy kind; its own Currency Design section and the shipped
+  code award them per level outcome (victory = `levelId * 2`, defeat = half). Correct that spec line.
+- **Harness staleness (distillation run #5, 2026-09-23)** — this file's status is only flipped
+  pre-merge, so it misreported `awaiting_playtest` after PR #19 merged. Corrected by hand; the
+  structural fix is queued as proposal P4 in `harness-feedback.md`.
+
 ## Recent Features
 
-- **Tower skill tree mechanics** (part 2/2, PR #19, opened 2026-09-22) — activates the 7 hidden
+- **Tower skill tree mechanics** (part 2/2, PR #19, merged) — activates the 7 hidden
   mechanic nodes: Arrow pierce + crit, Cannon cluster + stun, Laser ignite + chain (60%
   compounding falloff) + ramp (1.0→2.0× over 2s). First stun/burn status effects on `Enemy`;
   status and beam hot paths kept allocation-free. Review caught a real bug: `LaserTower`'s held

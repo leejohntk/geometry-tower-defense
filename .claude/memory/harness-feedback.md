@@ -17,7 +17,10 @@ metadata:
 
 ## What's Broken
 
-(None open.)
+### Open 2026-09-23
+
+- **Post-merge `current-feature.md` never gets corrected** — the status flip only happens pre-merge (set to `awaiting_playtest`), and PR #17 removed the post-merge writes because they could not be committed on `main`. Each feature's bookkeeping marks its *predecessor* merged, so with nothing queued the last feature stays `awaiting_playtest` indefinitely. `session-start.sh:37-41` surfaces this file as the "Current Feature Context" block (via `head -5`) and orchestrators read it for status, so the designated status file disagreed with reality until this run corrected it. The structural gap is queued as P4.
+- **Merge Cleanup step 6 is advisory** — the distiller flag was set 2026-09-21T04:37:00Z and PR #18 merged 2026-09-22T04:44:57Z with no check; the flag then sat ~2.6 days across a full feature. PR #19 did run the check. Nothing makes the step load-bearing.
 
 ### Resolved 2026-09-20
 
@@ -54,27 +57,42 @@ metadata:
 - **Level-4 review caught a real bug** — multi-lens Security lens found a CRITICAL (`WaveManager` null-forgiving deref after mid-wave reset → NRE + leaked enemy); fixed before merge. Review pipeline working. The null-forgiving `!` idiom recurs in `GameManager.cs`; watch for it, consider a convention later.
 - **Flag cadence** — flag re-tripped 30 min after run #3 with counter 31 vs threshold 12. Working as designed.
 
-**Queued proposals (await human approval — do not apply to skills/rules without sign-off):**
+### 2026-09-23 — Fifth Distillation
 
-**P1 (MEDIUM) — `skills/implement-feature/SKILL.md`, Merge Cleanup step 2.**
-Replace:
-```
-2. `git checkout main && git pull`
-```
-with:
-```
-2. `git fetch origin && git checkout main && git pull --ff-only`
-```
-and append to the step: "If the working tree is dirty, STOP — surface the modified files to the human before any checkout/pull, and never run `git reset --hard` / `git clean -f` / `git restore` to clear them (see `.claude/rules/harness-safety.md` → Destructive Git Ops)."
+First run with **subagent transcripts** in the evidence base (`36b5e55a-…/subagents/*.jsonl`, 27 files). They are where all build/test activity lives — the main transcript carries no sidechains, so prior runs were effectively blind to implementation churn. Reads: `jq` the main JSONL for tool_use; grep the subagent files for `error CS`, `Failed!`, and per-agent tool histograms. Window: PRs #16–#19.
 
-**P2 (MEDIUM) — `skills/implement-feature/SKILL.md`, Merge Cleanup post-merge bookkeeping.**
-After step 6 (`Delete .claude/state.json`), add:
-```
-6b. Post-merge bookkeeping is NOT committed on `main`. Either (a) commit it on a short-lived `chore/post-merge-{feature}` branch and open a PR, or (b) leave it uncommitted and fold it into the next feature branch's first commit. Pick one per cleanup; never `git commit` on `main` (see `.claude/rules/no-push-to-main.md` → No Local Commits on Main).
-```
+- **Playtest loop costs one implementer spawn per UI tweak** — 8 fix spawns for `feature/tower-skill-tree-framework`, **all 8 on `src/UI/SkillTreeScreen.cs`**, each with its own `state.json` edits and full gate re-run. The 7th and 8th were the same defect class twice (right-align left-branch labels → left-branch rank/coming-soon alignment, overlapping lines). Proposal P3.
+- **`--run-stdout` in CLAUDE.md is not a Godot flag** — `godot --help | grep -c run-stdout` → 0; the flag is silently ignored, exits 0. Worse, the documented form has no exit condition, so a headless game never quits and an agent following the doc literally hangs. Agents converged on `--headless --quit-after 120` unaided. Proposal P6.
+- **`timeout` does not exist on this host** — `timeout 600 dotnet test …` → `command not found: timeout`; no `gtimeout` either (darwin). One wasted round trip. Proposal P7.
+- **`state.json` is written ~46 times per feature pair** (39 Edit + 7 Write + 4 Read) in a fixed two-step ritual: a `phase` edit, then a `blocked_on` edit ~7 s later. One Edit failed on a stale assumed value (2026-09-22T00:21:16.835Z), recovered by `grep -n '"phase"\|"blocked_on"'`. Proposal P5.
+- **Run #4's P1/P2 verified landed** (PR #17): zero `reset --hard` this window (three in run #4's), clean fast-forward merges, bookkeeping folded onto the feature branch pre-merge. P2's removal of the post-merge writes is what created the staleness in "What's Broken" — the fix traded one problem for another.
+- **Holdout discipline held** — 0 of 12 implementer transcripts contained an `H<n>_*` scenario name; the frontmatter deny fires. Security lens and reviewer `Bash`-freedom (run #3's M3) both hold.
+- **Review produced real value** — `src/Grid/GridManager.cs:286`, placement preview uses base range instead of the skill-modified range after Range ranks are bought. Lenses used `Warning:`/`Info:` casing instead of the protocol's `WARNING`/`INFO` (cosmetic).
+- **No code thrash** — 2 error classes across 27 subagents, 6 compiler errors total (`CS0246 List<> missing using`, `CS1503 void→string?`). No fix-then-break cycles.
 
-**H3 (HIGH — blocked, human must implement) — re-escalated from run #3.**
-Guard destructive git ops in `pre-tool-use.sh`: deny `git reset --hard`, `git clean -f`, `git checkout -- .`, `git restore` (when the working tree is dirty). Only the guidance version (M6, "Destructive Git Ops" in `harness-safety.md`) has landed; the deterministic hook guard does not exist.
+**Queued proposals (await human approval — do not apply to skills/rules/CLAUDE.md without sign-off):**
+
+*(Run #4's P1 and P2 were approved and landed as PR #17 — closed.)*
+
+**P3 (MEDIUM) — `skills/implement-feature/SKILL.md`, Phase 8.** Batch playtest feedback: collect every issue from one playtest pass into a single fix list and spawn **one** implementer for the batch; re-spawn only for a genuinely new defect found after the batch lands. Grounded in 8 spawns that all hit the same file.
+
+**P4 (MEDIUM) — `skills/implement-feature/SKILL.md`, Merge Cleanup.** Restore the post-merge status flip, on a branch. After step 5 add:
+```
+5b. Flip `.claude/memory/current-feature.md` to the merged/idle status and commit it on a
+    short-lived `chore/post-merge-{feature}` branch + PR. Never `git commit` on `main`
+    (see `.claude/rules/no-push-to-main.md`). Until this runs, `current-feature.md` keeps
+    reporting the merged feature as `awaiting_playtest`.
+```
+This is run #4's P2 option (a); PR #17 implemented neither option, it just deleted the steps.
+
+**P5 (MEDIUM) — `skills/implement-feature/SKILL.md`, state updates.** Wherever the skill says to update `.claude/state.json`, add: "read it once, then write the whole file with a **single** `Write` when both `phase` and `blocked_on` change." Removes the two-`Edit` ritual and the stale-content failure mode.
+
+**P6 (MEDIUM — CLAUDE.md, outside distiller write scope) — Build & Run.** Replace `godot --headless --run-stdout` with `godot --headless --quit-after 300`. The current flag does not exist and the command has no exit condition.
+
+**P7 (LOW–MEDIUM) — host facts.** Record in `rules/verification-gates.md` or `memory/godot-mcp.md` that the agent shell is macOS `darwin`: no `timeout`, no `gtimeout`; bound long runs with `--quit-after <frames>` instead.
+
+**H3 (HIGH — blocked, human must implement) — re-escalated from runs #3 and #4.**
+Guard destructive git ops in `pre-tool-use.sh`: deny `git reset --hard`, `git clean -f`, `git checkout -- .`, `git restore` (when the working tree is dirty). Only the guidance version (M6, "Destructive Git Ops" in `harness-safety.md`) has landed; the deterministic hook guard does not exist. Lower pressure this window — zero occurrences — but still open.
 
 ## Harness Change Log
 
