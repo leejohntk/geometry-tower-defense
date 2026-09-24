@@ -74,7 +74,7 @@ First run with **subagent transcripts** in the evidence base (`36b5e55a-…/suba
 
 *(Run #4's P1 and P2 were approved and landed as PR #17 — closed.)*
 
-**P3 (MEDIUM) — `skills/implement-feature/SKILL.md`, Phase 8.** Batch playtest feedback: collect every issue from one playtest pass into a single fix list and spawn **one** implementer for the batch; re-spawn only for a genuinely new defect found after the batch lands. Grounded in 8 spawns that all hit the same file.
+**P3 — APPLIED 2026-09-23 (human-approved).** `skills/implement-feature/SKILL.md` Phase 8 now says to batch: collect every issue from one playtest pass into a single fix list and spawn **one** implementer for the whole batch, re-spawning only for a genuinely new defect found after the batch lands. The 8-spawns-one-file evidence is quoted inline as the rationale.
 
 **P4 — REJECTED by human 2026-09-23. Do not re-propose.** The original proposal was to restore the
 post-merge status flip on a short-lived `chore/post-merge-{feature}` branch + PR. Rejected because it
@@ -93,11 +93,11 @@ that settled it:
 managing it — no new rule, no stray PR. General principle for future runs: when a staleness gap
 appears, prefer deleting the redundant state over adding bookkeeping to sync it.
 
-**P5 (MEDIUM) — `skills/implement-feature/SKILL.md`, state updates.** Wherever the skill says to update `.claude/state.json`, add: "read it once, then write the whole file with a **single** `Write` when both `phase` and `blocked_on` change." Removes the two-`Edit` ritual and the stale-content failure mode.
+**P5 — APPLIED 2026-09-23 (human-approved).** `skills/implement-feature/SKILL.md` gained a "State file updates (applies to every phase below)" section: read `state.json` once, then write the whole file with a **single** `Write` — never one `Edit` for `phase` plus a second for `blocked_on`. Documents the ~46-writes-per-feature-pair cost and the stale-content `Edit` failure it removes.
 
 **P6 — APPLIED 2026-09-23 (human-approved).** Build & Run now reads `godot --headless --quit-after 300` with a comment explaining that the game loop never exits on its own so an unbounded invocation hangs. `--quit-after <int>` verified present in `godot --help`; `--run-stdout` verified absent (count 0). No remaining `run-stdout` references in `CLAUDE.md`.
 
-**P7 (LOW–MEDIUM) — host facts.** Record in `rules/verification-gates.md` or `memory/godot-mcp.md` that the agent shell is macOS `darwin`: no `timeout`, no `gtimeout`; bound long runs with `--quit-after <frames>` instead.
+**P7 — APPLIED 2026-09-23 (human-approved).** `rules/verification-gates.md` gained a "Host: macOS (darwin)" section above Gate 1: no `timeout` / `gtimeout` (use the Bash tool's own timeout parameter), and bound headless Godot runs with `--quit-after <frames>` since the game loop never exits on its own (`--run-stdout` is not a flag).
 
 **H3 (HIGH — blocked, human must implement) — re-escalated from runs #3 and #4.**
 Guard destructive git ops in `pre-tool-use.sh`: deny `git reset --hard`, `git clean -f`, `git checkout -- .`, `git restore` (when the working tree is dirty). Only the guidance version (M6, "Destructive Git Ops" in `harness-safety.md`) has landed; the deterministic hook guard does not exist. Lower pressure this window — zero occurrences — but still open.

@@ -6,6 +6,16 @@ paths: ["**/*"]
 
 Gates that must pass before work can be claimed done.
 
+## Host: macOS (darwin)
+
+The agent shell runs on macOS. Two facts that cost round trips when forgotten:
+
+- **No `timeout`, no `gtimeout`.** `timeout 600 dotnet test` → `command not found: timeout`.
+  Use the Bash tool's own `timeout` parameter (milliseconds) to bound a command instead.
+- **Godot's game loop never exits on its own.** Bound any headless run with
+  `--quit-after <frames>` (`godot --headless --quit-after 300`). An unbounded invocation hangs.
+  `--run-stdout` is **not** a Godot flag — it is silently ignored.
+
 ## Gate 1: Build
 
 ```bash
