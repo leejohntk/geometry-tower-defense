@@ -65,7 +65,7 @@ First run with **subagent transcripts** in the evidence base (`36b5e55a-…/suba
 - **`--run-stdout` in CLAUDE.md is not a Godot flag** — `godot --help | grep -c run-stdout` → 0; the flag is silently ignored, exits 0. Worse, the documented form has no exit condition, so a headless game never quits and an agent following the doc literally hangs. Agents converged on `--headless --quit-after 120` unaided. Proposal P6.
 - **`timeout` does not exist on this host** — `timeout 600 dotnet test …` → `command not found: timeout`; no `gtimeout` either (darwin). One wasted round trip. Proposal P7.
 - **`state.json` is written ~46 times per feature pair** (39 Edit + 7 Write + 4 Read) in a fixed two-step ritual: a `phase` edit, then a `blocked_on` edit ~7 s later. One Edit failed on a stale assumed value (2026-09-22T00:21:16.835Z), recovered by `grep -n '"phase"\|"blocked_on"'`. Proposal P5.
-- **Run #4's P1/P2 verified landed** (PR #17): zero `reset --hard` this window (three in run #4's), clean fast-forward merges, bookkeeping folded onto the feature branch pre-merge. P2's removal of the post-merge writes is what created the staleness in "What's Broken" — the fix traded one problem for another.
+- **Run #4's P1/P2 verified landed** (PR #17): zero `reset --hard` this window (three in run #4's), clean fast-forward merges, bookkeeping folded onto the feature branch pre-merge. P2's removal of the post-merge writes is what created the staleness in "What's Broken" — the fix traded one problem for another. **Long-term rule the human set 2026-09-23:** memory/config files must be updated **pre-merge** on the feature branch; post-merge stray PRs to sync them are not acceptable. Distillation runs are the deliberate exception and keep their own `chore/distillation-N` PRs.
 - **Holdout discipline held** — 0 of 12 implementer transcripts contained an `H<n>_*` scenario name; the frontmatter deny fires. Security lens and reviewer `Bash`-freedom (run #3's M3) both hold.
 - **Review produced real value** — `src/Grid/GridManager.cs:286`, placement preview uses base range instead of the skill-modified range after Range ranks are bought. Lenses used `Warning:`/`Info:` casing instead of the protocol's `WARNING`/`INFO` (cosmetic).
 - **No code thrash** — 2 error classes across 27 subagents, 6 compiler errors total (`CS0246 List<> missing using`, `CS1503 void→string?`). No fix-then-break cycles.
@@ -76,14 +76,22 @@ First run with **subagent transcripts** in the evidence base (`36b5e55a-…/suba
 
 **P3 (MEDIUM) — `skills/implement-feature/SKILL.md`, Phase 8.** Batch playtest feedback: collect every issue from one playtest pass into a single fix list and spawn **one** implementer for the batch; re-spawn only for a genuinely new defect found after the batch lands. Grounded in 8 spawns that all hit the same file.
 
-**P4 (MEDIUM) — `skills/implement-feature/SKILL.md`, Merge Cleanup.** Restore the post-merge status flip, on a branch. After step 5 add:
-```
-5b. Flip `.claude/memory/current-feature.md` to the merged/idle status and commit it on a
-    short-lived `chore/post-merge-{feature}` branch + PR. Never `git commit` on `main`
-    (see `.claude/rules/no-push-to-main.md`). Until this runs, `current-feature.md` keeps
-    reporting the merged feature as `awaiting_playtest`.
-```
-This is run #4's P2 option (a); PR #17 implemented neither option, it just deleted the steps.
+**P4 — REJECTED by human 2026-09-23. Do not re-propose.** The original proposal was to restore the
+post-merge status flip on a short-lived `chore/post-merge-{feature}` branch + PR. Rejected because it
+would create a stray PR after **every** feature merge to maintain a line nobody reads. Investigation
+that settled it:
+- `session-start.sh:40` surfaces this file with `head -5` — frontmatter only. The `Status:` line was
+  line 10 and was **never shown** at session start.
+- `.claude/state.json` is already the authoritative phase owner: gitignored (`.gitignore:29`), read
+  by `session-start.sh:28`, and deleted at merge → the next session prints `No state.json — clean
+  start.` Correct by construction, no rule required.
+- The `Status:` line was therefore a redundant second copy of a fact `state.json` already owned.
+
+**Resolution applied instead:** the volatile `Status:` line was deleted from
+`current-feature.md`, whose frontmatter description now states that live phase lives in
+`state.json` and the file records history only. This eliminates the staleness class rather than
+managing it — no new rule, no stray PR. General principle for future runs: when a staleness gap
+appears, prefer deleting the redundant state over adding bookkeeping to sync it.
 
 **P5 (MEDIUM) — `skills/implement-feature/SKILL.md`, state updates.** Wherever the skill says to update `.claude/state.json`, add: "read it once, then write the whole file with a **single** `Write` when both `phase` and `blocked_on` change." Removes the two-`Edit` ritual and the stale-content failure mode.
 
