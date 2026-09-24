@@ -39,18 +39,26 @@ public partial class GameManager : Node2D
     private readonly List<Tower> _activeTowers = new();
     private readonly List<Projectile> _activeProjectiles = new();
     private readonly List<ExplosionEffect> _activeExplosionEffects = new();
+    private readonly List<PierceSparkEffect> _activePierceSparks = new();
 
     // Object pools
     private ObjectPool<Enemy>? _enemyPool;
     private ObjectPool<ArrowProjectile>? _arrowProjectilePool;
     private ObjectPool<CannonProjectile>? _cannonProjectilePool;
     private ObjectPool<ExplosionEffect>? _explosionEffectPool;
+    private ObjectPool<PierceSparkEffect>? _pierceSparkPool;
 
     // Cached list for collision detection (avoids per-frame allocation)
     private readonly List<(Projectile, Enemy)> _projectileCollisionPairs = new();
 
     // Cached snapshot for AoE explosion damage (avoids collection-modified exceptions)
     private readonly List<Enemy> _aoeSnapshot = new();
+
+    // Cached snapshots for the status pass and the laser chain path (no per-frame
+    // allocation — these lists are cleared and reused every frame).
+    private readonly List<Enemy> _statusSnapshot = new();
+    private readonly List<Enemy> _chainHitEnemies = new();
+    private readonly List<Vector2> _chainTargets = new();
 
     // Player state
     private int _hp;
@@ -191,6 +199,10 @@ public partial class GameManager : Node2D
 
         // Explosion effects are spawned per cannonball impact.
         _explosionEffectPool = new ObjectPool<ExplosionEffect>(8, this);
+
+        // Pierce sparks are spawned per passed-through enemy, so several can be alive
+        // at once for a single fully-piercing arrow (pool grows on demand if exceeded).
+        _pierceSparkPool = new ObjectPool<PierceSparkEffect>(12, this);
     }
 
     public override void _Process(double delta)
@@ -211,6 +223,9 @@ public partial class GameManager : Node2D
 
         // Apply continuous tower drain (laser) to their current targets
         UpdateTowerDrain((float)delta);
+
+        // Tick enemy stun/burn/flash statuses (movement pause is read in Enemy._Process)
+        UpdateEnemyStatuses((float)delta);
 
         // Update projectile collision detection
         UpdateProjectileCollisions();
@@ -250,6 +265,8 @@ public partial class GameManager : Node2D
 
     /// <summary>
     /// Towers fire at their current target, spawning the appropriate projectile type.
+    /// Cannon towers fire a cluster volley of (1 + cluster rank) shells spread across
+    /// a small arc; arrow towers fire a single piercing/crit-capable arrow.
     /// </summary>
     private void UpdateTowerFiring()
     {
@@ -264,30 +281,73 @@ public partial class GameManager : Node2D
 
             if (tower.TryFire(tower.CurrentTarget, out Vector2 targetPos))
             {
-                Projectile projectile;
-                if (tower is CannonTower)
+                if (tower is CannonTower cannon)
                 {
-                    var cannon = _cannonProjectilePool!.Acquire();
-                    cannon.Exploded += OnCannonExploded;
-                    projectile = cannon;
+                    SpawnCannonVolley(cannon, targetPos);
                 }
                 else
                 {
-                    projectile = _arrowProjectilePool!.Acquire();
+                    var arrow = _arrowProjectilePool!.Acquire();
+                    arrow.Initialize(tower, targetPos, tower.CurrentTarget);
+                    RegisterProjectile(arrow);
                 }
-
-                projectile.Initialize(tower, targetPos, tower.CurrentTarget);
-                projectile.EnemyHit += OnProjectileHitEnemy;
-                projectile.Dissipated += OnProjectileDissipated;
-                _activeProjectiles.Add(projectile);
             }
         }
     }
 
     /// <summary>
+    /// Spawns the cannon's cluster volley: (1 + cluster rank) shells fanned out
+    /// symmetrically around the direct line to the target. Each shell explodes
+    /// independently with the tower's skill-boosted splash radius.
+    /// </summary>
+    private void SpawnCannonVolley(CannonTower cannon, Vector2 targetPos)
+    {
+        int count = cannon.ClusterCount;
+        Vector2 baseDirection = (targetPos - cannon.Position).Normalized();
+
+        for (int i = 0; i < count; i++)
+        {
+            float offset = (i - (count - 1) / 2f) * GameConstants.SkillCannonClusterSpreadPerShellRadians;
+            Vector2 direction = baseDirection.Rotated(offset);
+            Vector2 shellTarget = cannon.Position + direction * cannon.RangePixels;
+
+            var shell = _cannonProjectilePool!.Acquire();
+            shell.Exploded += OnCannonExploded;
+            shell.Initialize(cannon, shellTarget, cannon.CurrentTarget!);
+            RegisterProjectile(shell);
+        }
+    }
+
+    /// <summary>
+    /// Subscribes a freshly spawned projectile's lifecycle signals and tracks it in the
+    /// active list. Pierce is wired for every projectile type: only a projectile with
+    /// spare hits ever emits it (the cannon's pierce count is 0), so a splash shot is
+    /// unaffected.
+    /// </summary>
+    private void RegisterProjectile(Projectile projectile)
+    {
+        projectile.EnemyHit += OnProjectileHitEnemy;
+        projectile.Pierced += OnProjectilePierced;
+        projectile.Dissipated += OnProjectileDissipated;
+        _activeProjectiles.Add(projectile);
+    }
+
+    /// <summary>
+    /// Inverse of <see cref="RegisterProjectile"/>: unhooks every signal and untracks
+    /// the projectile.
+    /// </summary>
+    private void UnregisterProjectile(Projectile projectile)
+    {
+        projectile.EnemyHit -= OnProjectileHitEnemy;
+        projectile.Pierced -= OnProjectilePierced;
+        projectile.Dissipated -= OnProjectileDissipated;
+    }
+
+    /// <summary>
     /// Continuous towers (laser) drain their current target every frame. The target is
     /// the nearest in-range enemy already computed by UpdateTowerTargeting — no extra scan.
-    /// Laser damage ignores armor.
+    /// Laser damage ignores armor and layers on the Part-2 mechanics: ramp-up while
+    /// holding one target, chain jumps to nearby enemies, and the per-second ignite roll.
     /// </summary>
     private void UpdateTowerDrain(float delta)
     {
@@ -296,14 +356,91 @@ public partial class GameManager : Node2D
             if (!tower.IsContinuous)
                 continue;
 
-            var target = tower.CurrentTarget;
-            if (target == null || target.IsDead)
+            if (tower is not LaserTower laser)
                 continue;
 
-            if (!tower.IsTargetInRange(target))
+            var target = laser.CurrentTarget;
+            if (target == null || target.IsDead || !laser.IsTargetInRange(target))
+            {
+                laser.ResetBeam();
                 continue;
+            }
 
-            target.TakeDamage(tower.Dps * delta, ignoreArmor: true);
+            float rampMultiplier = laser.UpdateRamp(target, delta);
+            float tickDamage = laser.Dps * rampMultiplier * delta;
+            target.TakeDamage(tickDamage, ignoreArmor: true);
+
+            if (target.IsDead)
+            {
+                laser.ResetBeam();
+                continue;
+            }
+
+            ApplyChain(laser, target, tickDamage);
+
+            int igniteRolls = laser.ConsumeIgniteRolls(delta);
+            for (int i = 0; i < igniteRolls; i++)
+            {
+                if (laser.Rolls.Roll(laser.IgniteChancePerSecond))
+                    target.ApplyBurn(GameConstants.SkillLaserBurnDps, GameConstants.SkillLaserBurnDuration);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Jumps the beam from the primary target to up to N further enemies, each within
+    /// one chain range of the previous target and each at 60% of the previous tick's
+    /// damage. No enemy is hit twice by one chain. Uses cached lists only.
+    /// </summary>
+    private void ApplyChain(LaserTower laser, Enemy primary, float tickDamage)
+    {
+        _chainHitEnemies.Clear();
+        _chainHitEnemies.Add(primary);
+        _chainTargets.Clear();
+
+        int jumps = laser.ChainJumps;
+        if (jumps <= 0)
+        {
+            laser.SetChainTargets(System.Array.Empty<Vector2>());
+            return;
+        }
+
+        var from = primary;
+        float damage = tickDamage;
+        for (int i = 0; i < jumps; i++)
+        {
+            var next = LaserChain.FindNextTarget(from, _activeEnemies, _chainHitEnemies);
+            if (next == null)
+                break;
+
+            damage *= GameConstants.SkillLaserChainFalloff;
+            next.TakeDamage(damage, ignoreArmor: true);
+            _chainHitEnemies.Add(next);
+            _chainTargets.Add(next.Position);
+            from = next;
+        }
+
+        laser.SetChainTargets(_chainTargets);
+    }
+
+    /// <summary>
+    /// Ticks stun/burn/flash timers and applies burn damage for every active enemy.
+    /// Iterates a cached snapshot because a burn tick can kill an enemy, whose Destroyed
+    /// signal mutates the live enemy list mid-pass.
+    /// </summary>
+    private void UpdateEnemyStatuses(float delta)
+    {
+        _statusSnapshot.Clear();
+        foreach (var enemy in _activeEnemies)
+        {
+            if (!enemy.IsDead)
+                _statusSnapshot.Add(enemy);
+        }
+
+        foreach (var enemy in _statusSnapshot)
+        {
+            if (!enemy.IsDead)
+                enemy.TickStatuses(delta);
         }
     }
 
@@ -422,27 +559,35 @@ public partial class GameManager : Node2D
     private void OnProjectileHitEnemy(Projectile projectile, Enemy enemy)
     {
         _activeProjectiles.Remove(projectile);
-        projectile.EnemyHit -= OnProjectileHitEnemy;
-        projectile.Dissipated -= OnProjectileDissipated;
+        UnregisterProjectile(projectile);
 
         // Damage is already applied synchronously in Projectile.HitEnemy.
         // This handler only manages lifecycle (pool release, list cleanup).
         ReleaseProjectile(projectile);
     }
 
+    /// <summary>
+    /// A hit landed but the projectile survived it (pierce), so it flies on to the next
+    /// enemy. Damage is already applied synchronously in Projectile.HitEnemy; this only
+    /// spawns the per-hit spark at the enemy it passed through.
+    /// </summary>
+    private void OnProjectilePierced(Projectile projectile, Enemy enemy)
+    {
+        SpawnPierceSpark(enemy.Position);
+    }
+
     private void OnProjectileDissipated(Projectile projectile)
     {
         _activeProjectiles.Remove(projectile);
-        projectile.EnemyHit -= OnProjectileHitEnemy;
-        projectile.Dissipated -= OnProjectileDissipated;
+        UnregisterProjectile(projectile);
 
         ReleaseProjectile(projectile);
     }
 
     /// <summary>
-    /// Applies cannonball AoE damage and spawns the explosion visual at the same impact point.
-    /// Uses a snapshot to avoid modifying the active enemy list while iterating it
-    /// (TakeDamage emits Destroyed, which mutates the list).
+    /// Applies cannonball AoE damage (plus any stun rolls) and spawns the explosion
+    /// visual at the same impact point. Uses a snapshot to avoid modifying the active
+    /// enemy list while iterating it (TakeDamage emits Destroyed, which mutates the list).
     /// </summary>
     private void OnCannonExploded(CannonProjectile projectile, Vector2 impactPosition)
     {
@@ -455,11 +600,7 @@ public partial class GameManager : Node2D
                 _aoeSnapshot.Add(enemy);
         }
 
-        foreach (var enemy in _aoeSnapshot)
-        {
-            if (!enemy.IsDead)
-                enemy.TakeDamage(projectile.ExplosionDamage);
-        }
+        projectile.Explode(_aoeSnapshot, impactPosition, projectile.ExplosionDamage);
 
         SpawnExplosionEffect(impactPosition, radius);
     }
@@ -482,6 +623,26 @@ public partial class GameManager : Node2D
         _activeExplosionEffects.Remove(effect);
         effect.Finished -= OnExplosionEffectFinished;
         _explosionEffectPool?.Release(effect);
+    }
+
+    /// <summary>
+    /// Spawns a pooled pierce spark where an arrow passed through an enemy, so each
+    /// pierced hit is visible. Sized from the pierce constants (never the cannon's AoE
+    /// radius), so the spark can't be mistaken for a splash.
+    /// </summary>
+    private void SpawnPierceSpark(Vector2 position)
+    {
+        var effect = _pierceSparkPool!.Acquire();
+        effect.Finished += OnPierceSparkFinished;
+        _activePierceSparks.Add(effect);
+        effect.Play(position);
+    }
+
+    private void OnPierceSparkFinished(PierceSparkEffect effect)
+    {
+        _activePierceSparks.Remove(effect);
+        effect.Finished -= OnPierceSparkFinished;
+        _pierceSparkPool?.Release(effect);
     }
 
     private void ReleaseProjectile(Projectile projectile)
@@ -602,8 +763,7 @@ public partial class GameManager : Node2D
         {
             if (IsInstanceValid(projectile))
             {
-                projectile.EnemyHit -= OnProjectileHitEnemy;
-                projectile.Dissipated -= OnProjectileDissipated;
+                UnregisterProjectile(projectile);
                 ReleaseProjectile(projectile);
             }
         }
@@ -619,6 +779,17 @@ public partial class GameManager : Node2D
             }
         }
         _activeExplosionEffects.Clear();
+
+        // Release in-flight pierce sparks back to pool (pools persist across restarts)
+        foreach (var spark in _activePierceSparks)
+        {
+            if (IsInstanceValid(spark))
+            {
+                spark.Finished -= OnPierceSparkFinished;
+                _pierceSparkPool?.Release(spark);
+            }
+        }
+        _activePierceSparks.Clear();
 
         // Free towers (not pooled)
         foreach (var tower in _activeTowers)

@@ -9,29 +9,44 @@ metadata:
 
 **Status:** awaiting_playtest
 
-**Feature:** tower-skill-tree-framework (Part 1 of 2) — implementation complete, PR open
-**Branch:** feature/tower-skill-tree-framework
-**Spec:** `.claude/specs/tower-skill-tree-framework.md` (approved 2026-09-21)
+**Feature:** tower-skill-tree-mechanics (Part 2 of 2) — all gates green, PR open
+**Branch:** feature/tower-skill-tree-mechanics (PR #19)
+**Spec:** `.claude/specs/tower-skill-tree-mechanics.md` (approved 2026-09-22)
 
-Persistent Skill Points (SP) currency earned per kill, plus the per-tower skill tree: 3 trees
-(Arrow / Cannon / Laser), 15 nodes total, 5 ranks each, flat 10 SP per rank. Part 1 ships the
-stat nodes (8 buyable) and renders the 7 mechanic nodes greyed ("coming soon"). Adds the first
-persistence layer (`user://skilltree.cfg` via `ConfigFile`) and a title-screen `SkillTreeScreen`.
-`Tower.RangeCells` widens from `int` to `float`. Saves coalesce to at most one write per frame
-and are written atomically (`.tmp` + rename).
+Activates the 7 mechanic nodes Part 1 shipped disabled: Arrow Pierce + Crit Chance, Cannon
+Cluster + Stun Chance, Laser Ignite (trunk) + Chain + Ramp-Up. Behavior-changing, not numbers.
+Ships the first stun/burn status effects on `Enemy` and the first per-tick laser beam mechanics
+(chain jumps at 60% falloff, dps ramp to 2.0× over 2s, ignite burn 2 dps × 2.0s ignoring armor).
+Crit/stun/ignite rolls route through a single seeded source so they are unit-testable without
+flakiness.
 
-Awaiting human playtest. Holdouts moved to `.claude/holdouts/regression/tower-skill-tree-framework/`.
+Spec + holdouts committed on the feature branch (`90cff40`). Part 1 merged as PR #18.
+
+**Gates:** build 0 warnings / 0 errors · 171 feature tests pass, 0 skipped · review aggregate
+0 CRITICAL / 4 WARNING / 5 INFO (5 fixed, 4 declined) · holdouts 10/10 PASS re-verified on the
+final post-simplify artifact · `/simplify` done (1 cleanup applied, 7 declined with reasons).
+Holdouts moved to `.claude/holdouts/regression/tower-skill-tree-mechanics/`.
+
+**Follow-up owed (doc drift, not code):** the part 1 framework spec's Description line claims Skill
+Points are awarded per kill, tiered by enemy kind — its own Currency Design section and the shipped
+code award them per level outcome (victory = `levelId * 2`, defeat = half). Correct that spec line.
 
 ## Feature Queue
 
-- **tower-skill-tree-mechanics** (Part 2 of 2) — spec drafted at
-  `.claude/specs/tower-skill-tree-mechanics.md`, status `draft`, awaiting human approval.
-  Gated: its spec states Part 1 must merge first (serial execution, rule 7).
+- (empty — serial execution, rule 7: human queues the next idea while this one runs)
 
 ## Recent Features
 
-- **Tower skill tree framework** (part 1/2, PR open on `feature/tower-skill-tree-framework`) —
-  persistent Skill Points (Basic 5 / swarm sub-unit 2 / Armored 8), 3 tower trees × 15 nodes,
+- **Tower skill tree mechanics** (part 2/2, PR #19, opened 2026-09-22) — activates the 7 hidden
+  mechanic nodes: Arrow pierce + crit, Cannon cluster + stun, Laser ignite + chain (60%
+  compounding falloff) + ramp (1.0→2.0× over 2s). First stun/burn status effects on `Enemy`;
+  status and beam hot paths kept allocation-free. Review caught a real bug: `LaserTower`'s held
+  target used `ReferenceEquals`, so a LIFO-pooled enemy reissued before the next drain pass
+  inherited the old ramp — fixed with an `Enemy.Generation` counter bumped in `ResetForPool()`.
+
+- **Tower skill tree framework** (part 1/2, PR #18, merged 2026-09-22) —
+  persistent Skill Points awarded per level outcome (victory = 2 × level id, defeat = half
+  that), 3 tower trees × 15 nodes,
   5 ranks at a flat 10 SP, 8 stat nodes buyable and 7 mechanic nodes staged greyed. First
   persistence layer in the codebase (`user://skilltree.cfg`), coalesced to ≤1 write/frame and
   written atomically. New `SkillTreeScreen` + title-screen entry; `Tower.RangeCells` int→float.

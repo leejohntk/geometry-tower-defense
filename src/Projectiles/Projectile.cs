@@ -1,4 +1,5 @@
 using Godot;
+using System.Collections.Generic;
 
 namespace GeometryTowerDefense;
 
@@ -13,6 +14,12 @@ public abstract partial class Projectile : Node2D
     [Signal]
     public delegate void EnemyHitEventHandler(Projectile projectile, Enemy enemy);
 
+    // Signal emitted when a hit lands but the projectile survives it and flies on
+    // (pierce). Presentation only: GameManager spawns a spark at the passed-through
+    // enemy. The consuming hit emits EnemyHit instead and needs no spark.
+    [Signal]
+    public delegate void PiercedEventHandler(Projectile projectile, Enemy enemy);
+
     // Signal emitted when projectile dissipates (max range or miss)
     [Signal]
     public delegate void DissipatedEventHandler(Projectile projectile);
@@ -23,6 +30,12 @@ public abstract partial class Projectile : Node2D
     protected float _speed;
     protected int _damage;
     private bool _hasHit = false;
+
+    // Pierce state: how many enemies this projectile may still hit, and which enemies
+    // it has already passed through (so a piercing arrow never re-hits the same target).
+    // The list is allocated once per pooled instance and cleared on Initialize.
+    private int _hitsRemaining = 1;
+    private readonly List<Enemy> _hitEnemies = new();
 
     /// <summary>
     /// The tower that fired this projectile.
@@ -69,6 +82,10 @@ public abstract partial class Projectile : Node2D
         _maxRangePixels = tower.RangePixels;
         _speed = GameConstants.ProjectileSpeed * GameConstants.CellSize * tower.ProjectileSpeedMultiplier;
 
+        // A projectile can hit (PierceCount + 1) enemies before it is consumed.
+        _hitsRemaining = tower.PierceCount + 1;
+        _hitEnemies.Clear();
+
         Position = tower.Position;
         _direction = (targetPosition - tower.Position).Normalized();
 
@@ -111,13 +128,29 @@ public abstract partial class Projectile : Node2D
         if (enemy.IsDead)
             return;
 
-        _hasHit = true;
+        // A piercing arrow never re-hits an enemy it already passed through.
+        if (_hitEnemies.Contains(enemy))
+            return;
+
+        _hitEnemies.Add(enemy);
 
         // Apply damage/side-effects synchronously — do not rely on signal timing.
         OnHit(enemy);
 
-        // Signal for lifecycle management (pool release, list cleanup).
-        EmitSignal(SignalName.EnemyHit, this, enemy);
+        _hitsRemaining--;
+        if (_hitsRemaining <= 0)
+        {
+            _hasHit = true;
+            // Signal for lifecycle management (pool release, list cleanup).
+            EmitSignal(SignalName.EnemyHit, this, enemy);
+        }
+        else
+        {
+            // Pierce: this hit did not consume the projectile, so report the
+            // pass-through for its per-hit spark. Emitted only here — the decision
+            // that the arrow continues is made in exactly one place.
+            EmitSignal(SignalName.Pierced, this, enemy);
+        }
     }
 
     /// <summary>
@@ -128,6 +161,10 @@ public abstract partial class Projectile : Node2D
         if (_hasHit || enemy.IsDead)
             return false;
 
+        // Skip enemies this projectile has already pierced this flight.
+        if (_hitEnemies.Contains(enemy))
+            return false;
+
         float collisionRadius = GameConstants.ProjectileSize / 2f + enemy.CollisionRadius;
         return Position.DistanceSquaredTo(enemy.Position) <= collisionRadius * collisionRadius;
     }
@@ -135,7 +172,8 @@ public abstract partial class Projectile : Node2D
 
 /// <summary>
 /// Arrow projectile: small yellow triangle that hits the first enemy on its trajectory.
-/// Deals single-target damage. No piercing.
+/// With the Pierce mechanic it continues through up to N further enemies; the Crit
+/// mechanic adds an independent per-hit double-damage roll.
 /// </summary>
 public partial class ArrowProjectile : Projectile
 {
@@ -171,6 +209,17 @@ public partial class ArrowProjectile : Projectile
         // Apply single-target damage synchronously. This ensures that when two
         // projectiles hit the same enemy in one frame, the second hit correctly
         // sees the enemy as dead (via HitEnemy's IsDead guard).
-        enemy.TakeDamage(_damage);
+        float damage = _damage;
+
+        // Independent per-hit crit roll: 2x the (already skill-boosted) damage.
+        // Each pierced hit rolls its own crit via the tower's shared roll source.
+        var tower = SourceTower;
+        if (tower != null && tower.CritChance > 0f && tower.Rolls.Roll(tower.CritChance))
+        {
+            damage *= 2f;
+            enemy.ApplyHitFlash();
+        }
+
+        enemy.TakeDamage(damage);
     }
 }

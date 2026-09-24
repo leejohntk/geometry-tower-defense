@@ -58,20 +58,36 @@ public partial class CannonProjectile : Projectile
 
     /// <summary>
     /// Applies explosion damage to every enemy in the given list within ExplosionRadius
-    /// of the impact point. Callers should pass a snapshot (not a live mutable collection)
+    /// of the impact point, and rolls the source tower's stun chance per surviving
+    /// enemy hit. Callers should pass a snapshot (not a live mutable collection)
     /// because TakeDamage can trigger Destroyed signals that modify the active enemy list.
+    /// Index-based iteration keeps the per-explosion loop allocation-free.
     /// </summary>
     public void Explode(IReadOnlyList<Enemy> enemies, Vector2 impactPosition, float damage)
     {
         // Hoisted out of the loop: ExplosionRadius walks a virtual chain, so read it once.
         float radius = ExplosionRadius;
-        foreach (var enemy in enemies)
+        float stunChance = SourceTower?.StunChance ?? 0f;
+        float stunDuration = GameConstants.SkillCannonStunDuration;
+        SkillRandom? rolls = SourceTower?.Rolls;
+
+        for (int i = 0; i < enemies.Count; i++)
         {
+            var enemy = enemies[i];
             if (enemy.IsDead)
                 continue;
 
-            if (IsWithinRadius(impactPosition, radius, enemy.Position))
-                enemy.TakeDamage(damage);
+            if (!IsWithinRadius(impactPosition, radius, enemy.Position))
+                continue;
+
+            // Armor still reduces the stunning hit's damage — stun is rolled after
+            // the normal damaging hit, and only matters if the enemy survived it.
+            enemy.TakeDamage(damage);
+            if (enemy.IsDead)
+                continue;
+
+            if (stunChance > 0f && rolls != null && rolls.Roll(stunChance))
+                enemy.ApplyStun(stunDuration);
         }
     }
 

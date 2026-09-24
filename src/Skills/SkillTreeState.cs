@@ -55,6 +55,10 @@ public sealed class SkillTreeState
     /// <summary>
     /// True if the node exists, is enabled, is unlocked, is below max rank, and is
     /// affordable.
+    ///
+    /// The enabled check is currently unreachable (all 15 catalog nodes are enabled
+    /// as of Part 2); it is retained deliberately so a node that ships disabled again
+    /// can never be bought or save-loaded with a non-zero rank.
     /// </summary>
     public bool CanBuyRank(string nodeId)
     {
@@ -85,16 +89,18 @@ public sealed class SkillTreeState
     }
 
     /// <summary>
-    /// Sets a node's rank directly (used by save loading). Unknown node ids and
-    /// currently-disabled (mechanic) nodes are rejected and zeroed so the UI can
-    /// never render a non-zero rank next to "coming soon". Valid ranks clamp to
-    /// 0..SkillMaxRanks.
+    /// Sets a node's rank directly (used by save loading). Unknown node ids and any
+    /// non-enabled node are rejected and zeroed so the UI can never render a rank for
+    /// a node it can't buy. Valid ranks clamp to 0..SkillMaxRanks.
+    ///
+    /// The enabled gate is currently unreachable (all 15 nodes are enabled as of
+    /// Part 2); it is retained deliberately for future nodes that ship disabled.
     /// </summary>
     public void SetRank(string nodeId, int rank)
     {
         var def = SkillTreeCatalog.Find(nodeId);
         // Deliberately mirrors CanBuyRank's enabled gate: a hand-edited save must
-        // never render a rank beside "coming soon", so do not "simplify" one away.
+        // never render a rank for a node the UI can't buy, so do not "simplify" one away.
         if (def == null || !def.Enabled)
         {
             _ranks.Remove(nodeId);

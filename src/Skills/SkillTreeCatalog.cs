@@ -42,8 +42,8 @@ public sealed class SkillNodeDefinition
 /// Static catalog of every skill-tree node across all three towers.
 ///
 /// All 15 nodes are defined here so the full tree shape renders from day one.
-/// The 8 stat nodes (enabled) are buyable and effective in Part 1; the 7 mechanic
-/// nodes (disabled) render greyed as "coming soon" and activate in Part 2.
+/// All 15 are enabled as of Part 2: the 8 stat nodes (effective since Part 1) plus
+/// the 7 mechanic nodes (behavior-changing seeds and the Laser Ignite trunk).
 /// </summary>
 public static class SkillTreeCatalog
 {
@@ -77,22 +77,22 @@ public static class SkillTreeCatalog
         new(ArrowDamage, TowerType.Arrow, "Damage", SkillNodeKind.Trunk, enabled: true),
         new(ArrowAttackSpeed, TowerType.Arrow, "Attack Speed", SkillNodeKind.Trunk, enabled: true),
         new(ArrowRange, TowerType.Arrow, "Range", SkillNodeKind.Trunk, enabled: true),
-        new(ArrowPierce, TowerType.Arrow, "Pierce", SkillNodeKind.Seed, enabled: false),
-        new(ArrowCritChance, TowerType.Arrow, "Crit Chance", SkillNodeKind.Seed, enabled: false),
+        new(ArrowPierce, TowerType.Arrow, "Pierce", SkillNodeKind.Seed, enabled: true),
+        new(ArrowCritChance, TowerType.Arrow, "Crit Chance", SkillNodeKind.Seed, enabled: true),
 
         // Cannon Tower — Bombardier | Concussive
         new(CannonPowderCharge, TowerType.Cannon, "Powder Charge", SkillNodeKind.Trunk, enabled: true),
         new(CannonAttackSpeed, TowerType.Cannon, "Attack Speed", SkillNodeKind.Trunk, enabled: true),
         new(CannonSplashRadius, TowerType.Cannon, "Splash Radius", SkillNodeKind.Trunk, enabled: true),
-        new(CannonCluster, TowerType.Cannon, "Cluster", SkillNodeKind.Seed, enabled: false),
-        new(CannonStunChance, TowerType.Cannon, "Stun Chance", SkillNodeKind.Seed, enabled: false),
+        new(CannonCluster, TowerType.Cannon, "Cluster", SkillNodeKind.Seed, enabled: true),
+        new(CannonStunChance, TowerType.Cannon, "Stun Chance", SkillNodeKind.Seed, enabled: true),
 
         // Laser Tower — Arc/Chain | Melter
         new(LaserDps, TowerType.Laser, "DPS", SkillNodeKind.Trunk, enabled: true),
         new(LaserRange, TowerType.Laser, "Range", SkillNodeKind.Trunk, enabled: true),
-        new(LaserIgnite, TowerType.Laser, "Ignite", SkillNodeKind.Trunk, enabled: false),
-        new(LaserChain, TowerType.Laser, "Chain", SkillNodeKind.Seed, enabled: false),
-        new(LaserRampUp, TowerType.Laser, "Ramp-Up", SkillNodeKind.Seed, enabled: false),
+        new(LaserIgnite, TowerType.Laser, "Ignite", SkillNodeKind.Trunk, enabled: true),
+        new(LaserChain, TowerType.Laser, "Chain", SkillNodeKind.Seed, enabled: true),
+        new(LaserRampUp, TowerType.Laser, "Ramp-Up", SkillNodeKind.Seed, enabled: true),
     };
 
     /// <summary>

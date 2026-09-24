@@ -7,11 +7,10 @@ namespace GeometryTowerDefense;
 /// <summary>
 /// Title-screen skill tree. Shows the persistent Skill Point balance, a right-hand
 /// tower selector sidebar, and the selected tower's tree — trunk nodes on a vertical
-/// spine with seed nodes branching left/right off the bottom trunk. Enabled (stat)
-/// nodes show a buy button when unlocked, or render fully greyed (icon, name, and
-/// connecting line) when still locked behind a prerequisite; disabled (mechanic)
-/// nodes render greyed with a "coming soon" label. Built programmatically to match
-/// the rest of the codebase's UI (no .tscn).
+/// spine with seed nodes branching left/right off the bottom trunk. All 15 nodes are
+/// enabled as of Part 2: nodes show a buy button when unlocked, or render fully greyed
+/// (icon, name, and connecting line) when still locked behind a prerequisite. Built
+/// programmatically to match the rest of the codebase's UI (no .tscn).
 /// </summary>
 public partial class SkillTreeScreen : Control
 {
@@ -396,13 +395,10 @@ public partial class SkillTreeScreen : Control
                 : new Color(0.45f, 0.45f, 0.5f));
         parent.AddChild(rankLabel);
 
-        if (locked)
-        {
-            // Locked enabled nodes render no text in the buy-button position and are
-            // NOT registered in _rows: they cannot be bought until their prerequisite
-            // reaches the unlock rank.
-        }
-        else if (node.Enabled)
+        // Only active (enabled + unlocked) nodes get a buy button and are registered
+        // in _rows. Locked nodes stay greyed with no button; a future disabled node
+        // is neither active nor locked, so it also renders no button.
+        if (active)
         {
             var buyButton = new Button();
             buyButton.Text = $"Buy ({GameConstants.SkillNodeRankCost} SP)";
@@ -412,20 +408,6 @@ public partial class SkillTreeScreen : Control
             buyButton.Pressed += () => OnBuyPressed(node.Id);
             parent.AddChild(buyButton);
             _rows[node.Id] = (rankLabel, buyButton);
-        }
-        else
-        {
-            // Disabled mechanic nodes are greyed with a "coming soon" label and are
-            // deliberately NOT registered in _rows: they can never change rank.
-            var comingSoon = new Label();
-            comingSoon.Text = "coming soon";
-            comingSoon.Position = new Vector2(ContentX(anchor.X, 310f, 124f, contentOnLeft), anchor.Y - 10f);
-            comingSoon.Size = new Vector2(124f, 20f);
-            comingSoon.AddThemeFontSizeOverride("font_size", 12);
-            if (contentOnLeft)
-                comingSoon.HorizontalAlignment = HorizontalAlignment.Right;
-            comingSoon.AddThemeColorOverride("font_color", new Color(0.45f, 0.45f, 0.5f));
-            parent.AddChild(comingSoon);
         }
     }
 

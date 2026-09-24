@@ -85,13 +85,19 @@ public class SkillTreeStateTest
     }
 
     [TestCase]
-    public void BuyRank_DisabledNode_ReturnsFalse()
+    public void BuyRank_MechanicNode_BuyableWhenUnlockedAndAffordable()
     {
         var state = new SkillTreeState();
-        state.SetSkillPoints(100);
+        state.SetSkillPoints(GameConstants.SkillNodeRankCost * 4);
 
-        AssertThat(state.BuyRank(SkillTreeCatalog.ArrowPierce)).IsFalse();
-        AssertThat(state.GetRank(SkillTreeCatalog.ArrowPierce)).IsEqual(0);
+        // Unlock the arrow seed path by buying all three arrow trunks to rank 1.
+        AssertThat(state.BuyRank(SkillTreeCatalog.ArrowDamage)).IsTrue();
+        AssertThat(state.BuyRank(SkillTreeCatalog.ArrowAttackSpeed)).IsTrue();
+        AssertThat(state.BuyRank(SkillTreeCatalog.ArrowRange)).IsTrue();
+
+        AssertThat(state.CanBuyRank(SkillTreeCatalog.ArrowPierce)).IsTrue();
+        AssertThat(state.BuyRank(SkillTreeCatalog.ArrowPierce)).IsTrue();
+        AssertThat(state.GetRank(SkillTreeCatalog.ArrowPierce)).IsEqual(1);
     }
 
     [TestCase]
@@ -111,7 +117,7 @@ public class SkillTreeStateTest
         state.SetSkillPoints(GameConstants.SkillNodeRankCost);
 
         AssertThat(state.CanBuyRank(SkillTreeCatalog.ArrowDamage)).IsTrue();
-        AssertThat(state.CanBuyRank(SkillTreeCatalog.ArrowPierce)).IsFalse();   // disabled
+        AssertThat(state.CanBuyRank(SkillTreeCatalog.ArrowPierce)).IsFalse();   // locked behind ArrowRange
         AssertThat(state.CanBuyRank("does.not.exist")).IsFalse();              // unknown
 
         state.SetRank(SkillTreeCatalog.ArrowDamage, GameConstants.SkillMaxRanks);
@@ -154,15 +160,16 @@ public class SkillTreeStateTest
     }
 
     [TestCase]
-    public void SetRank_RejectsUnknownAndDisabledNodes()
+    public void SetRank_RejectsUnknownNodes_AndRoundsTripMechanicNodes()
     {
         var state = new SkillTreeState();
 
-        state.SetRank(SkillTreeCatalog.ArrowPierce, 3); // disabled mechanic node
-        AssertThat(state.GetRank(SkillTreeCatalog.ArrowPierce)).IsEqual(0);
-
         state.SetRank("does.not.exist", 2);
         AssertThat(state.GetRank("does.not.exist")).IsEqual(0);
+
+        // Mechanic nodes are enabled in Part 2 and round-trip like stat nodes.
+        state.SetRank(SkillTreeCatalog.ArrowPierce, 3);
+        AssertThat(state.GetRank(SkillTreeCatalog.ArrowPierce)).IsEqual(3);
 
         // Enabled stat nodes still round-trip normally.
         state.SetRank(SkillTreeCatalog.ArrowDamage, 4);

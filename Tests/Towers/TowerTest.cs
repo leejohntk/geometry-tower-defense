@@ -141,4 +141,136 @@ public class TowerTest
         AssertThat(new CannonTower().Damage).IsEqual(15);
         AssertThat(new LaserTower().Dps).IsEqual(4f);
     }
+
+    [TestCase]
+    public void LaserTower_RampProgress_TracksTheMultiplier()
+    {
+        // 0 at the base multiplier (nothing ramped), 1 at the max (fully ramped).
+        AssertThat(LaserTower.RampProgress(1f, 2f)).IsEqual(0f);
+        AssertThat(LaserTower.RampProgress(1.5f, 2f)).IsEqual(0.5f);
+        AssertThat(LaserTower.RampProgress(2f, 2f)).IsEqual(1f);
+    }
+
+    [TestCase]
+    public void LaserTower_RampProgress_IsZeroWithoutRampNodes_OrForBadInput()
+    {
+        // A laser with no Ramp-Up ranks has max 1.0x: the beam must stay at its
+        // un-ramped look rather than dividing by zero.
+        AssertThat(LaserTower.RampProgress(1f, 1f)).IsEqual(0f);
+        AssertThat(LaserTower.RampProgress(1f, 0f)).IsEqual(0f);
+        AssertThat(LaserTower.RampProgress(1.2f, 0.8f)).IsEqual(0f);
+        AssertThat(LaserTower.RampProgress(float.NaN, 2f)).IsEqual(0f);
+        AssertThat(LaserTower.RampProgress(float.PositiveInfinity, 2f)).IsEqual(0f);
+    }
+
+    [TestCase]
+    public void LaserTower_RampProgress_ClampsOutOfRangeMultipliers()
+    {
+        AssertThat(LaserTower.RampProgress(0.5f, 2f)).IsEqual(0f);
+        AssertThat(LaserTower.RampProgress(3f, 2f)).IsEqual(1f);
+    }
+
+    [TestCase]
+    public void LaserTower_RampProgress_MatchesTheMultiplierUpdateRampReturns()
+    {
+        var state = new SkillTreeState();
+        state.SetRank(SkillTreeCatalog.LaserRampUp, 5); // max 2.0x
+        var laser = new LaserTower();
+        laser.SetSkillTree(state);
+
+        var enemy = new Enemy();
+        enemy.Configure(EnemyKind.Basic);
+
+        AssertThat(laser.UpdateRamp(enemy, 0f)).IsEqual(1f);
+        AssertThat(LaserTower.RampProgress(1f, laser.RampMaxMultiplier)).IsEqual(0f);
+
+        // Half the ramp time in: half-way to the max multiplier, so half beam intensity.
+        float half = laser.UpdateRamp(enemy, GameConstants.SkillLaserRampTime / 2f);
+        AssertThat(LaserTower.RampProgress(half, laser.RampMaxMultiplier)).IsEqual(0.5f);
+
+        float full = laser.UpdateRamp(enemy, GameConstants.SkillLaserRampTime / 2f);
+        AssertThat(LaserTower.RampProgress(full, laser.RampMaxMultiplier)).IsEqual(1f);
+    }
+
+    [TestCase]
+    public void LaserTower_BeamLevels_IntensifyFromMinToMax()
+    {
+        // Guards the direction of the feedback: the ramped beam must be wider and its
+        // color must keep the same alpha, so intensity reads as "brighter", not "thinner".
+        AssertThat(GameConstants.LaserBeamWidthMax).IsGreater(GameConstants.LaserBeamWidthMin);
+        AssertThat(GameConstants.LaserChainBeamWidthMax).IsGreater(GameConstants.LaserChainBeamWidthMin);
+        AssertThat(GameConstants.LaserBeamColorMax.A).IsGreaterEqual(GameConstants.LaserBeamColorMin.A);
+        AssertThat(GameConstants.LaserChainBeamColorMax.A).IsGreaterEqual(GameConstants.LaserChainBeamColorMin.A);
+    }
+
+    [TestCase]
+    public void CannonTower_SingleShell_ShowsNoMuzzleFlash()
+    {
+        var tower = new CannonTower();
+        tower.Initialize(0, 0); // position (32, 32)
+
+        var enemy = new Enemy();
+        enemy.Configure(EnemyKind.Basic);
+        enemy.Position = new Vector2(32, 100); // in range
+
+        AssertThat(tower.ClusterCount).IsEqual(1);
+        AssertThat(tower.TryFire(enemy, out _)).IsTrue();
+
+        // One shell is the un-cued baseline: the volley cue means "this was a cluster".
+        AssertThat(tower.IsMuzzleFlashing).IsFalse();
+    }
+
+    [TestCase]
+    public void CannonTower_ClusterVolley_FlashesTheMuzzle()
+    {
+        var state = new SkillTreeState();
+        state.SetRank(SkillTreeCatalog.CannonCluster, 2); // 3 shells
+        var tower = new CannonTower();
+        tower.Initialize(0, 0);
+        tower.SetSkillTree(state);
+
+        var enemy = new Enemy();
+        enemy.Configure(EnemyKind.Basic);
+        enemy.Position = new Vector2(32, 100);
+
+        AssertThat(tower.ClusterCount).IsEqual(3);
+        AssertThat(tower.IsMuzzleFlashing).IsFalse();
+
+        AssertThat(tower.TryFire(enemy, out _)).IsTrue();
+        AssertThat(tower.IsMuzzleFlashing).IsTrue();
+    }
+
+    [TestCase]
+    public void CannonTower_MuzzleFlash_ExpiresAfterItsDuration()
+    {
+        var state = new SkillTreeState();
+        state.SetRank(SkillTreeCatalog.CannonCluster, 1); // 2 shells
+        var tower = new CannonTower();
+        tower.Initialize(0, 0);
+        tower.SetSkillTree(state);
+
+        var enemy = new Enemy();
+        enemy.Configure(EnemyKind.Basic);
+        enemy.Position = new Vector2(32, 100);
+
+        tower.TryFire(enemy, out _);
+        AssertThat(tower.IsMuzzleFlashing).IsTrue();
+
+        // Ticked at ~60 fps: the flash is gone well before the next volley's cooldown.
+        float step = 1f / 60f;
+        int frames = 0;
+        while (tower.IsMuzzleFlashing && frames < 1000)
+        {
+            tower._Process(step);
+            frames++;
+        }
+
+        AssertThat(tower.IsMuzzleFlashing).IsFalse();
+        AssertThat(frames * step)
+            .IsGreaterEqual(GameConstants.CannonMuzzleFlashDuration);
+        AssertThat(frames * step)
+            .IsLessEqual(GameConstants.CannonMuzzleFlashDuration + 2f * step);
+        // The cue is far shorter than the firing cooldown, so volleys never smear.
+        AssertThat(GameConstants.CannonMuzzleFlashDuration).IsLess(tower.FireRate);
+    }
 }
