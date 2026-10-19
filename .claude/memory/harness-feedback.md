@@ -19,8 +19,12 @@ metadata:
 
 ### Open 2026-09-23
 
-- **Post-merge `current-feature.md` never gets corrected** — the status flip only happens pre-merge (set to `awaiting_playtest`), and PR #17 removed the post-merge writes because they could not be committed on `main`. Each feature's bookkeeping marks its *predecessor* merged, so with nothing queued the last feature stays `awaiting_playtest` indefinitely. `session-start.sh:37-41` surfaces this file as the "Current Feature Context" block (via `head -5`) and orchestrators read it for status, so the designated status file disagreed with reality until this run corrected it. The structural gap is queued as P4.
-- **Merge Cleanup step 6 is advisory** — the distiller flag was set 2026-09-21T04:37:00Z and PR #18 merged 2026-09-22T04:44:57Z with no check; the flag then sat ~2.6 days across a full feature. PR #19 did run the check. Nothing makes the step load-bearing.
+- **Merge Cleanup step 6 is advisory** — the distiller flag was set 2026-09-21T04:37:00Z and PR #18 merged 2026-09-22T04:44:57Z with no check; PR #19 did run the check. Recurred 2026-09-24: the flag was set at 02:12:12Z and PR #21 merged at 02:34:25Z with no check, then the flag sat 25 days until PR #22's merge (2026-10-19T23:47Z) ran it. The step works when invoked; nothing makes it load-bearing.
+
+### Resolved 2026-10-19
+
+- **Post-merge `current-feature.md` staleness** — resolved by deleting the volatile `Status:` line rather than adding post-merge bookkeeping (P4 was rejected; see below). The file records history only, and `.claude/state.json` is the sole phase owner. Verified in run #6: PR #22 updated `current-feature.md` pre-merge on the feature branch.
+- **H3 — destructive git ops hook guard** — implemented in PR #21. The PreToolUse guard now gates `git reset --hard`, `git clean -f`, path `checkout`, and `restore` on repo state (clean tree allowed; dirty tree denied with a `git stash push -u` pointer). It also fixed two real defects found while implementing it: force-push false positives on branch names containing `-f`, and command-extraction truncation at the first double quote (`jq` now parses stdin JSON). Verified 17/17. Zero destructive git ops executed in run #6's window.
 
 ### Resolved 2026-09-20
 
@@ -70,9 +74,22 @@ First run with **subagent transcripts** in the evidence base (`36b5e55a-…/suba
 - **Review produced real value** — `src/Grid/GridManager.cs:286`, placement preview uses base range instead of the skill-modified range after Range ranks are bought. Lenses used `Warning:`/`Info:` casing instead of the protocol's `WARNING`/`INFO` (cosmetic).
 - **No code thrash** — 2 error classes across 27 subagents, 6 compiler errors total (`CS0246 List<> missing using`, `CS1503 void→string?`). No fix-then-break cycles.
 
+### 2026-10-19 — Sixth Distillation
+
+Window: PR #21 (run #5 follow-ups + PreToolUse guard) and PR #22 (headless layout verifier). Evidence: main session `93e5a1e3-…` plus 14 subagent transcripts; 110 main-session tool calls.
+
+- **Run #5 proposals verified landed** — P3 (playtest batching), P5 (single-`Write` state updates), P6 (`--quit-after`), P7 (host facts) all in PR #21. H3 closed by the same PR (see above).
+- **Stale test convention (highest-value finding)** — `[RequireGodotRuntime]` appears in CLAUDE.md, a rule, and the implementer prompt, but not in gdUnit4.api 4.3.1 and not in any test. The implementer prompt also uses `[Test]` instead of the repo's `[TestCase]`. Proposal P8.
+- **Holdout enumeration** — `find src Tests .claude` exposed holdout folder/file names to the implementer. No content read, no `H<n>_*` names. Proposal P9 + H5.
+- **Host friction** — 3 `rm -rf` denials and 3 zsh unmatched-glob aborts. Proposal P10.
+- **Review pipeline healthy** — 13 findings (0C/9W/4I) across 3 Bash-free lenses on PR #22; security caught save-safety, correctness caught 3 tautologies, performance caught the unbounded verifier run. All fixed in one batch; simplify pass was output-identical. 203 tests pass; verifier 139 evaluated / 137 assertions / 2 skipped / 0 findings.
+- **Pre-merge bookkeeping held** — PR #22 committed `current-feature.md`, spec, and tool docs on the feature branch. No post-merge sync PR.
+- **Artifact unavailable** — one refused publish (ANTHROPIC_AUTH_TOKEN takes precedence over claude.ai login). One round trip; retries futile. No action.
+- **Flag cadence** — flag set 2026-09-24T02:12:12Z, skipped at PR #21's merge 22 minutes later, honored at PR #22's merge 25 days later. Step 6 remains advisory (see "Open 2026-09-23").
+
 **Queued proposals (await human approval — do not apply to skills/rules/CLAUDE.md without sign-off):**
 
-*(Run #4's P1 and P2 were approved and landed as PR #17 — closed.)*
+*(Run #4's P1 and P2 were approved and landed as PR #17 — closed. Run #5's P3/P5/P6/P7 landed as PR #21 — closed. H3 closed by PR #21.)*
 
 **P3 — APPLIED 2026-09-23 (human-approved).** `skills/implement-feature/SKILL.md` Phase 8 now says to batch: collect every issue from one playtest pass into a single fix list and spawn **one** implementer for the whole batch, re-spawning only for a genuinely new defect found after the batch lands. The 8-spawns-one-file evidence is quoted inline as the rationale.
 
@@ -99,8 +116,19 @@ appears, prefer deleting the redundant state over adding bookkeeping to sync it.
 
 **P7 — APPLIED 2026-09-23 (human-approved).** `rules/verification-gates.md` gained a "Host: macOS (darwin)" section above Gate 1: no `timeout` / `gtimeout` (use the Bash tool's own timeout parameter), and bound headless Godot runs with `--quit-after <frames>` since the game loop never exits on its own (`--run-stdout` is not a flag).
 
-**H3 (HIGH — blocked, human must implement) — re-escalated from runs #3 and #4.**
-Guard destructive git ops in `pre-tool-use.sh`: deny `git reset --hard`, `git clean -f`, `git checkout -- .`, `git restore` (when the working tree is dirty). Only the guidance version (M6, "Destructive Git Ops" in `harness-safety.md`) has landed; the deterministic hook guard does not exist. Lower pressure this window — zero occurrences — but still open.
+**H3 — CLOSED 2026-09-24 (PR #21).** The hook guard landed, along with two guard defects fixed while implementing it (standalone-token force matching; `jq`-parsed command extraction covering `HEAD:main` / `refs/heads/main`). Verified 17/17; zero destructive git ops in run #6's window. See "Resolved 2026-10-19".
+
+**P8 (MEDIUM — proposed, run #6) — remove the non-existent `[RequireGodotRuntime]` convention.**
+`CLAUDE.md:34,76`, `.claude/rules/godot-csharp-conventions.md:44`, and `.claude/agents/implementer.md:55,67,90` all reference an attribute that does not exist in gdUnit4.api 4.3.1 and is used by zero tests. The repo's actual pattern is `[TestSuite]` + `[TestCase]` + `AssertThat` (see `Tests/Towers/TowerTest.cs`). A review-fix implementer burned ~12 tool calls investigating the attribute. Full replacement text in `harness-evolution.md` → run #6, P8. CLAUDE.md lines are outside distiller scope — human applies.
+
+**P9 (MEDIUM — proposed, run #6) — prohibit holdout enumeration.**
+The implementer's `find src Tests .claude -type f` listed `.claude/holdouts/{armored-laser,first-level,level-4-multi-path,…}/scenarios.md`. The hook matches only the literal `.claude/holdouts/` string, so enumerating the parent directory passes. No scenario content or `H<n>_*` name leaked (0/3 transcripts), but coverage topics did. Proposed wording: "NEVER read **or enumerate** `.claude/holdouts/`; do not run recursive listings/searches over `.claude/`." Full text in run #6, P9.
+
+**P10 (LOW–MEDIUM — proposed, run #6) — host shell facts.**
+(a) `rm -rf` is hook-denied even under `/tmp`; use `mktemp -d` or a unique `$(date +%s)` suffix. Three denials this window. (b) zsh aborts the whole command on an unmatched glob (`no matches found`) before anything runs, so `rm -f x GdUnitRunner_*.cfg` never deletes `x`; quote patterns or use `find`. Three occurrences. Proposed addition to `rules/verification-gates.md` → "Host: macOS (darwin)". Full text in run #6, P10.
+
+**H5 (HIGH — blocked, human must implement) — guard recursive `.claude` enumeration.**
+Extend the implementer's PreToolUse Bash pattern to deny recursive listings/searches rooted at `.claude/` (`find … .claude`, `ls -R .claude`, `tree .claude`, `grep -r … .claude`) while still allowing explicit reads of named harness files (e.g. `cat .claude/settings.json`). P9 is the prompt-level mitigation; this is the deterministic backstop.
 
 ## Harness Change Log
 
