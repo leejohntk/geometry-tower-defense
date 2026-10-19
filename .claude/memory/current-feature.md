@@ -12,9 +12,24 @@ active right now (and is deleted at merge, which means "idle"). This file record
 shipped, its gates, and open follow-ups. Do not track phase here — it goes stale the moment a PR
 merges.
 
-**Last feature:** tower-skill-tree-mechanics (Part 2 of 2) — all gates green, **merged as PR #19** (`149ccd4`)
-**Branch:** `main` (feature branch deleted)
-**Spec:** `.claude/specs/tower-skill-tree-mechanics.md` (approved 2026-09-22)
+**Last feature:** layout-verifier — headless pre-playtest layout verification
+**Branch:** `feature/layout-verifier`
+**Spec:** `.claude/specs/layout-verifier.md` (approved 2026-10-19, AC-11 amended 2026-10-19)
+
+Adds `tools/layout_verifier.gd`, a headless `SceneTree` script that loads `Main.tscn`,
+walks the Control tree and evaluates 137 layout assertions (centering, alignment, mirroring,
+containment, stacking) across the title, skill-tree, HUD and result screens. Introduces the
+named-visual-group convention (`Row_{id}`, `Block_{name}`, `Panel_{name}`) so groups resolve by
+identity rather than generated node names, and a `LAYOUT:` field in the spec template.
+
+Review caught what would otherwise have shipped broken: three save-safety issues (verification
+hooks could write the real save if isolation regressed — now triple-gated behind a debug-build
+check, explicit enablement and an active-state query), and three tautological assertions that
+could not fail (sidebar panel compared to the block it was sized from, seed mirror measured on
+wrappers instead of rendered children, header centering algebraic on a copied width).
+
+Spec change: AC-11 amended from eight to seven layout-observable defect classes. SP-award rework
+has no rendered manifestation and is carried as an accepted coverage gap, not silently dropped.
 
 Activates the 7 mechanic nodes Part 1 shipped disabled: Arrow Pierce + Crit Chance, Cannon
 Cluster + Stun Chance, Laser Ignite (trunk) + Chain + Ramp-Up. Behavior-changing, not numbers.

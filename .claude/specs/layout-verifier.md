@@ -34,7 +34,7 @@ Measured on Godot 4.7.0 mono against this repository: Control layout and font me
 
 - [ ] **AC-10 — Wired into the dark loop.** `.claude/skills/implement-feature/SKILL.md` runs the verifier after the implementer completes and before multi-lens review. Until stage 3 of the rollout is complete it reports only; it does not block.
 
-- [ ] **AC-11 — Mutation test passes.** Reintroducing each of the eight known defect classes from `feature/tower-skill-tree-framework` one at a time is caught by an assertion. Each mutation is applied to a scratch copy, verified red, and reverted.
+- [ ] **AC-11 — Mutation test passes.** Reintroducing each of the **seven layout-observable** defect classes from `feature/tower-skill-tree-framework` one at a time is caught by an assertion. Each mutation is applied to a scratch copy, verified red, and reverted. The eighth class — SP-award rework — has no layout manifestation: it is gameplay logic that never renders at startup, so a layout verifier cannot observe it. It is an **explicitly accepted coverage gap**, recorded in `tools/layout_verifier.md` and reported in the PR coverage output. Coverage gaps are recorded, never silently dropped.
 
 - [ ] **AC-12 — False-positive check passes.** Running the verifier against the current tree produces zero findings.
 
@@ -84,7 +84,9 @@ This feature is harness code, so the standard gates map differently:
 
 **Gate 2 — Tests.** `dotnet test` unchanged and passing. The verifier's own assertions are exercised by AC-11 and AC-12 rather than by the unit suite.
 
-**Gate 3 — Mutation test (AC-11).** This replaces holdout verification for this feature. The eight defect classes are taken from the distilled record of `feature/tower-skill-tree-framework`: UI layout rework, node-unlock gating, greyed locked-node colours, SP-award rework, `QueueFree` runtime error, tree centering and rank-pip removal, right-aligned left-branch labels, and the left-branch rank/coming-soon alignment. Each is reintroduced in a scratch copy of the project, the verifier is run, and the mutation is expected to produce a finding. Mutations that no assertion catches are recorded as coverage gaps rather than silently dropped.
+**Gate 3 — Mutation test (AC-11).** This replaces holdout verification for this feature. The defect classes are taken from the distilled record of `feature/tower-skill-tree-framework`. Seven are layout-observable and must be caught: UI layout rework, node-unlock gating, greyed locked-node colours, `QueueFree` runtime error, tree centering and rank-pip removal, right-aligned left-branch labels, and the left-branch rank/coming-soon alignment. Each is reintroduced in a scratch copy of the project, the verifier is run, and the mutation is expected to produce a finding.
+
+The eighth — SP-award rework — is **out of scope by construction**: it is gameplay logic in `GameManager` that never renders at startup, so no layout assertion can observe it. It is carried as an accepted coverage gap in `tools/layout_verifier.md` and reported in the PR, not silently dropped. Any other class that no assertion catches is likewise recorded as a gap rather than dropped.
 
 **Gate 4 — False-positive check (AC-12).** Verifier run against the clean tree; zero findings expected.
 

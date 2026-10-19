@@ -37,6 +37,13 @@
 - {Color scheme}
 - {Animation style}
 
+**LAYOUT:** {State the spatial intent of the UI, not its implementation. Name each visual
+group and how it relates to the others: alignment, anchoring, and relationships between
+groups (for example "the left-branch rows mirror the right-branch rows about the panel
+centre", "the sidebar is anchored to the viewport's right edge", "the title block is
+centered on the viewport"). Every named group is measurable by the headless layout
+verifier, so state intent in terms of groups and relationships rather than pixel values.}
+
 ## Out of Scope
 
 - {Explicitly NOT included in this feature}

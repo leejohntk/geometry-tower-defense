@@ -51,6 +51,35 @@ Human describes feature. Orchestrator writes the spec to `.claude/specs/{feature
 4. SubagentStop hook validates build + tests passed (deterministic gate).
 5. Update state: `"phase": "implementing"`
 
+## Phase 3.5: Layout Verification (advisory during rollout)
+
+After the implementer completes and **before** multi-lens review, run the headless layout
+verifier against the real C# UI. Bound the invocation with the Bash tool's `timeout`
+parameter (this host has no `timeout` binary), for example **120000 ms**:
+
+```bash
+godot --headless --path . --script res://tools/layout_verifier.gd
+```
+
+Exit codes: `0` = pass with coverage, `1` = layout findings, `2` = fail-closed verifier
+failure. The output lists every assertion evaluated, every assertion skipped with its
+reason, and a `LAYOUT ASSERTIONS` count excluding harness preconditions; never treat a
+skipped assertion as a pass. A host-level timeout (the Bash tool killing the process) is
+treated as **fail-closed exit 2**, never a pass. The verifier also carries its own
+90-second watchdog so an uncaught error still exits `2` instead of hanging.
+
+1. **Pass (exit 0):** record `COVERAGE: N evaluated, M skipped` and the
+   `LAYOUT ASSERTIONS` count in the PR checklist and continue to Phase 4.
+2. **Findings (exit 1):** spawn the read-only `layout-verifier` sub-agent with the full
+   verifier output. Send its findings to the implementer as a normal fix batch (Phase 8
+   batching rules apply — one implementer for the whole batch). Re-run after the fix.
+3. **Fail-closed (exit 2) or timeout:** this is a verifier or build failure, not a pass.
+   Fix it before review; if the scene cannot build headlessly, stop and surface it.
+4. **Rollout:** until stage 3 of the rollout is complete, layout findings are advisory.
+   Record them in the PR checklist and in playtest notes, but do not block the PR. It
+   becomes a blocking gate only after its findings have matched actual playtest findings
+   across two features.
+
 ## Phase 4: Multi-Lens Review
 
 1. **Spawn 3 reviewer sub-agents in parallel** (Sonnet, `.claude/agents/reviewer.md`):
