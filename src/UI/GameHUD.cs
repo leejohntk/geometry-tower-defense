@@ -30,127 +30,158 @@ public partial class GameHUD : CanvasLayer
     {
         var viewportSize = GetViewport().GetVisibleRect().Size;
 
-        // Top bar background — spans the full viewport width, at top
+        // Top bar group — spans the full viewport width, at top. The wrapper sits at
+        // the origin so its children keep absolute positions.
+        var topBarBlock = new Control();
+        topBarBlock.Name = "Block_TopBar";
+        topBarBlock.Position = Vector2.Zero;
+        topBarBlock.Size = new Vector2(viewportSize.X, GameConstants.TopBarHeight);
+        topBarBlock.MouseFilter = Control.MouseFilterEnum.Ignore;
+        AddChild(topBarBlock);
+
         var topBarBg = new ColorRect();
+        topBarBg.Name = "Background";
         topBarBg.Size = new Vector2(viewportSize.X, GameConstants.TopBarHeight);
         topBarBg.Color = new Color(0.05f, 0.05f, 0.1f, 0.85f);
-        topBarBg.Position = new Vector2(0, 0);
-        AddChild(topBarBg);
+        topBarBg.Position = Vector2.Zero;
+        topBarBlock.AddChild(topBarBg);
 
         float currentX = 16f;
 
         // HP display
         var hpIcon = new Label();
+        hpIcon.Name = "HpIcon";
         hpIcon.Text = "[HP]";
         hpIcon.Position = new Vector2(currentX, 4);
         hpIcon.Size = new Vector2(40, 32);
         hpIcon.AddThemeColorOverride("font_color", new Color(1f, 0.3f, 0.3f));
-        AddChild(hpIcon);
+        topBarBlock.AddChild(hpIcon);
         currentX += 45f;
 
         _hpLabel = new Label();
+        _hpLabel.Name = "HpLabel";
         _hpLabel.Text = "3";
         _hpLabel.Position = new Vector2(currentX, 4);
         _hpLabel.Size = new Vector2(40, 32);
         _hpLabel.AddThemeFontSizeOverride("font_size", 20);
         _hpLabel.AddThemeColorOverride("font_color", new Color(1f, 1f, 1f));
-        AddChild(_hpLabel);
+        topBarBlock.AddChild(_hpLabel);
         currentX += 80f;
 
         // Coins display
         var coinIcon = new Label();
+        coinIcon.Name = "CoinIcon";
         coinIcon.Text = "[$]";
         coinIcon.Position = new Vector2(currentX, 4);
         coinIcon.Size = new Vector2(40, 32);
         coinIcon.AddThemeColorOverride("font_color", new Color(1f, 0.9f, 0.2f));
-        AddChild(coinIcon);
+        topBarBlock.AddChild(coinIcon);
         currentX += 45f;
 
         _coinsLabel = new Label();
+        _coinsLabel.Name = "CoinsLabel";
         _coinsLabel.Text = "10";
         _coinsLabel.Position = new Vector2(currentX, 4);
         _coinsLabel.Size = new Vector2(40, 32);
         _coinsLabel.AddThemeFontSizeOverride("font_size", 20);
         _coinsLabel.AddThemeColorOverride("font_color", new Color(1f, 1f, 1f));
-        AddChild(_coinsLabel);
+        topBarBlock.AddChild(_coinsLabel);
         currentX += 80f;
 
         // Wave display
         var waveIcon = new Label();
+        waveIcon.Name = "WaveIcon";
         waveIcon.Text = "Wave";
         waveIcon.Position = new Vector2(currentX, 4);
         waveIcon.Size = new Vector2(50, 32);
         waveIcon.AddThemeColorOverride("font_color", new Color(0.5f, 0.7f, 1f));
-        AddChild(waveIcon);
+        topBarBlock.AddChild(waveIcon);
         currentX += 55f;
 
         _waveLabel = new Label();
+        _waveLabel.Name = "WaveLabel";
         _waveLabel.Text = "0/5";
         _waveLabel.Position = new Vector2(currentX, 4);
         _waveLabel.Size = new Vector2(60, 32);
         _waveLabel.AddThemeFontSizeOverride("font_size", 20);
         _waveLabel.AddThemeColorOverride("font_color", new Color(1f, 1f, 1f));
-        AddChild(_waveLabel);
+        topBarBlock.AddChild(_waveLabel);
 
         // The sidebar sits to the RIGHT of the play area (grid), not overlapping it.
         float sidebarX = GameConstants.PlayAreaWidth;
 
+        // Sidebar group: background, separator, and action buttons. The wrapper's
+        // origin is the sidebar's top-left so children keep their global positions.
+        var sidebarBlock = new Control();
+        sidebarBlock.Name = "Block_Sidebar";
+        sidebarBlock.Position = new Vector2(sidebarX, 0);
+        sidebarBlock.Size = new Vector2(GameConstants.SidebarWidth, viewportSize.Y);
+        sidebarBlock.MouseFilter = Control.MouseFilterEnum.Ignore;
+        AddChild(sidebarBlock);
+
         // Right sidebar background — full height, opaque, next to the play area
         var sidebarBg = new ColorRect();
+        sidebarBg.Name = "Background";
         sidebarBg.Size = new Vector2(GameConstants.SidebarWidth, viewportSize.Y);
         sidebarBg.Color = new Color(0.05f, 0.05f, 0.1f, 1.0f);
-        sidebarBg.Position = new Vector2(sidebarX, 0);
-        AddChild(sidebarBg);
+        sidebarBg.Position = Vector2.Zero;
+        sidebarBlock.AddChild(sidebarBg);
 
         // Vertical separator line between the play area and sidebar
         var sidebarBorder = new ColorRect();
+        sidebarBorder.Name = "Border";
         sidebarBorder.Size = new Vector2(2, viewportSize.Y);
         sidebarBorder.Color = new Color(0.3f, 0.3f, 0.5f, 0.8f);
-        sidebarBorder.Position = new Vector2(sidebarX, 0);
-        AddChild(sidebarBorder);
+        sidebarBorder.Position = Vector2.Zero;
+        sidebarBlock.AddChild(sidebarBorder);
 
-        float sidebarCenterX = sidebarX + GameConstants.SidebarWidth / 2f;
+        float sidebarCenterX = GameConstants.SidebarWidth / 2f;
+        float sidebarButtonX = sidebarCenterX - 80f;
 
         // Place Arrow button
         _placeArrowButton = new Button();
+        _placeArrowButton.Name = "PlaceArrow";
         _placeArrowButton.Text = $"Place Arrow ({GameConstants.ArrowTowerCost}$)";
-        _placeArrowButton.Position = new Vector2(sidebarCenterX - 80, 20);
+        _placeArrowButton.Position = new Vector2(sidebarButtonX, 20);
         _placeArrowButton.Size = new Vector2(160, 40);
         _placeArrowButton.Disabled = true;
         _placeArrowButton.Pressed += () => EmitSignal(SignalName.PlaceTowerPressed, (int)TowerType.Arrow);
         _placeArrowButton.AddThemeFontSizeOverride("font_size", 12);
-        AddChild(_placeArrowButton);
+        sidebarBlock.AddChild(_placeArrowButton);
 
         // Place Cannon button (hidden for levels that don't allow it)
         _placeCannonButton = new Button();
+        _placeCannonButton.Name = "PlaceCannon";
         _placeCannonButton.Text = $"Place Cannon ({GameConstants.CannonTowerCost}$)";
-        _placeCannonButton.Position = new Vector2(sidebarCenterX - 80, 70);
+        _placeCannonButton.Position = new Vector2(sidebarButtonX, 70);
         _placeCannonButton.Size = new Vector2(160, 40);
         _placeCannonButton.Disabled = true;
         _placeCannonButton.Visible = false;
         _placeCannonButton.Pressed += () => EmitSignal(SignalName.PlaceTowerPressed, (int)TowerType.Cannon);
         _placeCannonButton.AddThemeFontSizeOverride("font_size", 12);
-        AddChild(_placeCannonButton);
+        sidebarBlock.AddChild(_placeCannonButton);
 
         // Place Laser button (hidden for levels that don't allow it)
         _placeLaserButton = new Button();
+        _placeLaserButton.Name = "PlaceLaser";
         _placeLaserButton.Text = $"Place Laser ({GameConstants.LaserTowerCost}$)";
-        _placeLaserButton.Position = new Vector2(sidebarCenterX - 80, 120);
+        _placeLaserButton.Position = new Vector2(sidebarButtonX, 120);
         _placeLaserButton.Size = new Vector2(160, 40);
         _placeLaserButton.Disabled = true;
         _placeLaserButton.Visible = false;
         _placeLaserButton.Pressed += () => EmitSignal(SignalName.PlaceTowerPressed, (int)TowerType.Laser);
         _placeLaserButton.AddThemeFontSizeOverride("font_size", 12);
-        AddChild(_placeLaserButton);
+        sidebarBlock.AddChild(_placeLaserButton);
 
         // Start Wave button — in sidebar, below the tower buttons
         _startWaveButton = new Button();
+        _startWaveButton.Name = "StartWave";
         _startWaveButton.Text = "Start Wave";
-        _startWaveButton.Position = new Vector2(sidebarCenterX - 70, 180);
+        _startWaveButton.Position = new Vector2(sidebarCenterX - 70f, 180);
         _startWaveButton.Size = new Vector2(140, 40);
         _startWaveButton.Pressed += OnStartWavePressed;
         _startWaveButton.AddThemeFontSizeOverride("font_size", 14);
-        AddChild(_startWaveButton);
+        sidebarBlock.AddChild(_startWaveButton);
     }
 
     /// <summary>

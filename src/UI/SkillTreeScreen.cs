@@ -28,7 +28,20 @@ public partial class SkillTreeScreen : Control
     private const float BranchOffset = 180f;
     private const float TreeTop = 90f;
 
-    private readonly SkillTree _skillTree;
+    // Node row metrics. Every row is a named Control wrapper whose rect spans the
+    // full row (icon edge to buy-column edge), so the headless layout verifier can
+    // resolve rows by identity instead of grouping them by y-coordinate.
+    private const float NameOffset = 20f;
+    private const float NameWidth = 150f;
+    private const float RankOffset = 262f;
+    private const float RankWidth = 44f;
+    private const float BuyOffset = 310f;
+    private const float BuyWidth = 124f;
+    private const float RowHalfHeight = 15f;
+
+    private SkillTree _skillTree;
+    private bool _verificationModeEnabled;
+    private bool _verificationStateActive;
     private Label? _spLabel;
     private Control? _treeArea;
     private readonly Dictionary<string, (Label RankLabel, Button BuyButton)> _rows = new();
@@ -70,38 +83,110 @@ public partial class SkillTreeScreen : Control
         }
     }
 
+    /// <summary>
+    /// Test/verification gate used by the headless layout verifier. Verification mode
+    /// is only available in a debug build and must be requested explicitly; gameplay
+    /// never calls it. Returns false and changes nothing otherwise, so normal play can
+    /// never leave the screen with a non-persisting tree.
+    /// </summary>
+    public bool EnableVerificationMode()
+    {
+        if (!OS.IsDebugBuild())
+            return false;
+
+        _verificationModeEnabled = true;
+        return true;
+    }
+
+    /// <summary>
+    /// True only after <see cref="ResetProgressForVerification"/> has installed the
+    /// isolated in-memory tree. The verifier refuses to grant SP or press Buy unless
+    /// this is true.
+    /// </summary>
+    public bool IsVerificationStateActive() => _verificationStateActive;
+
+    /// <summary>
+    /// Test/verification hook used by the headless layout verifier. Resets the
+    /// in-memory progression to an empty state and rebuilds the screen so locked and
+    /// unlocked rows can be measured deterministically. Requires
+    /// <see cref="EnableVerificationMode"/> (debug build only); returns false and
+    /// changes nothing otherwise. Nothing is flushed, so the player's save file is
+    /// never touched.
+    /// </summary>
+    public bool ResetProgressForVerification()
+    {
+        if (!_verificationModeEnabled)
+            return false;
+
+        // Replace the persistent tree with an isolated in-memory one whose save
+        // delegate is a no-op. A verification purchase can then drive the real
+        // purchase/rebuild path without ever writing user://skilltree.cfg.
+        _skillTree = new SkillTree(new SkillTreeState(), _ => true);
+        _verificationStateActive = true;
+        RenderTree();
+        Refresh();
+        return true;
+    }
+
+    /// <summary>
+    /// Test/verification hook: grants SP on the isolated verification tree. Refuses
+    /// (returns false, mutates nothing) unless verification state is active, so it can
+    /// never award SP on the player's real tree.
+    /// </summary>
+    public bool GrantSkillPointsForVerification(int amount)
+    {
+        if (!_verificationStateActive)
+            return false;
+
+        _skillTree.State.AddSkillPoints(amount);
+        Refresh();
+        return true;
+    }
+
     private void BuildUi()
     {
         var viewportSize = GetViewportRect().Size;
 
         // Dark background matching the title screen.
         var bg = new ColorRect();
+        bg.Name = "Background";
         bg.Size = viewportSize;
         bg.Color = new Color(0.05f, 0.05f, 0.1f);
         AddChild(bg);
 
-        // Header
+        // Header block: title + SP readout. Wrapped as one named visual group so the
+        // layout verifier can resolve it without relying on generated node names.
+        var titleBlock = new Control();
+        titleBlock.Name = "Block_Title";
+        titleBlock.Position = new Vector2(0, 20);
+        titleBlock.Size = new Vector2(viewportSize.X, 89);
+        titleBlock.MouseFilter = MouseFilterEnum.Ignore;
+        AddChild(titleBlock);
+
         var title = new Label();
+        title.Name = "Title";
         title.Text = "SKILL TREE";
         title.HorizontalAlignment = HorizontalAlignment.Center;
-        title.Position = new Vector2(0, 20);
+        title.Position = Vector2.Zero;
         title.Size = new Vector2(viewportSize.X, 50);
         title.AddThemeFontSizeOverride("font_size", 40);
         title.AddThemeColorOverride("font_color", new Color(0.8f, 0.85f, 1.0f));
-        AddChild(title);
+        titleBlock.AddChild(title);
 
         // Skill Point readout
         _spLabel = new Label();
+        _spLabel.Name = "SkillPoints";
         _spLabel.Text = "Skill Points: 0";
         _spLabel.HorizontalAlignment = HorizontalAlignment.Center;
-        _spLabel.Position = new Vector2(0, 78);
+        _spLabel.Position = new Vector2(0, 58);
         _spLabel.Size = new Vector2(viewportSize.X, 30);
         _spLabel.AddThemeFontSizeOverride("font_size", 22);
         _spLabel.AddThemeColorOverride("font_color", new Color(1f, 0.9f, 0.2f));
-        AddChild(_spLabel);
+        titleBlock.AddChild(_spLabel);
 
         // Back button
         var backButton = new Button();
+        backButton.Name = "Back";
         backButton.Text = "Back";
         backButton.Position = new Vector2(20, 18);
         backButton.Size = new Vector2(120, 44);
@@ -119,12 +204,14 @@ public partial class SkillTreeScreen : Control
 
         // Main tree panel.
         var mainPanel = new ColorRect();
+        mainPanel.Name = "Panel_Main";
         mainPanel.Position = new Vector2(margin - 10f, mainTop - 10f);
         mainPanel.Size = new Vector2(mainWidth + 20f, mainHeight + 20f);
         mainPanel.Color = new Color(0.08f, 0.08f, 0.16f, 0.9f);
         AddChild(mainPanel);
 
         _treeArea = new Control();
+        _treeArea.Name = "TreeArea";
         _treeArea.Position = new Vector2(margin, mainTop);
         _treeArea.Size = new Vector2(mainWidth, mainHeight);
         _treeArea.MouseFilter = MouseFilterEnum.Ignore;
@@ -143,11 +230,22 @@ public partial class SkillTreeScreen : Control
         const float buttonHeight = 60f;
         const float buttonGap = 16f;
 
+        // Sidebar group: panel + tower buttons. The wrapper's origin is the panel's
+        // top-left; children keep their global positions because their local offsets
+        // are expressed relative to that origin.
+        var sidebarBlock = new Control();
+        sidebarBlock.Name = "Block_Sidebar";
+        sidebarBlock.Position = new Vector2(x - 10f, top - 10f);
+        sidebarBlock.Size = new Vector2(width + 20f, 3 * buttonHeight + 2 * buttonGap + 20f);
+        sidebarBlock.MouseFilter = MouseFilterEnum.Ignore;
+        AddChild(sidebarBlock);
+
         var panel = new ColorRect();
-        panel.Position = new Vector2(x - 10f, top - 10f);
-        panel.Size = new Vector2(width + 20f, 3 * buttonHeight + 2 * buttonGap + 20f);
+        panel.Name = "Panel";
+        panel.Position = Vector2.Zero;
+        panel.Size = sidebarBlock.Size;
         panel.Color = new Color(0.08f, 0.08f, 0.16f, 0.9f);
-        AddChild(panel);
+        sidebarBlock.AddChild(panel);
 
         var towers = new[] { TowerType.Arrow, TowerType.Cannon, TowerType.Laser };
         for (int i = 0; i < towers.Length; i++)
@@ -156,15 +254,18 @@ public partial class SkillTreeScreen : Control
             var color = TowerColor(type);
 
             var button = new Button();
+            button.Name = $"Sidebar_{TowerKey(type)}";
             button.Size = new Vector2(width, buttonHeight);
-            button.Position = new Vector2(x, top + i * (buttonHeight + buttonGap));
+            button.Position = new Vector2(10f, 10f + i * (buttonHeight + buttonGap));
             button.Pressed += () => SelectTower(type);
 
             var icon = CreateTowerIcon(type, color);
+            icon.Name = "Icon";
             icon.Position = new Vector2(10f, (buttonHeight - 22f) / 2f);
             button.AddChild(icon);
 
             var label = new Label();
+            label.Name = "Label";
             label.Text = TowerName(type);
             label.Position = new Vector2(40f, (buttonHeight - 24f) / 2f);
             label.Size = new Vector2(width - 60f, 24f);
@@ -173,7 +274,7 @@ public partial class SkillTreeScreen : Control
             button.AddChild(label);
 
             _sidebarButtons[type] = (button, label);
-            AddChild(button);
+            sidebarBlock.AddChild(button);
         }
 
         UpdateSidebarStyles();
@@ -244,21 +345,30 @@ public partial class SkillTreeScreen : Control
 
         // Connection lines first so node rows render on top of them.
         var lineLayer = new Control();
+        lineLayer.Name = "Lines";
         lineLayer.Size = _treeArea.Size;
         lineLayer.MouseFilter = MouseFilterEnum.Ignore;
         lineLayer.Draw += () => DrawTreeLines(lineLayer, nodes, color);
         _treeArea.AddChild(lineLayer);
 
-        // Tower header above the tree.
+        // Tower header above the tree, wrapped as a named visual group.
         var (name, specs) = TowerInfo(_selectedTower);
+        var headerBlock = new Control();
+        headerBlock.Name = "Block_TreeHeader";
+        headerBlock.Position = new Vector2(0, 10);
+        headerBlock.Size = new Vector2(_treeArea.Size.X, 44);
+        headerBlock.MouseFilter = MouseFilterEnum.Ignore;
+        _treeArea.AddChild(headerBlock);
+
         var header = new Label();
+        header.Name = "Title";
         header.Text = $"{name}\n{specs}";
         header.HorizontalAlignment = HorizontalAlignment.Center;
-        header.Position = new Vector2(0, 10);
+        header.Position = Vector2.Zero;
         header.Size = new Vector2(_treeArea.Size.X, 44);
         header.AddThemeFontSizeOverride("font_size", 18);
         header.AddThemeColorOverride("font_color", color);
-        _treeArea.AddChild(header);
+        headerBlock.AddChild(header);
 
         float spineX = _treeArea.Size.X / 2f;
         foreach (var node in nodes)
@@ -363,37 +473,54 @@ public partial class SkillTreeScreen : Control
         bool locked = node.Enabled && !_skillTree.State.IsUnlocked(node.Id);
         bool active = node.Enabled && !locked;
 
+        // Row wrapper: fixed span from the icon edge on the branch side to the buy
+        // column edge on the content side. Its origin is the row's top-left, and every
+        // child is placed relative to it, so no child's global position changes.
+        float contentLeft = ContentX(anchor.X, BuyOffset, BuyWidth, true);
+        float contentRight = ContentX(anchor.X, BuyOffset, BuyWidth, false) + BuyWidth;
+        float rowLeft = contentOnLeft ? contentLeft : anchor.X - IconHalf;
+        float rowRight = contentOnLeft ? anchor.X + IconHalf : contentRight;
+        var rowOrigin = new Vector2(rowLeft, anchor.Y - RowHalfHeight);
+
+        var row = new Control();
+        row.Name = RowNodeName(node.Id);
+        row.Position = rowOrigin;
+        row.Size = new Vector2(rowRight - rowLeft, RowHalfHeight * 2f);
+        row.MouseFilter = MouseFilterEnum.Ignore;
+        parent.AddChild(row);
+
+        var labelColor = active
+            ? new Color(0.9f, 0.9f, 1.0f)
+            : new Color(0.45f, 0.45f, 0.5f);
+
         // Geometric shape icon centered on the tree anchor: circle for trunk, diamond
         // for seed. Locked (not-yet-unlocked) enabled nodes render greyed.
         var icon = CreateShapeIcon(node.Kind, active, color);
-        icon.Position = anchor - new Vector2(IconHalf, IconHalf);
-        parent.AddChild(icon);
+        icon.Name = "Icon";
+        icon.Position = anchor - new Vector2(IconHalf, IconHalf) - rowOrigin;
+        row.AddChild(icon);
 
         var nameLabel = new Label();
+        nameLabel.Name = "Name";
         nameLabel.Text = node.DisplayName;
-        nameLabel.Position = new Vector2(ContentX(anchor.X, 20f, 150f, contentOnLeft), anchor.Y - 10f);
-        nameLabel.Size = new Vector2(150f, 20f);
+        nameLabel.Position = new Vector2(ContentX(anchor.X, NameOffset, NameWidth, contentOnLeft), anchor.Y - 10f) - rowOrigin;
+        nameLabel.Size = new Vector2(NameWidth, 20f);
         nameLabel.AddThemeFontSizeOverride("font_size", 14);
         if (contentOnLeft)
             nameLabel.HorizontalAlignment = HorizontalAlignment.Right;
-        nameLabel.AddThemeColorOverride("font_color",
-            active
-                ? new Color(0.9f, 0.9f, 1.0f)
-                : new Color(0.45f, 0.45f, 0.5f));
-        parent.AddChild(nameLabel);
+        nameLabel.AddThemeColorOverride("font_color", labelColor);
+        row.AddChild(nameLabel);
 
         var rankLabel = new Label();
+        rankLabel.Name = "Rank";
         rankLabel.Text = "0/5";
-        rankLabel.Position = new Vector2(ContentX(anchor.X, 262f, 44f, contentOnLeft), anchor.Y - 10f);
-        rankLabel.Size = new Vector2(44f, 20f);
+        rankLabel.Position = new Vector2(ContentX(anchor.X, RankOffset, RankWidth, contentOnLeft), anchor.Y - 10f) - rowOrigin;
+        rankLabel.Size = new Vector2(RankWidth, 20f);
         rankLabel.AddThemeFontSizeOverride("font_size", 14);
         if (contentOnLeft)
             rankLabel.HorizontalAlignment = HorizontalAlignment.Right;
-        rankLabel.AddThemeColorOverride("font_color",
-            active
-                ? new Color(0.9f, 0.9f, 1.0f)
-                : new Color(0.45f, 0.45f, 0.5f));
-        parent.AddChild(rankLabel);
+        rankLabel.AddThemeColorOverride("font_color", labelColor);
+        row.AddChild(rankLabel);
 
         // Only active (enabled + unlocked) nodes get a buy button and are registered
         // in _rows. Locked nodes stay greyed with no button; a future disabled node
@@ -401,15 +528,22 @@ public partial class SkillTreeScreen : Control
         if (active)
         {
             var buyButton = new Button();
+            buyButton.Name = "Buy";
             buyButton.Text = $"Buy ({GameConstants.SkillNodeRankCost} SP)";
-            buyButton.Position = new Vector2(ContentX(anchor.X, 310f, 124f, contentOnLeft), anchor.Y - 15f);
-            buyButton.Size = new Vector2(124f, 30f);
+            buyButton.Position = new Vector2(ContentX(anchor.X, BuyOffset, BuyWidth, contentOnLeft), anchor.Y - RowHalfHeight) - rowOrigin;
+            buyButton.Size = new Vector2(BuyWidth, RowHalfHeight * 2f);
             buyButton.AddThemeFontSizeOverride("font_size", 12);
             buyButton.Pressed += () => OnBuyPressed(node.Id);
-            parent.AddChild(buyButton);
+            row.AddChild(buyButton);
             _rows[node.Id] = (rankLabel, buyButton);
         }
     }
+
+    /// <summary>
+    /// Node id to wrapper name. Dots are not legal in Godot node names, so the id is
+    /// flattened (arrow.pierce -> Row_arrow_pierce) to keep names stable and resolvable.
+    /// </summary>
+    private static string RowNodeName(string nodeId) => "Row_" + nodeId.Replace('.', '_');
 
     /// <summary>
     /// Horizontal position of row content that normally sits to the right of the
@@ -512,6 +646,13 @@ public partial class SkillTreeScreen : Control
         TowerType.Cannon => "Cannon",
         TowerType.Laser => "Laser",
         _ => "Arrow"
+    };
+
+    private static string TowerKey(TowerType type) => type switch
+    {
+        TowerType.Cannon => "cannon",
+        TowerType.Laser => "laser",
+        _ => "arrow"
     };
 
     private static (string Name, string Specializations) TowerInfo(TowerType type) => type switch

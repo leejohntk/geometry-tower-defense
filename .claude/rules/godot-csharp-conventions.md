@@ -50,3 +50,16 @@ Tests/
 - Use Godot MCP tools for all scene creation and editing. Never hand-edit `.tscn`.
 - Root node type matches scene purpose (Node2D for gameplay, Control for UI).
 - Scene files in relevant `src/` subdirectory alongside their C# script.
+
+## Named Visual Groups
+
+- Every visual group built in code is wrapped in a `Control` whose `Name` identifies the
+  group: rows (`Row_{id}`), title blocks (`Block_Title`), panels (`Panel_{Name}`), and
+  button groups (`Block_{Name}`). Give the important children stable names too
+  (`Name`, `Rank`, `Buy`, `Icon`).
+- Position the wrapper so its rect spans the group, and place children relative to it.
+  Wrapping must not change any child's global position, size, input, or rendering; set
+  `MouseFilter = Ignore` on wrapper Controls so they cannot consume input.
+- Group identity is the wrapper node, never a y-coordinate heuristic or a generated name.
+  Generated names (`@Label@31`) are not resolvable by the headless layout verifier and
+  must never appear in a finding. This is a general UI rule, not specific to one screen.
