@@ -296,6 +296,18 @@ public partial class GridManager : Node2D
     }
 
     /// <summary>
+    /// True while any part of the placement preview (cell highlight, tower ghost, or
+    /// range circle) is visible. Read-only query so callers and tests can observe the
+    /// preview without reaching into its private nodes.
+    /// </summary>
+    public bool IsPlacementPreviewVisible =>
+        (_previewHighlight?.Visible ?? false) ||
+        (_previewTower?.Visible ?? false) ||
+        (_previewTowerCircle?.Visible ?? false) ||
+        (_previewTowerLaser?.Visible ?? false) ||
+        (_previewRange?.Visible ?? false);
+
+    /// <summary>
     /// Hide the placement preview.
     /// </summary>
     public void HidePlacementPreview()

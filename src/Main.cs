@@ -209,6 +209,11 @@ public partial class Main : Node2D
 
     private void OnGameOverTriggered()
     {
+        // The run can end while the player is aiming. Leave placement mode first so
+        // the ghost/range preview and the Cross cursor cannot linger under the
+        // result overlay.
+        ExitTowerPlacementMode();
+
         if (_gameOverScreen != null)
             _gameOverScreen.Visible = true;
         _gameRunning = false;
@@ -216,6 +221,10 @@ public partial class Main : Node2D
 
     private void OnVictoryTriggered()
     {
+        // Same as game over: a victory landing mid-aim must not strand placement
+        // state beneath the result overlay.
+        ExitTowerPlacementMode();
+
         if (_victoryScreen != null)
             _victoryScreen.Visible = true;
         _gameRunning = false;
@@ -309,10 +318,13 @@ public partial class Main : Node2D
             return;
         }
 
-        // Handle tower selection / range display (not in placement mode)
+        // Handle tower selection / range display (not in placement mode). Only a
+        // click on the battlefield can select a tower: the HUD top bar overlays
+        // row 0, so a click there must not toggle a tower's range underneath it.
         if (@event is InputEventMouseButton click &&
             click.ButtonIndex == MouseButton.Left &&
-            click.Pressed)
+            click.Pressed &&
+            GameConstants.IsBattlefieldPoint(click.Position))
         {
             // Find which tower (if any) was clicked
             Tower? clickedTower = null;
@@ -414,7 +426,10 @@ public partial class Main : Node2D
 
     /// <summary>
     /// Leave tower placement mode: drop the selection, hide the preview ghost, and
-    /// restore the cursor and Start Wave button to normal play state.
+    /// restore the cursor and Start Wave button to normal play state. Idempotent and
+    /// null-safe, so it is safe to call when placement already ended — including
+    /// immediately after <see cref="GameManager.PlaceTower"/> consumed the selection,
+    /// and from game-over/victory handlers.
     /// </summary>
     private void ExitTowerPlacementMode()
     {

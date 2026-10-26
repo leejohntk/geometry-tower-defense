@@ -905,6 +905,22 @@ public partial class GameManager : Node2D
     }
 
     /// <summary>
+    /// Test-only seam: grants coins without combat so placement-lifecycle tests can
+    /// start above one tower's cost and observe that a successful placement consumes
+    /// the selection while coins remain. Internal to the game assembly; not part of
+    /// the public gameplay API.
+    /// </summary>
+    internal void AddCoinsForTesting(int amount)
+    {
+        if (amount <= 0)
+            return;
+
+        _coins += amount;
+        EmitSignal(SignalName.CoinsChanged, _coins);
+        EmitSignal(SignalName.TowerPlacementStateChanged, _coins >= GameConstants.ArrowTowerCost);
+    }
+
+    /// <summary>
     /// Reset the game state (for starting a new game after game over / victory).
     /// Does NOT call Initialize() — Main.StartNewGame() is the sole caller of Initialize.
     /// </summary>
