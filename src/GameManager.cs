@@ -857,6 +857,7 @@ public partial class GameManager : Node2D
 
     /// <summary>
     /// Place a tower of the currently selected type at the specified grid position.
+    /// A successful placement consumes the selection (one tower per selection).
     /// Returns true if placement succeeded.
     /// </summary>
     public bool PlaceTower(int row, int col)
@@ -896,7 +897,27 @@ public partial class GameManager : Node2D
         _activeTowers.Add(tower);
         AddChild(tower);
 
+        // One selection = one tower. Consume the placement type here so no caller can
+        // leave the player stuck in placement mode after a successful placement.
+        PlacingTowerType = null;
+
         return true;
+    }
+
+    /// <summary>
+    /// Test-only seam: grants coins without combat so placement-lifecycle tests can
+    /// start above one tower's cost and observe that a successful placement consumes
+    /// the selection while coins remain. Internal to the game assembly; not part of
+    /// the public gameplay API.
+    /// </summary>
+    internal void AddCoinsForTesting(int amount)
+    {
+        if (amount <= 0)
+            return;
+
+        _coins += amount;
+        EmitSignal(SignalName.CoinsChanged, _coins);
+        EmitSignal(SignalName.TowerPlacementStateChanged, _coins >= GameConstants.ArrowTowerCost);
     }
 
     /// <summary>

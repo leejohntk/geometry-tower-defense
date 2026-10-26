@@ -243,6 +243,15 @@ public static class GameConstants
     /// </summary>
     public static int TotalViewportWidth => PlayAreaWidth + (int)SidebarWidth;
 
+    /// <summary>
+    /// True when a screen-space point is over the visible battlefield: inside the grid
+    /// bounds and not under the HUD top bar. The sidebar, top bar, and the margin below
+    /// the grid are UI/outside, so clicks there must not act on the battlefield.
+    /// </summary>
+    public static bool IsBattlefieldPoint(Vector2 point) =>
+        point.X >= 0f && point.X < PlayAreaWidth &&
+        point.Y >= TopBarHeight && point.Y < PlayAreaHeight;
+
     // Cell center helpers
     public static float CellCenterX(int col) => col * CellSize + CellSize / 2f;
     public static float CellCenterY(int row) => row * CellSize + CellSize / 2f;

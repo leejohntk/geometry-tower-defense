@@ -192,10 +192,7 @@ public partial class Main : Node2D
         if (_gameManager.PlacingTowerType == type)
         {
             // Cancel placement
-            _gameManager.PlacingTowerType = null;
-            _gameManager.Grid?.HidePlacementPreview();
-            UpdateStartWaveButtonState();
-            Input.SetDefaultCursorShape(Input.CursorShape.Arrow);
+            ExitTowerPlacementMode();
         }
         else
         {
@@ -212,6 +209,11 @@ public partial class Main : Node2D
 
     private void OnGameOverTriggered()
     {
+        // The run can end while the player is aiming. Leave placement mode first so
+        // the ghost/range preview and the Cross cursor cannot linger under the
+        // result overlay.
+        ExitTowerPlacementMode();
+
         if (_gameOverScreen != null)
             _gameOverScreen.Visible = true;
         _gameRunning = false;
@@ -219,6 +221,10 @@ public partial class Main : Node2D
 
     private void OnVictoryTriggered()
     {
+        // Same as game over: a victory landing mid-aim must not strand placement
+        // state beneath the result overlay.
+        ExitTowerPlacementMode();
+
         if (_victoryScreen != null)
             _victoryScreen.Visible = true;
         _gameRunning = false;
@@ -268,6 +274,14 @@ public partial class Main : Node2D
 
         if (_gameManager.IsPlacingTower)
         {
+            // Escape cancels the current placement selection.
+            if (@event.IsActionPressed("ui_cancel"))
+            {
+                ExitTowerPlacementMode();
+                GetViewport().SetInputAsHandled();
+                return;
+            }
+
             // Track mouse for placement preview (shows ghost + highlight + range)
             if (@event is InputEventMouseMotion mouseMotion)
             {
@@ -279,7 +293,18 @@ public partial class Main : Node2D
                 mouseButton.ButtonIndex == MouseButton.Left &&
                 mouseButton.Pressed)
             {
-                TryPlaceTowerAtMouse(mouseButton.Position);
+                if (GameConstants.IsBattlefieldPoint(mouseButton.Position))
+                {
+                    TryPlaceTowerAtMouse(mouseButton.Position);
+                }
+                else
+                {
+                    // Clicking the side menu, HUD, or anywhere off the grid cancels
+                    // placement. Consume the click so a sidebar button under the cursor
+                    // cannot immediately start a new placement from the same event.
+                    ExitTowerPlacementMode();
+                    GetViewport().SetInputAsHandled();
+                }
             }
 
             // Cancel placement with right click
@@ -287,19 +312,19 @@ public partial class Main : Node2D
                 rightClick.ButtonIndex == MouseButton.Right &&
                 rightClick.Pressed)
             {
-                _gameManager.PlacingTowerType = null;
-                _gameManager.Grid?.HidePlacementPreview();
-                Input.SetDefaultCursorShape(Input.CursorShape.Arrow);
-                UpdateStartWaveButtonState();
+                ExitTowerPlacementMode();
             }
 
             return;
         }
 
-        // Handle tower selection / range display (not in placement mode)
+        // Handle tower selection / range display (not in placement mode). Only a
+        // click on the battlefield can select a tower: the HUD top bar overlays
+        // row 0, so a click there must not toggle a tower's range underneath it.
         if (@event is InputEventMouseButton click &&
             click.ButtonIndex == MouseButton.Left &&
-            click.Pressed)
+            click.Pressed &&
+            GameConstants.IsBattlefieldPoint(click.Position))
         {
             // Find which tower (if any) was clicked
             Tower? clickedTower = null;
@@ -344,7 +369,7 @@ public partial class Main : Node2D
 
     /// <summary>
     /// Update the tower placement preview (ghost + highlight + range) at the cell under the mouse.
-    /// Hides the preview if the mouse is outside the grid bounds.
+    /// Hides the preview when the pointer is over HUD chrome or outside the grid.
     /// </summary>
     private void UpdateTowerPlacementPreview(Vector2 mousePos)
     {
@@ -353,6 +378,13 @@ public partial class Main : Node2D
 
         if (_gameManager.PlacingTowerType == null)
             return;
+
+        // Never draw the ghost over HUD chrome (top bar / sidebar) or off the grid.
+        if (!GameConstants.IsBattlefieldPoint(mousePos))
+        {
+            _gameManager.Grid.HidePlacementPreview();
+            return;
+        }
 
         var type = _gameManager.PlacingTowerType.Value;
 
@@ -384,18 +416,28 @@ public partial class Main : Node2D
 
         if (placed)
         {
-            // Hide preview momentarily — next mouse motion will re-show
-            _gameManager.Grid.HidePlacementPreview();
-
-            // Stay in placement mode - player can place multiple towers.
-            // Re-check if we can still afford the selected type.
-            var type = _gameManager.PlacingTowerType;
-            if (type != null && _gameManager.Coins < GameConstants.TowerCost(type.Value))
-            {
-                _gameManager.PlacingTowerType = null;
-                Input.SetDefaultCursorShape(Input.CursorShape.Arrow);
-                UpdateStartWaveButtonState();
-            }
+            // Exactly one tower per selection: GameManager consumed the placement type,
+            // so drop the preview, cursor, and Start Wave state to match.
+            ExitTowerPlacementMode();
         }
+        // A failed battlefield click (path or occupied cell) keeps the selection so the
+        // player can retry on a valid cell.
+    }
+
+    /// <summary>
+    /// Leave tower placement mode: drop the selection, hide the preview ghost, and
+    /// restore the cursor and Start Wave button to normal play state. Idempotent and
+    /// null-safe, so it is safe to call when placement already ended — including
+    /// immediately after <see cref="GameManager.PlaceTower"/> consumed the selection,
+    /// and from game-over/victory handlers.
+    /// </summary>
+    private void ExitTowerPlacementMode()
+    {
+        if (_gameManager != null)
+            _gameManager.PlacingTowerType = null;
+
+        _gameManager?.Grid?.HidePlacementPreview();
+        Input.SetDefaultCursorShape(Input.CursorShape.Arrow);
+        UpdateStartWaveButtonState();
     }
 }
