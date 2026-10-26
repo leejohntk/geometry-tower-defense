@@ -100,7 +100,7 @@ Holdouts moved to `.claude/holdouts/regression/tower-skill-tree-mechanics/`.
 
 ## Recent Features
 
-- **Level 5 + The Progenitor** (PR pending) — three simultaneous lanes, waves 12/15/18/21/24,
+- **Level 5 + The Progenitor** (PR #25, awaiting playtest) — three simultaneous lanes, waves 12/15/18/21/24,
   first boss mid-wave. Progenitor slows and summons ahead on-path with HP-phase escalation;
   zero-coin summons count toward wave completion. Review caught a critical post-base summon
   leak (synthetic exit waypoint) plus game-over/victory races; all fixed with regression tests.
