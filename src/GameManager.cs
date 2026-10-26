@@ -60,6 +60,18 @@ public partial class GameManager : Node2D
     private readonly List<Enemy> _chainHitEnemies = new();
     private readonly List<Vector2> _chainTargets = new();
 
+    // The active Progenitor (at most one per level). Tracked by reference rather than
+    // discovered by scanning _activeEnemies, so ticking the boss costs one null check
+    // per frame. Nulled when the boss dies, leaks, or the level resets, which stops all
+    // future summons.
+    private Enemy? _activeBoss;
+    private int _bossRouteIndex;
+
+    // Cached ring offsets per squad size. Summons reuse these arrays so summoning never
+    // allocates on the frame it fires; at most three arrays are ever built per game.
+    private readonly Vector2[][] _summonOffsetsBySquadSize =
+        new Vector2[GameConstants.ProgenitorMaxSquadSize + 1][];
+
     // Player state
     private int _hp;
     private int _coins;
@@ -127,6 +139,13 @@ public partial class GameManager : Node2D
     public SkillTree? SkillTree { get; set; }
 
     /// <summary>
+    /// Injectable, seeded roll source for Progenitor summon composition. Production
+    /// uses the shared seeded default; tests assign a scripted source to force exact
+    /// summon squads.
+    /// </summary>
+    public SkillRandom SummonRandom { get; set; } = SkillRandom.Default;
+
+    /// <summary>
     /// Number of active (alive) enemies.
     /// </summary>
     public int ActiveEnemyCount => _activeEnemies.Count;
@@ -135,6 +154,11 @@ public partial class GameManager : Node2D
     /// Returns active towers as a read-only list (no allocation).
     /// </summary>
     public System.Collections.Generic.IReadOnlyList<Tower> GetActiveTowers() => _activeTowers;
+
+    /// <summary>
+    /// Returns active enemies as a read-only list (no allocation). Includes boss summons.
+    /// </summary>
+    public System.Collections.Generic.IReadOnlyList<Enemy> GetActiveEnemies() => _activeEnemies;
 
     /// <summary>
     /// Called by Main to initialize a new game for the given level.
@@ -152,6 +176,8 @@ public partial class GameManager : Node2D
         _coins = GameConstants.StartingCoins;
         _state = GameState.Playing;
         PlacingTowerType = null;
+        _activeBoss = null;
+        _bossRouteIndex = 0;
 
         // Create object pools once (persist across game restarts)
         if (!_poolsCreated)
@@ -190,8 +216,11 @@ public partial class GameManager : Node2D
     /// </summary>
     private void InitializePools()
     {
-        // Enough enemies for Level 2's largest wave (15) plus a buffer.
-        _enemyPool = new ObjectPool<Enemy>(24, this);
+        // Enough enemies for Level 5's peak: wave 5 defines 24 enemies (boss included)
+        // plus a phase-3 summon squad of 5, with a buffer. Prewarming the peak keeps
+        // ObjectPool.Acquire from constructing nodes mid-wave when fewer than a full
+        // squad has recycled.
+        _enemyPool = new ObjectPool<Enemy>(36, this);
 
         // Separate pools for arrow and cannon projectiles.
         _arrowProjectilePool = new ObjectPool<ArrowProjectile>(8, this);
@@ -226,6 +255,10 @@ public partial class GameManager : Node2D
 
         // Tick enemy stun/burn/flash statuses (movement pause is read in Enemy._Process)
         UpdateEnemyStatuses((float)delta);
+
+        // Advance the boss summon timers. Done centrally (one tracked reference, no
+        // enemy-list scan) and only while playing, so game over stops all summons.
+        UpdateProgenitorSummons((float)delta);
 
         // Update projectile collision detection
         UpdateProjectileCollisions();
@@ -445,6 +478,16 @@ public partial class GameManager : Node2D
     }
 
     /// <summary>
+    /// Advances the active Progenitor's summon state machine. One tracked reference, so
+    /// this never scans the enemy list. The boss's SummonReady signal fires synchronously
+    /// from this tick and hands off to <see cref="OnBossSummonReady"/>.
+    /// </summary>
+    private void UpdateProgenitorSummons(float delta)
+    {
+        _activeBoss?.TickProgenitorSummon(delta);
+    }
+
+    /// <summary>
     /// Check all active projectiles for collision with enemies.
     /// Uses cached list to avoid per-frame allocation.
     /// </summary>
@@ -478,16 +521,120 @@ public partial class GameManager : Node2D
 
     private void OnEnemySpawned(Enemy enemy, int routeIndex)
     {
-        enemy.ReachedEnd += OnEnemyReachedEnd;
-        enemy.Destroyed += OnEnemyDestroyed;
-
-        // Set path
+        // Set path before registering so the enemy is already at its spawn anchor.
         if (_gridManager != null)
         {
             enemy.SetPath(_gridManager.GetPathWaypoints(routeIndex));
         }
 
+        RegisterEnemy(enemy, routeIndex);
+    }
+
+    /// <summary>
+    /// Hooks an enemy into the normal lifecycle: reached-end/destroyed handlers, boss
+    /// tracking (reference only, never a list scan), the summon roll source, and the
+    /// active list. Shared by wave spawns and boss summons.
+    /// </summary>
+    private void RegisterEnemy(Enemy enemy, int routeIndex)
+    {
+        enemy.ReachedEnd += OnEnemyReachedEnd;
+        enemy.Destroyed += OnEnemyDestroyed;
+
+        if (enemy.Kind == EnemyKind.Progenitor)
+        {
+            _activeBoss = enemy;
+            _bossRouteIndex = routeIndex;
+            enemy.SetSummonRandom(SummonRandom);
+            enemy.SummonReady += OnBossSummonReady;
+        }
+
         _activeEnemies.Add(enemy);
+    }
+
+    /// <summary>
+    /// Inverse of <see cref="RegisterEnemy"/>: unhooks every lifecycle signal and, if
+    /// this was the boss, stops future summons by clearing the tracked reference.
+    /// </summary>
+    private void UnregisterEnemy(Enemy enemy)
+    {
+        enemy.ReachedEnd -= OnEnemyReachedEnd;
+        enemy.Destroyed -= OnEnemyDestroyed;
+
+        if (enemy.Kind == EnemyKind.Progenitor)
+        {
+            enemy.SummonReady -= OnBossSummonReady;
+            if (ReferenceEquals(_activeBoss, enemy))
+                _activeBoss = null;
+        }
+    }
+
+    /// <summary>
+    /// A Progenitor finished its summon windup. Releases the rolled squad into the
+    /// normal enemy lifecycle: each member is acquired from the shared enemy pool,
+    /// configured as its rolled kind, started at the boss's current waypoint index, and
+    /// anchored at the lead point ahead of the boss on the same route. The static ring
+    /// spread is applied as the formation offset with zero orbit speed. Summons are
+    /// counted by WaveManager and worth zero coins, so the wave stays active while any
+    /// of them is alive.
+    /// </summary>
+    private void OnBossSummonReady(Enemy boss)
+    {
+        if (_state != GameState.Playing || _waveManager == null || _gridManager == null)
+            return;
+
+        int count = boss.PendingSummonCount;
+        if (count <= 0)
+            return;
+
+        var waypoints = _gridManager.GetPathWaypoints(_bossRouteIndex);
+
+        // A boss that has reached the base is walking off GridManager's synthetic exit
+        // waypoint; spawning adds there would drop them on/past the base, where they
+        // would leak within a frame or two for unavoidable HP loss. Reaching the base
+        // stops all future summons, so drop the pending squad.
+        if (waypoints.Count == 0 || boss.HasReachedBase)
+        {
+            boss.ClearPendingSummon();
+            return;
+        }
+
+        var offsets = GetSummonOffsets(count);
+        Vector2 leadAnchor = boss.GetSummonLeadPoint();
+        int waypointIndex = boss.CurrentWaypointIndex;
+
+        for (int i = 0; i < count; i++)
+        {
+            EnemyKind kind = boss.PendingSummonKind(i);
+            var add = _waveManager.SpawnSummon(kind, waypoints, waypointIndex, leadAnchor, offsets[i]);
+            if (add == null)
+                continue;
+
+            RegisterEnemy(add, _bossRouteIndex);
+        }
+
+        boss.ClearPendingSummon();
+    }
+
+    /// <summary>
+    /// Static ring offsets for a summon squad, cached per squad size. The layouts come
+    /// from WaveManager.GenerateClusterOffsets with the Progenitor's offset radius, so a
+    /// squad spreads around its lead anchor without overlapping — but, unlike a swarm
+    /// cluster, these adds never orbit.
+    /// </summary>
+    private Vector2[] GetSummonOffsets(int count)
+    {
+        int size = Mathf.Clamp(count, 1, GameConstants.ProgenitorMaxSquadSize);
+        var cached = _summonOffsetsBySquadSize[size];
+        if (cached != null)
+            return cached;
+
+        var generated = WaveManager.GenerateClusterOffsets(size, GameConstants.ProgenitorSummonOffsetRadius);
+        var offsets = new Vector2[size];
+        for (int i = 0; i < size; i++)
+            offsets[i] = generated[i];
+
+        _summonOffsetsBySquadSize[size] = offsets;
+        return offsets;
     }
 
     private void OnEnemyReachedEnd(Enemy enemy)
@@ -495,8 +642,7 @@ public partial class GameManager : Node2D
         _activeEnemies.Remove(enemy);
 
         // Disconnect signals before returning to pool
-        enemy.ReachedEnd -= OnEnemyReachedEnd;
-        enemy.Destroyed -= OnEnemyDestroyed;
+        UnregisterEnemy(enemy);
 
         // Don't process more HP loss if game is already over
         if (_state == GameState.GameOver)
@@ -506,12 +652,17 @@ public partial class GameManager : Node2D
             return;
         }
 
-        _hp--;
+        // Every kind costs one HP except a boss with its own base-damage constant.
+        _hp -= enemy.BaseDamage;
 
         if (_hp <= 0)
         {
             _hp = 0;
             _state = GameState.GameOver;
+
+            // Stop the wave timer immediately on defeat. Without this the spawn timer
+            // keeps firing after game over and keeps adding enemies to a finished run.
+            _waveManager?.StopSpawning();
         }
 
         EmitSignal(SignalName.HpChanged, _hp);
@@ -538,10 +689,11 @@ public partial class GameManager : Node2D
     {
         _activeEnemies.Remove(enemy);
 
-        // Disconnect signals before returning to pool
-        enemy.ReachedEnd -= OnEnemyReachedEnd;
-        enemy.Destroyed -= OnEnemyDestroyed;
+        // Disconnect signals before returning to pool. For the boss this also stops
+        // all future summons; already-spawned adds keep walking and stay counted.
+        UnregisterEnemy(enemy);
 
+        // Summoned enemies carry CoinDrop = 0, so their kills award nothing.
         _coins += enemy.CoinDrop;
 
         EmitSignal(SignalName.CoinsChanged, _coins);
@@ -672,6 +824,13 @@ public partial class GameManager : Node2D
 
     private void OnAllWavesCompleted()
     {
+        // A defeat can complete the final wave synchronously: OnEnemyReachedEnd sets
+        // GameOver, then its NotifyEnemyReachedEnd call can empty the wave and fire
+        // this signal. Victory must never overwrite a defeat (which would also award
+        // victory SP and suppress the GameOver signal/defeat SP).
+        if (_state != GameState.Playing)
+            return;
+
         _state = GameState.Victory;
 
         // Award victory SP once before flushing.
@@ -751,12 +910,16 @@ public partial class GameManager : Node2D
         {
             if (IsInstanceValid(enemy))
             {
-                enemy.ReachedEnd -= OnEnemyReachedEnd;
-                enemy.Destroyed -= OnEnemyDestroyed;
+                UnregisterEnemy(enemy);
                 _enemyPool?.Release(enemy);
             }
         }
         _activeEnemies.Clear();
+
+        // Stop all boss summon timers: after a reset nothing may tick a stale boss or
+        // emit a summon callback into a torn-down level.
+        _activeBoss = null;
+        _bossRouteIndex = 0;
 
         // Release active projectiles back to pool
         foreach (var projectile in _activeProjectiles)

@@ -376,15 +376,40 @@ func _evaluate_title_screen(title_screen: Node) -> void:
     if menu_block == null:
         return
 
+    # Expected catalog, stated from the spec independently of the scene. The button
+    # enumeration is fail-closed below: the actual direct Button children of the group
+    # must match this list exactly, so a button added (or removed) without updating the
+    # verifier produces a finding instead of silently passing unmeasured.
+    var expected_menu_buttons := ["Level1", "Level2", "Level3", "Level4", "Level5", "SkillTree"]
+    var actual_menu_buttons := []
+    for child in menu_block.get_children():
+        if child is Button:
+            actual_menu_buttons.append(String(child.name))
+    actual_menu_buttons.sort()
+    var sorted_expected_buttons := expected_menu_buttons.duplicate()
+    sorted_expected_buttons.sort()
+    _check(
+        "title.menu.button_catalog",
+        "TitleScreen/Block_LevelMenu",
+        "buttons=%s" % str(actual_menu_buttons),
+        "buttons=%s (exact direct Button set)" % str(sorted_expected_buttons),
+        actual_menu_buttons == sorted_expected_buttons,
+        "Enumerate every title menu button here when adding one; an unlisted button must fail, not go unmeasured.",
+        TITLE_SOURCE,
+        "WARNING"
+    )
+
     var menu_rect: Rect2 = menu_block.get_global_rect()
     var previous: Rect2 = Rect2()
     var has_previous := false
-    for button_name in ["Level1", "Level2", "Level3", "Level4", "SkillTree"]:
+    var menu_button_rects := []
+    for button_name in expected_menu_buttons:
         var button := _require(menu_block, button_name, "TitleScreen/Block_LevelMenu", TITLE_SOURCE)
         if button == null:
             continue
 
         var rect: Rect2 = button.get_global_rect()
+        menu_button_rects.append(rect)
         var group := "TitleScreen/Block_LevelMenu/%s" % button_name
         _check_centered_on_viewport(
             "title.menu.%s.centered" % button_name, group, rect,
@@ -405,6 +430,33 @@ func _evaluate_title_screen(title_screen: Node) -> void:
             )
         previous = rect
         has_previous = true
+
+    # The per-button check above only proves each gap is positive. The acceptance
+    # criterion is a *uniform* stack, so compare every gap against the first one.
+    # Every catalog button is required; a missing button is already a separate finding,
+    # and the count clause keeps this assertion from passing vacuously on a short stack.
+    var menu_gaps := []
+    var uniform_gap: bool = menu_button_rects.size() == expected_menu_buttons.size()
+    var first_gap := 0.0
+    if menu_button_rects.size() >= 2:
+        first_gap = menu_button_rects[1].position.y - menu_button_rects[0].end.y
+        for i in range(1, menu_button_rects.size()):
+            var gap: float = menu_button_rects[i].position.y - menu_button_rects[i - 1].end.y
+            menu_gaps.append(gap)
+            uniform_gap = uniform_gap and _approx(gap, first_gap)
+
+    _check(
+        "title.menu.uniform_stack_gap",
+        "TitleScreen/Block_LevelMenu",
+        "buttons=%d gaps=%s" % [menu_button_rects.size(), str(menu_gaps)],
+        "buttons=%d and every gap=%.2f (uniform, within %.2f)" % [
+            expected_menu_buttons.size(), first_gap, EPS,
+        ],
+        uniform_gap,
+        "Stack all menu buttons with one uniform gap; a non-uniform gap breaks the uniform stack.",
+        TITLE_SOURCE,
+        "WARNING"
+    )
 
 
 func _evaluate_result_screen(result_screen: Node) -> void:

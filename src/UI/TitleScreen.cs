@@ -14,6 +14,17 @@ public partial class TitleScreen : Control
     [Signal]
     public delegate void SkillTreePressedEventHandler();
 
+    // Menu column geometry. Five level buttons plus the Skill Tree button share one
+    // uniform stack; the block is sized from these constants so adding a button can
+    // never silently push one outside the block or overlap its neighbour.
+    private const float MenuButtonWidth = 240f;
+    private const float MenuButtonHeight = 50f;
+    private const float MenuButtonGap = 12f;
+    private const float MenuButtonPitch = MenuButtonHeight + MenuButtonGap;
+    private const int MenuButtonCount = 6;
+    private const float MenuTopOffsetFromCenter = 10f;
+    private const float InstructionsGap = 16f;
+
     public override void _Ready()
     {
         var viewportSize = GetViewportRect().Size;
@@ -55,26 +66,32 @@ public partial class TitleScreen : Control
         subtitle.AddThemeColorOverride("font_color", new Color(0.6f, 0.6f, 0.8f));
         titleBlock.AddChild(subtitle);
 
-        // Level selection buttons, grouped as one named visual group.
+        // Level selection buttons, grouped as one named visual group. The block spans
+        // the whole six-button stack, so every button (including the Skill Tree) is
+        // inside Block_LevelMenu with a uniform gap and the group stays centered.
+        float menuTop = viewportSize.Y / 2f + MenuTopOffsetFromCenter;
+        float menuHeight = (MenuButtonCount - 1) * MenuButtonPitch + MenuButtonHeight;
+
         var menuBlock = new Control();
         menuBlock.Name = "Block_LevelMenu";
-        menuBlock.Position = new Vector2(viewportSize.X / 2f - 120, viewportSize.Y / 2f + 40);
-        menuBlock.Size = new Vector2(240, 330);
+        menuBlock.Position = new Vector2(viewportSize.X / 2f - MenuButtonWidth / 2f, menuTop);
+        menuBlock.Size = new Vector2(MenuButtonWidth, menuHeight);
         menuBlock.MouseFilter = MouseFilterEnum.Ignore;
         AddChild(menuBlock);
 
-        CreateMenuButton(menuBlock, "Level1", "Level 1", 0, () => EmitSignal(SignalName.LevelSelected, Levels.Level1.Id));
-        CreateMenuButton(menuBlock, "Level2", "Level 2", 70, () => EmitSignal(SignalName.LevelSelected, Levels.Level2.Id));
-        CreateMenuButton(menuBlock, "Level3", "Level 3", 140, () => EmitSignal(SignalName.LevelSelected, Levels.Level3.Id));
-        CreateMenuButton(menuBlock, "Level4", "Level 4", 210, () => EmitSignal(SignalName.LevelSelected, Levels.Level4.Id));
+        CreateMenuButton(menuBlock, "Level1", "Level 1", 0 * MenuButtonPitch, () => EmitSignal(SignalName.LevelSelected, Levels.Level1.Id));
+        CreateMenuButton(menuBlock, "Level2", "Level 2", 1 * MenuButtonPitch, () => EmitSignal(SignalName.LevelSelected, Levels.Level2.Id));
+        CreateMenuButton(menuBlock, "Level3", "Level 3", 2 * MenuButtonPitch, () => EmitSignal(SignalName.LevelSelected, Levels.Level3.Id));
+        CreateMenuButton(menuBlock, "Level4", "Level 4", 3 * MenuButtonPitch, () => EmitSignal(SignalName.LevelSelected, Levels.Level4.Id));
+        CreateMenuButton(menuBlock, "Level5", "Level 5", 4 * MenuButtonPitch, () => EmitSignal(SignalName.LevelSelected, Levels.Level5.Id));
 
         // Skill tree navigation button
-        CreateMenuButton(menuBlock, "SkillTree", "Skill Tree", 280, () => EmitSignal(SignalName.SkillTreePressed));
+        CreateMenuButton(menuBlock, "SkillTree", "Skill Tree", 5 * MenuButtonPitch, () => EmitSignal(SignalName.SkillTreePressed));
 
-        // Instructions text
+        // Instructions text, placed below the menu block so six buttons never overlap it.
         var instructionsBlock = new Control();
         instructionsBlock.Name = "Block_Instructions";
-        instructionsBlock.Position = new Vector2(0, viewportSize.Y / 2f + 400);
+        instructionsBlock.Position = new Vector2(0, menuTop + menuHeight + InstructionsGap);
         instructionsBlock.Size = new Vector2(viewportSize.X, 60);
         instructionsBlock.MouseFilter = MouseFilterEnum.Ignore;
         AddChild(instructionsBlock);
@@ -101,7 +118,7 @@ public partial class TitleScreen : Control
         button.Name = name;
         button.Text = label;
         button.Position = new Vector2(0, yOffset);
-        button.Size = new Vector2(240, 50);
+        button.Size = new Vector2(MenuButtonWidth, MenuButtonHeight);
         button.Pressed += onPressed;
         button.AddThemeFontSizeOverride("font_size", 22);
         parent.AddChild(button);

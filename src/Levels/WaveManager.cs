@@ -167,12 +167,20 @@ public partial class WaveManager : Node
             return;
 
         var spawn = _pendingSpawns.Dequeue();
+        var (kind, count) = WaveDefinition.Resolve(spawn);
+
+        if (kind == EnemyKind.Progenitor)
+        {
+            // The boss always enters on the level's middle route, independent of the
+            // round-robin counter. Deliberately does NOT advance _routeCounter, so the
+            // surrounding wave events keep their normal round-robin assignment.
+            SpawnEnemy(kind, Vector2.Zero, BossRouteIndex(_level.Paths.Count));
+            return;
+        }
 
         // One route per spawn EVENT: a SwarmCluster is a single event, so all of
         // its members share this route index (they never straddle two routes).
         int routeIndex = NextRouteIndex(ref _routeCounter, _level.Paths.Count);
-
-        var (kind, count) = WaveDefinition.Resolve(spawn);
 
         if (count == 1)
         {
@@ -186,6 +194,13 @@ public partial class WaveManager : Node
                 SpawnEnemy(kind, offset, routeIndex);
         }
     }
+
+    /// <summary>
+    /// The route a Progenitor always enters on: the level's middle route. For Level 5's
+    /// three routes this is index 1. Independent of the round-robin counter.
+    /// </summary>
+    public static int BossRouteIndex(int routeCount) =>
+        routeCount <= 0 ? 0 : routeCount / 2;
 
     /// <summary>
     /// Computes the round-robin route index for the next spawn event and advances
@@ -224,22 +239,71 @@ public partial class WaveManager : Node
 
     private void SpawnEnemy(EnemyKind kind, Vector2 offset, int routeIndex)
     {
+        // Swarm members orbit their anchor; other kinds stay fixed (zero angular speed).
+        float angularSpeed = kind == EnemyKind.Swarm
+            ? GameConstants.SwarmClusterRotationSpeed
+            : 0f;
+        var enemy = PrepareEnemy(kind, offset, angularSpeed);
+        if (enemy == null)
+            return;
+
+        EmitSignal(SignalName.EnemySpawned, enemy, routeIndex);
+    }
+
+    /// <summary>
+    /// Acquires and configures one enemy from the pool, places it at the given formation
+    /// offset, and counts it toward the wave's live total. Shared by wave spawns and boss
+    /// summons so both follow the same pool/lifecycle path. Returns null when the level
+    /// is gone (a mid-reset callback).
+    /// </summary>
+    private Enemy? PrepareEnemy(EnemyKind kind, Vector2 offset, float angularSpeed)
+    {
+        if (_enemyPool == null)
+            return null;
+
         // Acquire enemy from pool, resetting its state for reuse
-        var enemy = _enemyPool!.Acquire();
+        var enemy = _enemyPool.Acquire();
         enemy.ResetForPool();
         enemy.Configure(kind);
 
         // Set the formation offset before the spawn signal: GameManager.OnEnemySpawned
         // calls SetPath inside the handler, which places the enemy at anchor + offset.
-        // Swarm members orbit their anchor; basic enemies stay fixed (zero angular speed).
-        float angularSpeed = kind == EnemyKind.Swarm
-            ? GameConstants.SwarmClusterRotationSpeed
-            : 0f;
         enemy.SetFormationOffset(offset, angularSpeed);
 
+        // Summons and wave spawns both count toward the live total, so a wave — and in
+        // particular the final wave — cannot complete while any of them is alive.
         _enemiesAliveThisWave++;
 
-        EmitSignal(SignalName.EnemySpawned, enemy, routeIndex);
+        return enemy;
+    }
+
+    /// <summary>
+    /// Spawns one boss-summoned enemy at the boss's current route progress: the given
+    /// waypoint index and anchor (already lead-shifted and corner-clamped by the
+    /// caller). Every slot produces exactly one enemy — a Swarm slot is a single small
+    /// circle, not a 3-member cluster — placed with a static ring offset (zero orbit
+    /// speed), worth zero coins, and counted toward the wave's live total. The enemy is
+    /// returned unregistered; GameManager wires its lifecycle signals.
+    /// </summary>
+    public Enemy? SpawnSummon(
+        EnemyKind kind,
+        List<Vector2> waypoints,
+        int waypointIndex,
+        Vector2 anchorPosition,
+        Vector2 offset)
+    {
+        if (_level == null || waypoints.Count == 0)
+            return null;
+
+        var enemy = PrepareEnemy(kind, offset, angularSpeed: 0f);
+        if (enemy == null)
+            return null;
+
+        // Summons are worth nothing, so they can never be farmed for coins.
+        enemy.SetCoinDrop(0);
+        enemy.StartAtProgress(waypoints, waypointIndex, anchorPosition);
+
+        return enemy;
     }
 
     /// <summary>

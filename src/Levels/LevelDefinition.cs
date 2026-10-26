@@ -6,13 +6,15 @@ namespace GeometryTowerDefense;
 
 /// <summary>
 /// A single spawn entry in a wave. Basic spawns one basic enemy; SwarmCluster
-/// spawns a tight cluster of three swarm enemies; Armored spawns one armored enemy.
+/// spawns a tight cluster of three swarm enemies; Armored spawns one armored enemy;
+/// Progenitor spawns the boss (always on the level's middle route).
 /// </summary>
 public enum SpawnKind
 {
     Basic,
     SwarmCluster,
-    Armored
+    Armored,
+    Progenitor
 }
 
 /// <summary>
@@ -43,7 +45,7 @@ public class WaveDefinition
 
     /// <summary>
     /// Maps a spawn kind to the enemy kind it produces and how many enemies it
-    /// spawns. Basic and Armored produce one enemy; SwarmCluster produces
+    /// spawns. Basic, Armored, and Progenitor produce one enemy; SwarmCluster produces
     /// GameConstants.SwarmClusterSize swarm enemies. This is the single source of
     /// truth for the spawn-kind mapping — a new enemy kind is added here only.
     /// </summary>
@@ -51,6 +53,7 @@ public class WaveDefinition
     {
         SpawnKind.Basic => (EnemyKind.Basic, 1),
         SpawnKind.Armored => (EnemyKind.Armored, 1),
+        SpawnKind.Progenitor => (EnemyKind.Progenitor, 1),
         SpawnKind.SwarmCluster => (EnemyKind.Swarm, GameConstants.SwarmClusterSize),
         _ => throw new System.ArgumentOutOfRangeException(nameof(spawn), spawn, "Unknown spawn kind.")
     };

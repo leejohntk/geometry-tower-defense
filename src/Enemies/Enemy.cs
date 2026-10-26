@@ -5,13 +5,15 @@ namespace GeometryTowerDefense;
 
 /// <summary>
 /// Identifies an enemy variant. Basic is a red circle; Swarm is a smaller orange circle;
-/// Armored is a grey square (diamond) with flat damage reduction.
+/// Armored is a grey square (diamond) with flat damage reduction; Progenitor is the
+/// large magenta octagon boss that summons squads ahead of itself.
 /// </summary>
 public enum EnemyKind
 {
     Basic,
     Swarm,
-    Armored
+    Armored,
+    Progenitor
 }
 
 /// <summary>
@@ -25,6 +27,13 @@ public partial class Enemy : Node2D
 
     [Signal]
     public delegate void DestroyedEventHandler(Enemy enemy);
+
+    // Emitted by the Progenitor when a summon windup completes. The rolled squad stays
+    // pending (PendingSummonCount/Kind) until the consumer clears it, so the sweep of
+    // squad members spawns synchronously from one signal with no collection passed
+    // through the signal system.
+    [Signal]
+    public delegate void SummonReadyEventHandler(Enemy boss);
 
     private List<Vector2> _waypoints = new();
     private int _currentWaypointIndex = 0;
@@ -67,6 +76,23 @@ public partial class Enemy : Node2D
     private Vector2[] _diamondPoints = System.Array.Empty<Vector2>();
     private Vector2[] _insetPoints = System.Array.Empty<Vector2>();
     private readonly Color[] _fillColorArray = new Color[1];
+
+    // Progenitor summon state machine. Timers are ticked in GameManager's centralized
+    // boss pass (never in _Process), and every field is cleared by ApplyConfig /
+    // ResetForPool so a pooled boss never leaks phase, cooldown, windup, or pending
+    // composition into a normal-enemy reuse. The pending buffer is fixed-size and
+    // reused, so a summon rolls its squad without allocating.
+    private int _summonPhase = ProgenitorSummons.FirstPhase;
+    private float _summonCountdown = 0f;
+    private float _summonWindupRemaining = 0f;
+    private int _pendingSummonCount = 0;
+    private readonly EnemyKind[] _pendingSummonKinds = new EnemyKind[GameConstants.ProgenitorMaxSquadSize];
+    private SkillRandom _summonRolls = SkillRandom.Default;
+
+    // Cached octagon geometry for the Progenitor (fill ring + closed outline), rebuilt
+    // on Configure like the armored diamond.
+    private Vector2[] _octagonPoints = System.Array.Empty<Vector2>();
+    private Vector2[] _octagonOutlinePoints = System.Array.Empty<Vector2>();
 
     /// <summary>
     /// The kind this enemy is currently configured as.
@@ -152,6 +178,81 @@ public partial class Enemy : Node2D
     /// </summary>
     public float FormationAngularSpeed => _formationAngularSpeed;
 
+    /// <summary>
+    /// True while this enemy is configured as the Progenitor boss.
+    /// </summary>
+    public bool IsProgenitor => Kind == EnemyKind.Progenitor;
+
+    /// <summary>
+    /// Current summon phase (1..3). Always 1 for non-Progenitor enemies.
+    /// </summary>
+    public int SummonPhase => _summonPhase;
+
+    /// <summary>
+    /// Seconds until the next summon windup begins. Zero for non-Progenitor enemies.
+    /// </summary>
+    public float SummonCountdown => _summonCountdown;
+
+    /// <summary>
+    /// True during the 0.5 s summon windup: movement is slowed and the pulse ring is
+    /// visible.
+    /// </summary>
+    public bool IsSummoning => _summonWindupRemaining > 0f;
+
+    /// <summary>
+    /// Number of rolled squad members waiting to be spawned by the summon consumer.
+    /// Zero when no windup has completed (or after the consumer clears it).
+    /// </summary>
+    public int PendingSummonCount => _pendingSummonCount;
+
+    /// <summary>
+    /// Base movement speed in cells/sec before the windup slow multiplier.
+    /// </summary>
+    public float Speed => _speed;
+
+    /// <summary>
+    /// Speed actually used for movement this tick: the base speed multiplied by
+    /// ProgenitorSummonSlowFactor during a summon windup.
+    /// </summary>
+    public float CurrentSpeed => IsProgenitor && _summonWindupRemaining > 0f
+        ? _speed * GameConstants.ProgenitorSummonSlowFactor
+        : _speed;
+
+    /// <summary>
+    /// Player HP lost if this enemy reaches the base. The Progenitor uses its own
+    /// constant; every other kind costs one HP, matching pre-boss behavior.
+    /// </summary>
+    public int BaseDamage => IsProgenitor
+        ? GameConstants.ProgenitorBaseDamage
+        : 1;
+
+    /// <summary>
+    /// The waypoint index this enemy is currently moving toward. Summons start with the
+    /// boss's index so they continue along the same route.
+    /// </summary>
+    public int CurrentWaypointIndex => _currentWaypointIndex;
+
+    /// <summary>
+    /// The point on the route this enemy follows. Position is always
+    /// AnchorPosition + FormationOffset.
+    /// </summary>
+    public Vector2 AnchorPosition => _anchorPosition;
+
+    /// <summary>
+    /// Border color for the current phase. Shifts white -> amber -> red as HP falls.
+    /// </summary>
+    public Color PhaseBorderColor => ProgenitorSummons.BorderColorForPhase(_summonPhase);
+
+    /// <summary>
+    /// True once this enemy has reached the base: the last real route cell is index
+    /// Count-2, and GridManager appends one synthetic "one cell past the base" exit
+    /// waypoint at Count-1. An enemy whose index has advanced to Count-1 is walking off
+    /// that exit cell — it has already reached the base, so it must not be used as a
+    /// summon anchor (adds spawned there would leak within a frame or two).
+    /// </summary>
+    public bool HasReachedBase =>
+        _waypoints.Count > 0 && _currentWaypointIndex >= _waypoints.Count - 1;
+
     public override void _Ready()
     {
         ApplyConfig(EnemyKind.Basic);
@@ -161,6 +262,11 @@ public partial class Enemy : Node2D
     private void ApplyConfig(EnemyKind kind)
     {
         Kind = kind;
+
+        // Every (re)configuration starts from a clean summon state; the Progenitor
+        // branch below re-seeds its phase machine. This is what keeps a pooled boss
+        // from leaking phase/windup/coin state when reused as a normal enemy.
+        ResetSummonState();
 
         switch (kind)
         {
@@ -193,10 +299,55 @@ public partial class Enemy : Node2D
                 _borderColor = new Color(0.3f, 0.3f, 0.35f);  // Darker grey border
                 CoinDrop = GameConstants.ArmoredCoinDropPerKill;
                 break;
+
+            case EnemyKind.Progenitor:
+                _maxHP = GameConstants.ProgenitorHP;
+                _armor = GameConstants.ProgenitorArmor;
+                _speed = GameConstants.ProgenitorSpeed;
+                _diameter = GameConstants.ProgenitorDiameter;
+                _fillColor = GameConstants.ProgenitorFillColor;
+                // The border is drawn from the live phase (PhaseBorderColor), not a
+                // cached field, so it shifts white -> amber -> red as HP falls.
+                CoinDrop = GameConstants.ProgenitorCoinDrop;
+                // The timer starts at spawn and counts down to the first interval — the
+                // boss never summons on the frame it appears.
+                _summonCountdown = ProgenitorSummons.IntervalForPhase(_summonPhase);
+                break;
         }
 
         _currentHP = _maxHP;
         _isDead = false;
+    }
+
+    /// <summary>
+    /// Clears every Progenitor-only field to its default. Called on every (re)configure
+    /// and on pool reset, so no boss state can survive into a reuse.
+    /// </summary>
+    private void ResetSummonState()
+    {
+        _summonPhase = ProgenitorSummons.FirstPhase;
+        _summonCountdown = 0f;
+        _summonWindupRemaining = 0f;
+        _pendingSummonCount = 0;
+    }
+
+    /// <summary>
+    /// Sets the injectable roll source used for summon composition. Tests pass a
+    /// scripted source; production leaves the seeded default. A null source falls back
+    /// to the shared seeded default rather than ever rolling from an unseeded source.
+    /// </summary>
+    public void SetSummonRandom(SkillRandom? rolls)
+    {
+        _summonRolls = rolls ?? SkillRandom.Default;
+    }
+
+    /// <summary>
+    /// Zero-coin override used by summons so they cannot be farmed. Configure resets the
+    /// coin value for the kind, so this is applied after Configure.
+    /// </summary>
+    public void SetCoinDrop(int coins)
+    {
+        CoinDrop = Mathf.Max(0, coins);
     }
 
     /// <summary>
@@ -222,6 +373,7 @@ public partial class Enemy : Node2D
     {
         // Geometry is diameter-dependent; rebuild on configure (not per draw).
         RebuildArmoredGeometry();
+        RebuildProgenitorGeometry();
 
         if (_circleContainer == null) return;
 
@@ -261,6 +413,35 @@ public partial class Enemy : Node2D
         };
     }
 
+    /// <summary>
+    /// Rebuilds the cached octagon fill/outline vertex arrays from the current
+    /// diameter. No-op for non-Progenitor kinds.
+    /// </summary>
+    private void RebuildProgenitorGeometry()
+    {
+        if (!IsProgenitor)
+            return;
+
+        const int sides = 8;
+        float diameter = _diameter;
+        Vector2 center = new Vector2(diameter / 2f, diameter / 2f);
+        float radius = diameter / 2f;
+
+        _octagonPoints = new Vector2[sides];
+        _octagonOutlinePoints = new Vector2[sides + 1];
+
+        for (int i = 0; i < sides; i++)
+        {
+            float angle = Mathf.Tau * i / sides;
+            Vector2 point = center + new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * radius;
+            _octagonPoints[i] = point;
+            _octagonOutlinePoints[i] = point;
+        }
+
+        // Close the outline polyline back to the first vertex.
+        _octagonOutlinePoints[sides] = _octagonOutlinePoints[0];
+    }
+
     private void DrawEnemyShape(Control container)
     {
         if (!IsInstanceValid(container)) return;
@@ -268,6 +449,26 @@ public partial class Enemy : Node2D
         float radius = _diameter / 2f;
         Vector2 center = new Vector2(_diameter / 2f, _diameter / 2f);
         Color fill = EffectiveFillColor();
+
+        if (IsProgenitor)
+        {
+            // Geometry is rebuilt on Configure; drawing before that (or after a
+            // partial teardown) must not touch an empty vertex array.
+            if (_octagonPoints.Length == 0)
+                return;
+
+            // Large octagon with a thick phase-colored border, plus the geometric HP
+            // bar and (mid-windup) the telegraph pulse ring.
+            _fillColorArray[0] = fill;
+            container.DrawPolygon(_octagonPoints, _fillColorArray);
+            container.DrawPolyline(
+                _octagonOutlinePoints,
+                PhaseBorderColor,
+                GameConstants.ProgenitorBorderWidth);
+            DrawProgenitorHealthBar(container, center);
+            DrawSummonPulseRing(container, center, radius);
+            return;
+        }
 
         if (Kind == EnemyKind.Armored)
         {
@@ -284,6 +485,83 @@ public partial class Enemy : Node2D
 
         // Dark border
         container.DrawCircle(center, radius - 2, _borderColor, false, 2.0f);
+    }
+
+    /// <summary>
+    /// Draws the boss health bar above the octagon: dark track, phase-colored fill, a
+    /// thin outline, and tick marks exactly at the 66% and 33% phase thresholds. All
+    /// coordinates are container-local; the bar lives above the octagon's top edge.
+    /// </summary>
+    private void DrawProgenitorHealthBar(Control container, Vector2 center)
+    {
+        float barWidth = _diameter * GameConstants.ProgenitorHealthBarWidthRatio;
+        float barHeight = GameConstants.ProgenitorHealthBarHeight;
+        float left = center.X - barWidth / 2f;
+        float top = -GameConstants.ProgenitorHealthBarGap - barHeight;
+
+        var track = new Rect2(left, top, barWidth, barHeight);
+        container.DrawRect(track, new Color(0.08f, 0.02f, 0.06f, 0.9f));
+
+        float fraction = _maxHP > 0f ? Mathf.Clamp(_currentHP / _maxHP, 0f, 1f) : 0f;
+        if (fraction > 0f)
+        {
+            var fillRect = new Rect2(left, top, barWidth * fraction, barHeight);
+            container.DrawRect(fillRect, PhaseBorderColor);
+        }
+
+        container.DrawRect(track, new Color(0.95f, 0.9f, 0.95f, 0.9f), filled: false, width: 1f);
+
+        // Tick marks at the phase thresholds (33% then 66%), drawn individually so the
+        // draw path allocates nothing.
+        var tickColor = new Color(0.95f, 0.9f, 0.95f, 0.85f);
+        DrawHealthBarTick(container, left, top, barWidth, barHeight, ProgenitorSummons.Phase3ThresholdHP(_maxHP), tickColor);
+        DrawHealthBarTick(container, left, top, barWidth, barHeight, ProgenitorSummons.Phase2ThresholdHP(_maxHP), tickColor);
+    }
+
+    private void DrawHealthBarTick(
+        Control container,
+        float left,
+        float top,
+        float barWidth,
+        float barHeight,
+        int thresholdHP,
+        Color color)
+    {
+        if (!(_maxHP > 0f))
+            return;
+
+        float x = left + barWidth * (thresholdHP / _maxHP);
+        container.DrawLine(new Vector2(x, top), new Vector2(x, top + barHeight), color, 1.0f);
+    }
+
+    /// <summary>
+    /// Draws the telegraph ring that expands during the summon windup, so the squad
+    /// spawn is always visible before it happens. Draws nothing outside a windup.
+    /// </summary>
+    private void DrawSummonPulseRing(Control container, Vector2 center, float radius)
+    {
+        if (_summonWindupRemaining <= 0f)
+            return;
+
+        float duration = GameConstants.ProgenitorSummonWindup;
+        float progress = duration > 0f
+            ? Mathf.Clamp(1f - _summonWindupRemaining / duration, 0f, 1f)
+            : 1f;
+        float pulseRadius = radius * Mathf.Lerp(
+            GameConstants.ProgenitorPulseStartScale,
+            GameConstants.ProgenitorPulseEndScale,
+            progress);
+
+        Color pulse = GameConstants.ProgenitorPulseColor with { A = 1f - 0.5f * progress };
+        container.DrawArc(
+            center,
+            pulseRadius,
+            0f,
+            Mathf.Tau,
+            GameConstants.ProgenitorPulseSegments,
+            pulse,
+            3.0f,
+            antialiased: true);
     }
 
     /// <summary>
@@ -372,6 +650,131 @@ public partial class Enemy : Node2D
         }
     }
 
+    /// <summary>
+    /// Starts this enemy partway along a path — at <paramref name="waypointIndex"/>
+    /// with its anchor already at <paramref name="anchorPosition"/>. Used by boss
+    /// summons so an add continues along the boss's route from the boss's current
+    /// progress instead of restarting at the spawn cell. The formation offset is kept,
+    /// so Position is anchor + offset.
+    /// </summary>
+    public void StartAtProgress(List<Vector2> waypoints, int waypointIndex, Vector2 anchorPosition)
+    {
+        // GridManager's waypoint list appends a synthetic one-cell-past-base exit
+        // waypoint, so the last index (Count-1) is not a spawnable route position: an
+        // enemy starting there would leak within a frame or two. Clamp to the last real
+        // route cell (Count-2) so no caller can ever start an enemy on the exit.
+        int maxIndex = waypoints.Count >= 2 ? waypoints.Count - 2 : 0;
+
+        _waypoints = waypoints;
+        _currentWaypointIndex = Mathf.Clamp(waypointIndex, 0, maxIndex);
+        _anchorPosition = anchorPosition;
+        _isDead = false;
+        Position = _anchorPosition + _formationOffset;
+    }
+
+    /// <summary>
+    /// The point on this enemy's route where a summon squad should appear: the boss's
+    /// current anchor pushed ProgenitorSummonLeadDistance px toward the waypoint it is
+    /// approaching, clamped to that waypoint so the lead never cuts a corner. Returns
+    /// the anchor unchanged once the route is finished.
+    /// </summary>
+    public Vector2 GetSummonLeadPoint()
+    {
+        if (_currentWaypointIndex < 0 || _currentWaypointIndex >= _waypoints.Count)
+            return _anchorPosition;
+
+        return ProgenitorSummons.LeadPoint(
+            _anchorPosition,
+            _waypoints[_currentWaypointIndex],
+            GameConstants.ProgenitorSummonLeadDistance);
+    }
+
+    /// <summary>
+    /// Advances the Progenitor summon state machine by one frame. Called once per frame
+    /// by GameManager's centralized boss pass — never from _Process — so the boss adds
+    /// no per-node update loop and no enemy-list scan.
+    /// Allocating nothing: composition rolls write into the fixed pending buffer.
+    /// </summary>
+    public void TickProgenitorSummon(float delta)
+    {
+        if (!IsProgenitor || _isDead || !(delta > 0f))
+            return;
+
+        if (_summonWindupRemaining > 0f)
+        {
+            _summonWindupRemaining = Mathf.Max(0f, _summonWindupRemaining - delta);
+
+            if (_summonWindupRemaining > 0f)
+            {
+                // The pulse ring expands every frame for the (short) windup only.
+                RedrawVisual();
+                return;
+            }
+
+            // Reset the cooldown only once the squad actually spawns. A phase change
+            // during the windup therefore applies to the next summon, not this one.
+            _summonCountdown = ProgenitorSummons.IntervalForPhase(_summonPhase);
+            RedrawVisual();
+            EmitSignal(SignalName.SummonReady, this);
+            return;
+        }
+
+        _summonCountdown -= delta;
+        if (_summonCountdown <= 0f)
+            BeginSummonWindup();
+    }
+
+    /// <summary>
+    /// Rolls the squad for the current phase at windup start and freezes it: if a phase
+    /// threshold is crossed during the windup, the already-rolled composition still
+    /// spawns (the spec's edge case). One roll per squad slot.
+    /// </summary>
+    private void BeginSummonWindup()
+    {
+        _pendingSummonCount = ProgenitorSummons.SquadSizeForPhase(_summonPhase);
+        for (int i = 0; i < _pendingSummonCount; i++)
+            _pendingSummonKinds[i] = ProgenitorSummons.RollKind(_summonPhase, _summonRolls);
+
+        _summonWindupRemaining = GameConstants.ProgenitorSummonWindup;
+        RedrawVisual();
+    }
+
+    /// <summary>
+    /// Kind of the pending squad member at <paramref name="index"/>. Out-of-range reads
+    /// return Basic so a stale index can never throw.
+    /// </summary>
+    public EnemyKind PendingSummonKind(int index) =>
+        index >= 0 && index < _pendingSummonCount ? _pendingSummonKinds[index] : EnemyKind.Basic;
+
+    /// <summary>
+    /// Marks the pending squad as consumed. Called by the summon consumer after every
+    /// member has been released into the normal enemy lifecycle.
+    /// </summary>
+    public void ClearPendingSummon()
+    {
+        _pendingSummonCount = 0;
+    }
+
+    /// <summary>
+    /// Recomputes the phase from current HP. Damage is the only way HP falls, so this
+    /// runs on each damaging hit for the boss. Crossing a threshold immediately adopts
+    /// the new cadence for the current countdown — clamped, never reset to the new full
+    /// duration — so a threshold can neither add a sudden wait nor cause a double
+    /// summon.
+    /// </summary>
+    private void UpdateProgenitorPhase()
+    {
+        if (!IsProgenitor)
+            return;
+
+        int phase = ProgenitorSummons.PhaseFor(_currentHP, _maxHP);
+        if (phase == _summonPhase)
+            return;
+
+        _summonPhase = phase;
+        _summonCountdown = Mathf.Min(_summonCountdown, ProgenitorSummons.IntervalForPhase(phase));
+    }
+
     public override void _Process(double delta)
     {
         if (_isDead || _waypoints.Count == 0)
@@ -404,7 +807,9 @@ public partial class Enemy : Node2D
 
         Vector2 toTarget = target - _anchorPosition;
         float distanceToWaypoint = toTarget.Length();
-        float moveDistance = _speed * GameConstants.CellSize * delta;
+        // CurrentSpeed includes the Progenitor's summon-windup slow: the boss keeps
+        // walking during the windup, just at a fraction of its speed.
+        float moveDistance = CurrentSpeed * GameConstants.CellSize * delta;
 
         if (moveDistance >= distanceToWaypoint)
         {
@@ -458,6 +863,19 @@ public partial class Enemy : Node2D
         _burnFlashRemaining = 0f;
         _burnPulsePhase = 0f;
         _burnPulseStep = 0;
+
+        // Clear every Progenitor field: phase, summon timer, windup, pending
+        // composition, roll source, and the zero-coin summon override. The next
+        // Configure re-seeds what its kind needs, so a boss reused as a Basic enemy
+        // has completely normal stats and behavior.
+        ResetSummonState();
+        _summonRolls = SkillRandom.Default;
+        // Back to the default kind too, so a pooled boss is not still identified as a
+        // Progenitor (which now drives both IsProgenitor and the draw path) between
+        // release and the next Configure.
+        Kind = EnemyKind.Basic;
+        CoinDrop = GameConstants.CoinDropPerKill;
+        RedrawVisual();
     }
 
     /// <summary>
@@ -477,8 +895,20 @@ public partial class Enemy : Node2D
         {
             _currentHP = 0;
             _isDead = true;
+            // A dying boss cancels its in-flight windup: no squad spawns, and the
+            // telegraph ring is cleared before the enemy is hidden and pooled.
+            _summonWindupRemaining = 0f;
+            _pendingSummonCount = 0;
             EmitSignal(SignalName.Destroyed, this);
             // GameManager.OnEnemyDestroyed handles release to pool
+            return;
+        }
+
+        if (IsProgenitor && applied > 0f)
+        {
+            // Phase recompute on every damaging hit, and repaint the border/bar.
+            UpdateProgenitorPhase();
+            RedrawVisual();
         }
     }
 
