@@ -57,7 +57,6 @@ public partial class SkillTreeScreen : Control
     public override void _Ready()
     {
         BuildUi();
-        Refresh();
     }
 
     /// <summary>
@@ -124,7 +123,6 @@ public partial class SkillTreeScreen : Control
         _skillTree = new SkillTree(new SkillTreeState(), _ => true);
         _verificationStateActive = true;
         RenderTree();
-        Refresh();
         return true;
     }
 
@@ -331,6 +329,9 @@ public partial class SkillTreeScreen : Control
     /// <summary>
     /// Rebuilds the main area for the currently-selected tower: a header, a line layer
     /// drawing the trunk spine + seed branches, and one node row per catalog entry.
+    /// Ends by repopulating rank labels and buy-button state from the persistent
+    /// <see cref="SkillTreeState"/>, so every rebuild (initial load, tower switch,
+    /// purchase) is self-consistent and no caller has to remember a follow-up refresh.
     /// </summary>
     private void RenderTree()
     {
@@ -376,6 +377,8 @@ public partial class SkillTreeScreen : Control
             if (_nodeAnchors.TryGetValue(node.Id, out var anchor))
                 BuildNodeRow(node, color, anchor, node.Kind == SkillNodeKind.Seed && anchor.X < spineX, _treeArea);
         }
+
+        Refresh();
     }
 
     private void ClearTreeArea()
@@ -556,13 +559,10 @@ public partial class SkillTreeScreen : Control
     private void OnBuyPressed(string nodeId)
     {
         // A successful purchase can unlock a child node, so rebuild the tree to show
-        // its new state (buy button appearing in place of the greyed locked row) and
-        // then refresh SP, rank labels, and button states.
+        // its new state (buy button appearing in place of the greyed locked row);
+        // RenderTree also refreshes SP, rank labels, and button states.
         if (_skillTree.BuyRank(nodeId))
-        {
             RenderTree();
-            Refresh();
-        }
     }
 
     /// <summary>
