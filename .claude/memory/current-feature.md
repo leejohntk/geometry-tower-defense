@@ -7,6 +7,9 @@ metadata:
 
 # Current Feature
 
+**Active feature:** level-5-progenitor — three-route Level 5 + The Progenitor boss (spec approved
+2026-10-25; `.claude/specs/level-5-progenitor.md`).
+
 **Live phase lives in `.claude/state.json`** — that file is the single source of truth for what is
 active right now (and is deleted at merge, which means "idle"). This file records *history*: what
 shipped, its gates, and open follow-ups. Do not track phase here — it goes stale the moment a PR

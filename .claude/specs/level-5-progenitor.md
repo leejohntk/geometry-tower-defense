@@ -1,6 +1,6 @@
 # Feature Spec: level-5-progenitor
 
-**Status:** draft
+**Status:** approved
 **Branch:** feature/level-5-progenitor
 **Date:** 2026-10-25
 
