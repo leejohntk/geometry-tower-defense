@@ -65,7 +65,7 @@ stronger enemy mix as HP falls.
 
 | Constant | Value | Notes |
 |----------|-------|-------|
-| `ProgenitorHP` | 120 | Highest in the game (Armored is 14) |
+| `ProgenitorHP` | 250 | Highest in the game (Armored is 14) |
 | `ProgenitorArmor` | 3 | Flat reduction; Laser still ignores armor |
 | `ProgenitorSpeed` | 1.4 cells/s | Normal enemies are 2.0 |
 | `ProgenitorDiameter` | 72 px | Basic/Armored are 48, Swarm 24 (reduced from 96 after playtest) |
@@ -87,7 +87,8 @@ stronger enemy mix as HP falls.
 - Summon timer starts at spawn, counts down to the first interval, then resets after each summon.
 - Entering a new phase applies the new interval to the current countdown without resetting it to the
   new full duration (no sudden extra wait or instant double-summon at a threshold).
-- Exact threshold HP (e.g. `floor(maxHP * 2 / 3)`) belongs to the lower phase.
+- Exact threshold HP (e.g. `floor(maxHP * 2 / 3)`) belongs to the lower phase. At 250 HP the
+  phase-2 threshold is 166 HP and the phase-3 threshold is 83 HP.
 
 ### Summon placement and behavior
 

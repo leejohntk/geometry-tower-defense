@@ -63,7 +63,7 @@ public static class GameConstants
     // itself on its route; the summon cadence, squad size, and mix escalate in three
     // HP phases. Phase thresholds are percentages of max HP; HP exactly on a
     // threshold belongs to the lower (harder) phase.
-    public const int ProgenitorHP = 120;
+    public const int ProgenitorHP = 250;
     public const int ProgenitorArmor = 3;
     public const float ProgenitorSpeed = 1.4f;
     public const int ProgenitorDiameter = 72;

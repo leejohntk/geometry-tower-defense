@@ -53,9 +53,9 @@ for each phase; inspect composition weights.
 
 **Expected:**
 - >66% → phase 1: 3.0 s, 3 adds, weights Basic 70 / Swarm 30 / Armored 0.
-- Exactly 66% and down to but not including 33% → phase 2: 2.25 s, 4 adds,
+- Exactly 66% (166 HP of 250) and down to but not including 33% → phase 2: 2.25 s, 4 adds,
   Basic 40 / Swarm 35 / Armored 25.
-- ≤33% → phase 3: 1.5 s, 5 adds, Basic 15 / Swarm 40 / Armored 45.
+- ≤33% (83 HP or less) → phase 3: 1.5 s, 5 adds, Basic 15 / Swarm 40 / Armored 45.
 - Interval strictly decreases and squad size strictly increases across phases.
 - Armored weight strictly increases across phases.
 - Crossing a threshold mid-countdown does not reset the countdown to the new full duration and

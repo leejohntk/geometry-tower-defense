@@ -92,15 +92,23 @@ public class ProgenitorTest
     {
         const float maxHP = GameConstants.ProgenitorHP;
 
-        AssertThat(ProgenitorSummons.Phase2ThresholdHP(maxHP)).IsEqual(80);
-        AssertThat(ProgenitorSummons.Phase3ThresholdHP(maxHP)).IsEqual(40);
+        AssertThat(ProgenitorSummons.Phase2ThresholdHP(maxHP)).IsEqual(166);
+        AssertThat(ProgenitorSummons.Phase3ThresholdHP(maxHP)).IsEqual(83);
 
-        AssertThat(ProgenitorSummons.PhaseFor(120f, maxHP)).IsEqual(1);
-        AssertThat(ProgenitorSummons.PhaseFor(81f, maxHP)).IsEqual(1);
-        AssertThat(ProgenitorSummons.PhaseFor(80f, maxHP)).IsEqual(2); // exact 66%
-        AssertThat(ProgenitorSummons.PhaseFor(41f, maxHP)).IsEqual(2);
-        AssertThat(ProgenitorSummons.PhaseFor(40f, maxHP)).IsEqual(3); // exact 33%
+        AssertThat(ProgenitorSummons.PhaseFor(250f, maxHP)).IsEqual(1);
+        AssertThat(ProgenitorSummons.PhaseFor(167f, maxHP)).IsEqual(1);
+        AssertThat(ProgenitorSummons.PhaseFor(166f, maxHP)).IsEqual(2); // exact 66%
+        AssertThat(ProgenitorSummons.PhaseFor(84f, maxHP)).IsEqual(2);
+        AssertThat(ProgenitorSummons.PhaseFor(83f, maxHP)).IsEqual(3); // exact 33%
         AssertThat(ProgenitorSummons.PhaseFor(0f, maxHP)).IsEqual(3);
+    }
+
+    [TestCase]
+    public void HpAndPhaseThresholds_ArePinned()
+    {
+        AssertThat(GameConstants.ProgenitorHP).IsEqual(250);
+        AssertThat(ProgenitorSummons.Phase2ThresholdHP(GameConstants.ProgenitorHP)).IsEqual(166);
+        AssertThat(ProgenitorSummons.Phase3ThresholdHP(GameConstants.ProgenitorHP)).IsEqual(83);
     }
 
     [TestCase]
@@ -199,15 +207,15 @@ public class ProgenitorTest
         var boss = new Enemy();
         boss.Configure(EnemyKind.Progenitor);
 
-        // 43 damage - 3 armor = 40 applied -> 80 HP, exactly the 66% threshold.
-        boss.TakeDamage(43);
-        AssertThat(boss.CurrentHP).IsEqual(80f);
+        // 87 damage - 3 armor = 84 applied -> 166 HP, exactly the 66% threshold.
+        boss.TakeDamage(87);
+        AssertThat(boss.CurrentHP).IsEqual(166f);
         AssertThat(boss.SummonPhase).IsEqual(2);
         AssertThat(boss.PhaseBorderColor).IsEqual(GameConstants.ProgenitorPhase2BorderColor);
 
-        // 40 more (armor applies) -> exactly 40 HP, the 33% threshold.
-        boss.TakeDamage(43);
-        AssertThat(boss.CurrentHP).IsEqual(40f);
+        // 86 more (83 after armor) -> exactly 83 HP, the 33% threshold.
+        boss.TakeDamage(86);
+        AssertThat(boss.CurrentHP).IsEqual(83f);
         AssertThat(boss.SummonPhase).IsEqual(3);
         AssertThat(boss.PhaseBorderColor).IsEqual(GameConstants.ProgenitorPhase3BorderColor);
     }
@@ -222,13 +230,15 @@ public class ProgenitorTest
         boss.TickProgenitorSummon(0.5f);
         AssertThat(boss.SummonCountdown).IsEqualApprox(2.5f, 0.0001f);
 
-        // Crossing to phase 2 adopts the shorter 2.25 s cadence on the current countdown.
-        boss.TakeDamage(43);
+        // Crossing to phase 2 (84 applied by 87 damage, 250 -> 166) adopts the shorter
+        // 2.25 s cadence on the current countdown.
+        boss.TakeDamage(87);
         AssertThat(boss.SummonPhase).IsEqual(2);
         AssertThat(boss.SummonCountdown).IsEqualApprox(2.25f, 0.0001f);
 
-        // Crossing to phase 3 clamps to 1.5 s (still less than the remaining 2.25 s).
-        boss.TakeDamage(43);
+        // Crossing to phase 3 (83 applied by 86 damage, 166 -> 83) clamps to 1.5 s,
+        // still less than the remaining 2.25 s.
+        boss.TakeDamage(86);
         AssertThat(boss.SummonPhase).IsEqual(3);
         AssertThat(boss.SummonCountdown).IsEqualApprox(1.5f, 0.0001f);
 
@@ -238,7 +248,7 @@ public class ProgenitorTest
         nearSummon.Configure(EnemyKind.Progenitor);
         nearSummon.TickProgenitorSummon(2.0f);
         AssertThat(nearSummon.SummonCountdown).IsEqualApprox(1.0f, 0.0001f);
-        nearSummon.TakeDamage(80, ignoreArmor: true); // straight to phase 3
+        nearSummon.TakeDamage(167, ignoreArmor: true); // 250 -> 83, straight to phase 3
         AssertThat(nearSummon.SummonPhase).IsEqual(3);
         AssertThat(nearSummon.SummonCountdown).IsEqualApprox(1.0f, 0.0001f);
     }
@@ -307,7 +317,7 @@ public class ProgenitorTest
 
         // Crossing to phase 3 mid-windup keeps the phase-1 squad: the next summon
         // (after the windup) uses the new phase.
-        boss.TakeDamage(80, ignoreArmor: true);
+        boss.TakeDamage(167, ignoreArmor: true); // 250 -> 83, phase 3
         AssertThat(boss.SummonPhase).IsEqual(3);
         AssertThat(boss.PendingSummonCount).IsEqual(3);
 
@@ -579,7 +589,7 @@ public class ProgenitorTest
     {
         var boss = new Enemy();
         boss.Configure(EnemyKind.Progenitor);
-        boss.TakeDamage(80f, ignoreArmor: true); // phase 3
+        boss.TakeDamage(167f, ignoreArmor: true); // 250 -> 83, phase 3
         boss.SetCoinDrop(0);
         boss.TickProgenitorSummon(GameConstants.ProgenitorPhase1SummonInterval);
         AssertThat(boss.IsSummoning).IsTrue();
