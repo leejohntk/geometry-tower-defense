@@ -66,7 +66,7 @@ public static class GameConstants
     public const int ProgenitorHP = 120;
     public const int ProgenitorArmor = 3;
     public const float ProgenitorSpeed = 1.4f;
-    public const int ProgenitorDiameter = 96;
+    public const int ProgenitorDiameter = 72;
     public const int ProgenitorCoinDrop = 12;
     public const int ProgenitorBaseDamage = 1;
     public const float ProgenitorSummonWindup = 0.5f;
@@ -75,9 +75,9 @@ public static class GameConstants
     public const float ProgenitorSummonOffsetRadius = 20f;
 
     // Progenitor phases: cadence, squad size, and mix weights (Basic / Swarm / Armored).
-    public const float ProgenitorPhase1SummonInterval = 6.0f;
-    public const float ProgenitorPhase2SummonInterval = 4.5f;
-    public const float ProgenitorPhase3SummonInterval = 3.0f;
+    public const float ProgenitorPhase1SummonInterval = 3.0f;
+    public const float ProgenitorPhase2SummonInterval = 2.25f;
+    public const float ProgenitorPhase3SummonInterval = 1.5f;
     public const int ProgenitorPhase1SquadSize = 3;
     public const int ProgenitorPhase2SquadSize = 4;
     public const int ProgenitorPhase3SquadSize = 5;

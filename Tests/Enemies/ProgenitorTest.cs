@@ -106,13 +106,45 @@ public class ProgenitorTest
     [TestCase]
     public void PhaseCadenceAndSquadSize_MatchSpec()
     {
-        AssertThat(ProgenitorSummons.IntervalForPhase(1)).IsEqual(6.0f);
-        AssertThat(ProgenitorSummons.IntervalForPhase(2)).IsEqual(4.5f);
-        AssertThat(ProgenitorSummons.IntervalForPhase(3)).IsEqual(3.0f);
+        AssertThat(ProgenitorSummons.IntervalForPhase(1)).IsEqual(3.0f);
+        AssertThat(ProgenitorSummons.IntervalForPhase(2)).IsEqual(2.25f);
+        AssertThat(ProgenitorSummons.IntervalForPhase(3)).IsEqual(1.5f);
 
         AssertThat(ProgenitorSummons.SquadSizeForPhase(1)).IsEqual(3);
         AssertThat(ProgenitorSummons.SquadSizeForPhase(2)).IsEqual(4);
         AssertThat(ProgenitorSummons.SquadSizeForPhase(3)).IsEqual(5);
+    }
+
+    [TestCase]
+    public void Cadence_PlaytestValues_AndFirstSummonReadyAtIntervalPlusWindup()
+    {
+        // Playtest-tuned cadence: the boss must summon visibly sooner than the original
+        // 6.0 / 4.5 / 3.0 schedule, while every other phase rule stays the same.
+        AssertThat(GameConstants.ProgenitorPhase1SummonInterval).IsEqual(3.0f);
+        AssertThat(GameConstants.ProgenitorPhase2SummonInterval).IsEqual(2.25f);
+        AssertThat(GameConstants.ProgenitorPhase3SummonInterval).IsEqual(1.5f);
+        AssertThat(GameConstants.ProgenitorSummonWindup).IsEqual(0.5f);
+
+        var boss = new Enemy();
+        boss.Configure(EnemyKind.Progenitor);
+        int ready = 0;
+        boss.SummonReady += _ => ready++;
+
+        // No summon on spawn, and nothing at half the interval either.
+        AssertThat(ready).IsEqual(0);
+        boss.TickProgenitorSummon(GameConstants.ProgenitorPhase1SummonInterval * 0.5f);
+        AssertThat(ready).IsEqual(0);
+        AssertThat(boss.IsSummoning).IsFalse();
+
+        // At exactly one interval the windup starts; the squad is not out yet.
+        boss.TickProgenitorSummon(GameConstants.ProgenitorPhase1SummonInterval * 0.5f);
+        AssertThat(boss.IsSummoning).IsTrue();
+        AssertThat(ready).IsEqual(0);
+
+        // The first SummonReady lands after interval + windup (3.0 + 0.5 = 3.5 s).
+        boss.TickProgenitorSummon(GameConstants.ProgenitorSummonWindup);
+        AssertThat(ready).IsEqual(1);
+        AssertThat(boss.PendingSummonCount).IsEqual(GameConstants.ProgenitorPhase1SquadSize);
     }
 
     [TestCase]
@@ -186,25 +218,25 @@ public class ProgenitorTest
         var boss = new Enemy();
         boss.Configure(EnemyKind.Progenitor);
 
-        // One second in: 5.0 s left of the phase-1 cadence.
-        boss.TickProgenitorSummon(1.0f);
-        AssertThat(boss.SummonCountdown).IsEqualApprox(5.0f, 0.0001f);
+        // Half a second in: 2.5 s left of the 3.0 s phase-1 cadence.
+        boss.TickProgenitorSummon(0.5f);
+        AssertThat(boss.SummonCountdown).IsEqualApprox(2.5f, 0.0001f);
 
-        // Crossing to phase 2 adopts the shorter 4.5 s cadence on the current countdown.
+        // Crossing to phase 2 adopts the shorter 2.25 s cadence on the current countdown.
         boss.TakeDamage(43);
         AssertThat(boss.SummonPhase).IsEqual(2);
-        AssertThat(boss.SummonCountdown).IsEqualApprox(4.5f, 0.0001f);
+        AssertThat(boss.SummonCountdown).IsEqualApprox(2.25f, 0.0001f);
 
-        // Crossing to phase 3 clamps to 3.0 s (still less than the remaining 4.5 s).
+        // Crossing to phase 3 clamps to 1.5 s (still less than the remaining 2.25 s).
         boss.TakeDamage(43);
         AssertThat(boss.SummonPhase).IsEqual(3);
-        AssertThat(boss.SummonCountdown).IsEqualApprox(3.0f, 0.0001f);
+        AssertThat(boss.SummonCountdown).IsEqualApprox(1.5f, 0.0001f);
 
         // A nearly-elapsed countdown must not be extended by the faster cadence:
-        // phase 3's 3.0 s interval never pushes a 1.0 s remainder back up.
+        // phase 3's 1.5 s interval never pushes a 1.0 s remainder back up.
         var nearSummon = new Enemy();
         nearSummon.Configure(EnemyKind.Progenitor);
-        nearSummon.TickProgenitorSummon(5.0f);
+        nearSummon.TickProgenitorSummon(2.0f);
         AssertThat(nearSummon.SummonCountdown).IsEqualApprox(1.0f, 0.0001f);
         nearSummon.TakeDamage(80, ignoreArmor: true); // straight to phase 3
         AssertThat(nearSummon.SummonPhase).IsEqual(3);

@@ -21,14 +21,14 @@ final run into the base, with pressure from simultaneous paths rather than a lon
 lets towers re-hit enemies. Waves escalate 12/15/18/21/24 enemies and lean on Swarm clusters.
 The final wave is 14 spawn events; **The Progenitor** is event 7, so it arrives mid-wave.
 
-The Progenitor walks the middle route: 120 HP, 3 armor, speed 1.4, 96 px octagon, geometric HP
+The Progenitor walks the middle route: 120 HP, 3 armor, speed 1.4, 72 px octagon, geometric HP
 bar with 66%/33% ticks. Every interval it slows to 35% speed for 0.5 s, pulses a ring, and
 releases a mixed squad directly ahead of itself on the path. Three HP phases tighten cadence
-(6/4.5/3 s), grow the squad (3/4/5), and shift the mix toward Armored (70/30/0 → 40/35/25 →
+(3/2.25/1.5 s), grow the squad (3/4/5), and shift the mix toward Armored (70/30/0 → 40/35/25 →
 15/40/45). Summons drop zero coins, count toward the wave's live total, and stop on boss death
 or base arrival. Boss leak costs 1 HP.
 
-Gates: build 0 warnings / 0 errors · 259 tests pass, 0 skipped · layout verifier PASS (142
+Gates: build 0 warnings / 0 errors · 260 tests pass, 0 skipped · layout verifier PASS (142
 assertions, 144 evaluated, 2 skipped) · review 1 CRITICAL + 4 WARNING + 2 INFO, all fixed
 (critical: summons could spawn after the boss reached the base; warnings: game-over kept
 spawning, victory could overwrite defeat, pool prewarm too small, test bypassed the production
@@ -40,6 +40,10 @@ Holdouts: `.claude/holdouts/regression/level-5-progenitor/scenarios.md`.
 Known limitations: one tracked boss per level (a second Progenitor would silently be ignored);
 route selection for non-round-robin spawns is still a WaveManager branch; summon spawning uses
 a second pipeline beside `EnemySpawned`. Balance is test-verified, not playtested.
+
+Playtest 1 (2026-10-25): boss read as too large and never visibly summoned. Fix batch reduced
+diameter 96 → 72 px and cadence 6/4.5/3 → 3/2.25/1.5 s (first summon now at 3.5 s); added a
+cadence pin test. Spec + holdouts amended to match.
 
 **Previous feature:** layout-verifier — headless pre-playtest layout verification
 **Branch:** `feature/layout-verifier`

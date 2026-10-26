@@ -42,7 +42,7 @@ observation is verified; "looks right" is not a pass.
 **Expected:**
 - HP strictly greater than every normal enemy (Basic 10, Swarm 5, Armored 14).
 - Armor 3; speed 1.4 cells/s (slower than 2.0).
-- Diameter 96 px; collision radius 48.
+- Diameter 72 px; collision radius 36.
 - Coin drop 12.
 - Reaching base costs exactly 1 player HP.
 
@@ -52,10 +52,10 @@ observation is verified; "looks right" is not a pass.
 for each phase; inspect composition weights.
 
 **Expected:**
-- >66% → phase 1: 6.0 s, 3 adds, weights Basic 70 / Swarm 30 / Armored 0.
-- Exactly 66% and down to but not including 33% → phase 2: 4.5 s, 4 adds,
+- >66% → phase 1: 3.0 s, 3 adds, weights Basic 70 / Swarm 30 / Armored 0.
+- Exactly 66% and down to but not including 33% → phase 2: 2.25 s, 4 adds,
   Basic 40 / Swarm 35 / Armored 25.
-- ≤33% → phase 3: 3.0 s, 5 adds, Basic 15 / Swarm 40 / Armored 45.
+- ≤33% → phase 3: 1.5 s, 5 adds, Basic 15 / Swarm 40 / Armored 45.
 - Interval strictly decreases and squad size strictly increases across phases.
 - Armored weight strictly increases across phases.
 - Crossing a threshold mid-countdown does not reset the countdown to the new full duration and

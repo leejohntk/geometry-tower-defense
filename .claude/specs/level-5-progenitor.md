@@ -40,7 +40,7 @@ stronger enemy mix as HP falls.
 - [ ] Summoned enemies spawn ahead of the boss on its current route, continue toward the base, and
       count toward the wave's live-enemy total.
 - [ ] Summoned enemies drop 0 coins; the boss drops `ProgenitorCoinDrop` coins.
-- [ ] Phase cadence is 6.0 s / 4.5 s / 3.0 s, squad size 3 / 4 / 5, phase thresholds at 66% and
+- [ ] Phase cadence is 3.0 s / 2.25 s / 1.5 s, squad size 3 / 4 / 5, phase thresholds at 66% and
       33% max HP, with exact threshold HP belonging to the lower (harder) phase.
 - [ ] Summon mix shifts toward tougher enemies by phase (weights below); every summoned slot
       produces exactly one enemy (a Swarm slot is one small circle, not a 3-member cluster).
@@ -68,7 +68,7 @@ stronger enemy mix as HP falls.
 | `ProgenitorHP` | 120 | Highest in the game (Armored is 14) |
 | `ProgenitorArmor` | 3 | Flat reduction; Laser still ignores armor |
 | `ProgenitorSpeed` | 1.4 cells/s | Normal enemies are 2.0 |
-| `ProgenitorDiameter` | 96 px | Basic/Armored are 48, Swarm 24 |
+| `ProgenitorDiameter` | 72 px | Basic/Armored are 48, Swarm 24 (reduced from 96 after playtest) |
 | `ProgenitorCoinDrop` | 12 | Boss payoff |
 | `ProgenitorBaseDamage` | 1 | Same leak cost as any enemy (tunable) |
 | `ProgenitorSummonWindup` | 0.5 s | Slow state + pulse ring |
@@ -80,9 +80,9 @@ stronger enemy mix as HP falls.
 
 | Phase | HP range | Summon interval | Squad size | Mix (Basic / Swarm / Armored) |
 |-------|----------|-----------------|------------|-------------------------------|
-| 1 | > 66% max | 6.0 s | 3 | 70% / 30% / 0% |
-| 2 | 33%–66% max | 4.5 s | 4 | 40% / 35% / 25% |
-| 3 | ≤ 33% max | 3.0 s | 5 | 15% / 40% / 45% |
+| 1 | > 66% max | 3.0 s | 3 | 70% / 30% / 0% |
+| 2 | 33%–66% max | 2.25 s | 4 | 40% / 35% / 25% |
+| 3 | ≤ 33% max | 1.5 s | 5 | 15% / 40% / 45% |
 
 - Summon timer starts at spawn, counts down to the first interval, then resets after each summon.
 - Entering a new phase applies the new interval to the current countdown without resetting it to the
@@ -185,7 +185,7 @@ In wave 5 the boss is the 7th of 14 spawn events, with six normal events before 
 
 ## Visual / Geometry Theme
 
-- **Progenitor:** large octagon (96 px), deep magenta fill, thick border. Phase border colors shift
+- **Progenitor:** large octagon (72 px), deep magenta fill, thick border. Phase border colors shift
   white → amber → red as HP falls. A pulsing ring expands during the 0.5 s summon windup so the
   summon is telegraphed.
 - **HP bar:** thin geometric bar above the octagon, with tick marks at 66% and 33%; fill uses the

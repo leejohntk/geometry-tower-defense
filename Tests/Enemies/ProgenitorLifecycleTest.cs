@@ -190,10 +190,12 @@ public class ProgenitorLifecycleTest
 
         AssertThat(manager.ActiveEnemyCount).IsEqual(1);
 
-        // Drive time only through the production update loop. This fails if
-        // GameManager stops ticking its tracked boss (or stops registering it).
+        // Drive time only through the production update loop. 90 x 0.05 s = 4.5 s,
+        // past the first 3.0 s interval + 0.5 s windup but short of the next windup at
+        // 6.5 s, so exactly one squad must appear. This fails if GameManager stops
+        // ticking its tracked boss (or stops registering it).
         int ticks = 0;
-        while (ticks++ < 140)
+        while (ticks++ < 90)
             manager._Process(0.05f);
 
         int expected = 1 + GameConstants.ProgenitorPhase1SquadSize;
