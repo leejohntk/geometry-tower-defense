@@ -68,7 +68,7 @@ stronger enemy mix as HP falls.
 | `ProgenitorHP` | 250 | Highest in the game (Armored is 14) |
 | `ProgenitorArmor` | 3 | Flat reduction; Laser still ignores armor |
 | `ProgenitorSpeed` | 1.4 cells/s | Normal enemies are 2.0 |
-| `ProgenitorDiameter` | 72 px | Basic/Armored are 48, Swarm 24 (reduced from 96 after playtest) |
+| `ProgenitorDiameter` | 64 px | Basic/Armored are 48, Swarm 24 (reduced from 96 after playtest) |
 | `ProgenitorCoinDrop` | 12 | Boss payoff |
 | `ProgenitorBaseDamage` | 1 | Same leak cost as any enemy (tunable) |
 | `ProgenitorSummonWindup` | 0.5 s | Slow state + pulse ring |
@@ -186,7 +186,7 @@ In wave 5 the boss is the 7th of 14 spawn events, with six normal events before 
 
 ## Visual / Geometry Theme
 
-- **Progenitor:** large octagon (72 px), deep magenta fill, thick border. Phase border colors shift
+- **Progenitor:** large octagon (64 px), deep magenta fill, thick border. Phase border colors shift
   white → amber → red as HP falls. A pulsing ring expands during the 0.5 s summon windup so the
   summon is telegraphed.
 - **HP bar:** thin geometric bar above the octagon, with tick marks at 66% and 33%; fill uses the

@@ -66,7 +66,7 @@ public static class GameConstants
     public const int ProgenitorHP = 250;
     public const int ProgenitorArmor = 3;
     public const float ProgenitorSpeed = 1.4f;
-    public const int ProgenitorDiameter = 72;
+    public const int ProgenitorDiameter = 64;
     public const int ProgenitorCoinDrop = 12;
     public const int ProgenitorBaseDamage = 1;
     public const float ProgenitorSummonWindup = 0.5f;

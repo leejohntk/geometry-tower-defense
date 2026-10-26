@@ -42,7 +42,7 @@ observation is verified; "looks right" is not a pass.
 **Expected:**
 - HP strictly greater than every normal enemy (Basic 10, Swarm 5, Armored 14).
 - Armor 3; speed 1.4 cells/s (slower than 2.0).
-- Diameter 72 px; collision radius 36.
+- Diameter 64 px; collision radius 32.
 - Coin drop 12.
 - Reaching base costs exactly 1 player HP.
 

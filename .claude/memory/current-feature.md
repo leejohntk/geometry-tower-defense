@@ -21,7 +21,7 @@ final run into the base, with pressure from simultaneous paths rather than a lon
 lets towers re-hit enemies. Waves escalate 12/15/18/21/24 enemies and lean on Swarm clusters.
 The final wave is 14 spawn events; **The Progenitor** is event 7, so it arrives mid-wave.
 
-The Progenitor walks the middle route: 250 HP, 3 armor, speed 1.4, 72 px octagon, geometric HP
+The Progenitor walks the middle route: 250 HP, 3 armor, speed 1.4, 64 px octagon, geometric HP
 bar with 66%/33% ticks. Every interval it slows to 35% speed for 0.5 s, pulses a ring, and
 releases a mixed squad directly ahead of itself on the path. Three HP phases tighten cadence
 (3/2.25/1.5 s), grow the squad (3/4/5), and shift the mix toward Armored (70/30/0 → 40/35/25 →
@@ -47,6 +47,9 @@ cadence pin test. Spec + holdouts amended to match.
 
 Playtest 2 (2026-10-25): boss HP raised 120 → 250 so it survives long enough to summon through
 its phases (thresholds now 166 / 83 HP); tests re-pinned.
+
+Playtest 3 (2026-10-25): boss still read slightly large; diameter 72 → 64 px (collision radius
+32). No other tuning changed.
 
 **Previous feature:** layout-verifier — headless pre-playtest layout verification
 **Branch:** `feature/layout-verifier`
