@@ -97,11 +97,11 @@ Window: PR #21 (run #5 follow-ups + PreToolUse guard) and PR #22 (headless layou
 
 Window: PR #23 (run #6 memory updates), PR #24 (skill-tree tab-switch fix via `/fix-bug`), PR #25 (Level 5 + Progenitor). Evidence: main session `99297c2c-…` (102 Bash, 29 Edit, 9 Agent spawns, 5 skills) plus 11 subagent transcripts; the Oct 25 Open Design investigation sessions were also in the window but contained no game/harness work.
 
-- **P8 recurred, still unapplied** — `[RequireGodotRuntime]` remains in `implementer.md:55,67,90`, `rules/godot-csharp-conventions.md:44`, and `CLAUDE.md:34,76`, while the repo has 0 uses and 24 `[TestSuite]` classes / 261 `[TestCase]` methods. The fix-bug agent grepped it 4×, each implementer 2×, and the orchestrator checked once. Re-queued.
-- **Reviewer handoff is impossible as written (new P11)** — all 3 lens prompts said “Run `git diff`”, but `.claude/agents/reviewer.md` grants only Read/Glob/Grep. Every report disclaimed that git/build/test could not be run. `orchestrator.md:61`'s “Pass the diff or branch” is unactionable for shell-free reviewers.
-- **P10 recurred + one new guard** — one `rm -rf` hook denial (Level 5 implementer) and one zsh unmatched-glob abort (`GdUnitRunner_*.cfg`); new this window, the Bash tool blocked a chained foreground `sleep 30` and pointed at Monitor / `run_in_background`. Re-queued with a third bullet.
-- **Spec-time visual scale (new P12 + memory applied)** — Progenitor 96 → 72 → 64 px across two playtest passes; cadence 6.0 → 3.0 s because a first summon at 6.5 s read as “never summoned”. Applied grid-relative sizing + telegraph timing to `game-design.md`; proposed template wording.
-- **`GdUnitRunner_<uuid>.cfg` leaks** — `dotnet test` leaves an untracked cfg at the repo root. Proposed `.gitignore` entry (outside distiller scope).
+- **P8 recurred, then APPLIED 2026-10-26** — `[RequireGodotRuntime]` was in `implementer.md`, `rules/godot-csharp-conventions.md`, and `CLAUDE.md` while the repo has 0 uses and 24 `[TestSuite]` classes / 261 `[TestCase]` methods. Fixed in PR #26 across all three files; the invalid `[Test]` / `SceneRunner.Load` sample was also replaced.
+- **Reviewer handoff is impossible as written (new P11) — FIXED 2026-10-26 (PR #26)** — all 3 lens prompts said “Run `git diff`”, but `.claude/agents/reviewer.md` grants only Read/Glob/Grep. Orchestrator and skill prompts now require passing diff text; reviewers are told they are shell-free.
+- **P10 recurred + one new guard — DECLINED 2026-10-26** — one `rm -rf` hook denial (Level 5 implementer) and one zsh unmatched-glob abort (`GdUnitRunner_*.cfg`); the Bash tool also blocked a chained foreground `sleep 30`. Human declined adding host guidance to `verification-gates.md`.
+- **Spec-time visual scale (new P12 + memory applied) — TEMPLATE APPLIED 2026-10-26 (PR #26)** — Progenitor 96 → 72 → 64 px across two playtest passes; cadence 6.0 → 3.0 s because a first summon at 6.5 s read as “never summoned”. Grid-relative sizing + telegraph timing are now in `game-design.md` and the spec template.
+- **`GdUnitRunner_<uuid>.cfg` leaks — DECLINED 2026-10-26** — `dotnet test` leaves an untracked cfg at the repo root; human declined the `.gitignore` entry.
 - **Flag honored at merge** — set 21:55:42, PR #25 merged 22:28, `/evolve-harness` ran immediately. Step 6 worked; run #6's 25-day gap did not recur.
 - **P3 batching, P5 single-Write, merge hygiene held** — 3 playtest passes → 3 implementer batches; state.json written 4× with `Write`, never edited; fast-forward main, no destructive git, no stray post-merge PR.
 - **Review/simplify healthy** — 1 CRITICAL (post-base summon leak, found independently by security and correctness) + 4 WARNING + 2 INFO, fixed in one batch, re-verified CLEAN by the correctness lens. 4 simplify lenses, 9 cleanups, 14 declined. Build 0 warnings, 261 tests, verifier PASS, holdouts 13/13.
@@ -139,25 +139,27 @@ appears, prefer deleting the redundant state over adding bookkeeping to sync it.
 
 **H3 — CLOSED 2026-09-24 (PR #21).** The hook guard landed, along with two guard defects fixed while implementing it (standalone-token force matching; `jq`-parsed command extraction covering `HEAD:main` / `refs/heads/main`). Verified 17/17; zero destructive git ops in run #6's window. See "Resolved 2026-10-19".
 
-**P8 (MEDIUM — proposed run #6, RECURRED 2026-10-25) — remove the non-existent `[RequireGodotRuntime]` convention.**
-`CLAUDE.md:34,76`, `.claude/rules/godot-csharp-conventions.md:44`, and `.claude/agents/implementer.md:55,67,90` all reference an attribute that does not exist in gdUnit4.api 4.3.1 and is used by zero tests. The repo's actual pattern is `[TestSuite]` + `[TestCase]` + `AssertThat` (see `Tests/Towers/TowerTest.cs`). A review-fix implementer burned ~12 tool calls investigating the attribute in run #6; in run #7 the fix-bug fork grepped it 4×, each implementer 2×, and the orchestrator checked once. Full replacement text in `harness-evolution.md` → run #6, P8. CLAUDE.md lines are outside distiller scope — human applies.
+**P8 — APPLIED 2026-10-26 (human-approved, PR #26): remove the non-existent `[RequireGodotRuntime]` convention.**
+`CLAUDE.md`, `.claude/rules/godot-csharp-conventions.md`, and `.claude/agents/implementer.md` now describe the real `[TestSuite]` + `[TestCase]` + `AssertThat` pattern; the invalid `[Test]` / `SceneRunner.Load` sample was replaced with a verified pattern. There is no `[RequireGodotRuntime]` attribute in gdUnit4.api 4.3.1.
 
-**P9 (MEDIUM — proposed, run #6) — prohibit holdout enumeration.**
+**P9 — DECLINED 2026-10-26 by human.** Prohibit holdout enumeration in `.claude/agents/implementer.md`; current wording and hook guard left unchanged.
 The implementer's `find src Tests .claude -type f` listed `.claude/holdouts/{armored-laser,first-level,level-4-multi-path,…}/scenarios.md`. The hook matches only the literal `.claude/holdouts/` string, so enumerating the parent directory passes. No scenario content or `H<n>_*` name leaked (0/3 transcripts), but coverage topics did. Proposed wording: "NEVER read **or enumerate** `.claude/holdouts/`; do not run recursive listings/searches over `.claude/`." Full text in run #6, P9.
 
-**P10 (LOW–MEDIUM — proposed run #6, RECURRED 2026-10-25) — host shell facts.**
+**P10 — DECLINED 2026-10-26 by human.** Host shell facts (rm -rf denial, zsh glob abort, blocked chained sleep) were not added to the host section.
 (a) `rm -rf` is hook-denied even under `/tmp`; use `mktemp -d` or a unique `$(date +%s)` suffix. Three denials in run #6, one in run #7. (b) zsh aborts the whole command on an unmatched glob (`no matches found`) before anything runs, so `rm -f x GdUnitRunner_*.cfg` never deletes `x`; quote patterns or use `find`. Three occurrences in run #6, one in run #7. (c) New in run #7: the Bash tool blocks a foreground `sleep` chained with another command, pointing at Monitor/until-loop or `run_in_background`. Proposed addition to `rules/verification-gates.md` → "Host: macOS (darwin)". Full text in run #7, P10.
 
-**P11 (MEDIUM — new, run #7) — make the reviewer handoff match the reviewer's shell-free tool set.**
+**P11 — APPLIED 2026-10-26 (human-approved, PR #26; diff-text variant): make the reviewer handoff match the reviewer's shell-free tool set.**
+`orchestrator.md`, `review-changes/SKILL.md`, `implement-feature/SKILL.md`, `reviewer.md`, and `dark-factory-patterns.md` now require the orchestrator to generate the diff and paste it into every reviewer prompt; reviewers are explicitly shell-free and never asked to run git/build/test.
 All three Level 5 lens prompts said “Run `git diff`”, but `.claude/agents/reviewer.md` grants only Read/Glob/Grep; every report disclaimed that git/build/test could not be run. Proposed edits: `orchestrator.md:61` → pass the diff text (or changed-file contents), never tell a reviewer to run git/build/test; `review-changes/SKILL.md` step 2 → include the diff in each reviewer prompt; `reviewer.md` Review Process step 1 → “You have no shell: do not attempt git diff, build, or test commands”; `dark-factory-patterns.md` → add an Orchestrator → Reviewer handoff line. Full text in run #7, P11.
 
-**P12 (MEDIUM — new, run #7) — specify visual scale in grid-cell units.**
+**P12 — APPLIED 2026-10-26 (human-approved, PR #26): specify visual scale in grid-cell units.**
+`.claude/templates/spec-template.md` now asks for rendered size in grid-cell units (cell = 64 px) and first-telegraph timing relative to spawn/lifetime.
 Progenitor diameter was 96 px (1.5 × 64 px cell) → 72 px → 64 px across two playtest passes; first summon at 6.5 s read as “never summoned” and the cadence was halved. Proposed addition to `.claude/templates/spec-template.md` → `## Visual / Geometry Theme`, before LAYOUT: “State rendered sizes for new entities in grid-cell units (cell = 64 px, `GameConstants.CellSize`) and state when the first signature behavior becomes visible.” The matching design heuristic is already applied in `game-design.md`. Full text in run #7, P12.
 
-**Proposal (LOW — outside distiller scope, run #7) — ignore the GdUnitRunner cfg.**
+**Proposal (LOW — DECLINED 2026-10-26 by human) — ignore the GdUnitRunner cfg.**
 `dotnet test` leaves `GdUnitRunner_<uuid>.cfg` untracked at the repo root. Add `GdUnitRunner_*.cfg` to `.gitignore`.
 
-**H5 (HIGH — blocked, human must implement) — guard recursive `.claude` enumeration.**
+**H5 — DECLINED 2026-10-26 by human (deterministic guard not implemented) — guard recursive `.claude` enumeration.**
 Extend the implementer's PreToolUse Bash pattern to deny recursive listings/searches rooted at `.claude/` (`find … .claude`, `ls -R .claude`, `tree .claude`, `grep -r … .claude`) while still allowing explicit reads of named harness files (e.g. `cat .claude/settings.json`). P9 is the prompt-level mitigation; this is the deterministic backstop.
 
 ## Harness Change Log

@@ -58,7 +58,7 @@ On session start, read `.claude/state.json`. If it exists and `phase` is not `id
 ## Delegation Rules
 
 - **Implementer:** Pass the FULL spec. NEVER mention holdouts or pass holdout file paths. The implementer agent has Read denied on `.claude/holdouts/**` but don't test that boundary — don't mention holdouts at all.
-- **Reviewer:** Pass the diff or branch. Each reviewer gets a focused lens prompt. Do not cross-contaminate lenses.
+- **Reviewer:** Generate the diff yourself (`git diff main...HEAD`, plus `git diff HEAD` for working-tree changes and the list of untracked files) and paste that diff text into each reviewer prompt. Reviewer agents have Read/Glob/Grep only — no shell — so they cannot run `git diff`, build, or test. Give each reviewer a focused lens prompt; never ask a reviewer to run a command. Do not cross-contaminate lenses.
 - **Investigator:** Pass specific questions. "Where is X defined?" "What calls Y?" Expect `file:line` tables.
 - **Distiller:** Triggered automatically by stop hook. Review proposals, classify risk, apply or escalate.
 

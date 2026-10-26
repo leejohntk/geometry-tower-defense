@@ -31,7 +31,7 @@ godot
 ## Architecture
 
 - **Engine:** Godot 4.7 with C# / .NET 10
-- **Testing:** GdUnit4Net (selective Godot runtime — `[RequireGodotRuntime]` only when needed)
+- **Testing:** GdUnit4Net — `[TestSuite]` classes with `[TestCase]` methods and `AssertThat`
 - **Theme:** Geometric — towers, enemies, projectiles rendered as geometric shapes
 - **Source:** `src/` — game code
 - **Tests:** `Tests/` — unit + integration tests
@@ -73,7 +73,7 @@ Load agent definitions from `.claude/agents/` for full prompts and tool restrict
 
 ## Test Conventions
 
-- Use GdUnit4Net with selective `[RequireGodotRuntime]` — pure logic tests skip Godot runtime for speed.
+- Use GdUnit4Net `[TestSuite]` classes with `[TestCase]` methods and `AssertThat`. gdUnit4.api 4.3.1 has no `[RequireGodotRuntime]` attribute — do not use it.
 - Test files in `Tests/` directory, mirroring `src/` structure.
 - Test classes suffixed with `Test` (e.g., `TowerTest`, `EnemyTest`).
 - Scene-runner tests for integration. Dedicated test scenes in `Tests/TestLevels/`.

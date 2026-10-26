@@ -36,7 +36,7 @@ Focus ONLY on your assigned lens. Do not drift into other areas. If you see a se
 
 ## Review Process
 
-1. Read the diff or changed files the orchestrator provides.
+1. Read the diff text and changed/untracked file paths the orchestrator provides. You have no shell — never attempt `git diff`, build, or test commands; review only the supplied diff and the files you can read.
 2. Examine each change through your lens.
 3. For each issue found, output exactly one line in this format:
 

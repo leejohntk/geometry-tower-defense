@@ -15,8 +15,8 @@ Orchestrator runs this skill during the review phase of feature implementation, 
 
 ## Process
 
-1. **Get the diff:** `git diff main...HEAD` or `git diff` for staged changes.
-2. **Spawn 3 reviewers in parallel:**
+1. **Get the diff yourself:** `git diff main...HEAD`, plus `git diff HEAD` for working-tree changes, plus the list of untracked files. Reviewers have no shell, so capture the diff text now.
+2. **Spawn 3 reviewers in parallel:** paste the full diff text and the changed/untracked file paths into every reviewer prompt. Never tell a reviewer to run `git diff`, build, or test.
    - Lens: `security` — "Review this diff for security issues. Look for unsafe input handling, resource leaks, missing validation, injection risks."
    - Lens: `performance` — "Review this diff for performance issues. Look for hot-path allocations, GC pressure, missing object pooling, unnecessary _Process calls."
    - Lens: `correctness` — "Review this diff for correctness issues. Look for logic errors, edge cases, null safety, signal wiring, resource loading."

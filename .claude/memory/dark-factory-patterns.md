@@ -68,6 +68,12 @@ Human playtests
 - Build status
 - Issues/notes
 
+### Orchestrator → Reviewer
+- Generate the diff (`git diff main...HEAD`, plus `git diff HEAD` and the untracked-file list) and
+  paste the diff text into every reviewer prompt.
+- Reviewers have Read/Glob/Grep only — no shell. Never ask them to run `git diff`, build, or test.
+- Give each reviewer one lens; do not cross-contaminate.
+
 ### Reviewer → Orchestrator
 - Findings in `path:line: severity: finding. fix.` format
 - Severity: CRITICAL | WARNING | INFO
