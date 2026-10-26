@@ -857,6 +857,7 @@ public partial class GameManager : Node2D
 
     /// <summary>
     /// Place a tower of the currently selected type at the specified grid position.
+    /// A successful placement consumes the selection (one tower per selection).
     /// Returns true if placement succeeded.
     /// </summary>
     public bool PlaceTower(int row, int col)
@@ -895,6 +896,10 @@ public partial class GameManager : Node2D
         tower.SetSkillTree(SkillTree?.State);
         _activeTowers.Add(tower);
         AddChild(tower);
+
+        // One selection = one tower. Consume the placement type here so no caller can
+        // leave the player stuck in placement mode after a successful placement.
+        PlacingTowerType = null;
 
         return true;
     }

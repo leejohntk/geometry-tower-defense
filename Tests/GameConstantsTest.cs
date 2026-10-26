@@ -1,5 +1,6 @@
 using GeometryTowerDefense;
 using GdUnit4;
+using Godot;
 using static GdUnit4.Assertions;
 
 namespace GeometryTowerDefense.Tests;
@@ -85,6 +86,29 @@ public class GameConstantsTest
     {
         AssertThat(GameConstants.PlayAreaWidth).IsEqual(1280);
         AssertThat(GameConstants.PlayAreaHeight).IsEqual(896);
+    }
+
+    [TestCase]
+    public void IsBattlefieldPoint_ExcludesHudChromeAndOuterMargins()
+    {
+        // Interior and the visible first row below the top bar are battlefield.
+        AssertThat(GameConstants.IsBattlefieldPoint(new Vector2(100, 100))).IsTrue();
+        AssertThat(GameConstants.IsBattlefieldPoint(
+            new Vector2(0, GameConstants.TopBarHeight))).IsTrue();
+        AssertThat(GameConstants.IsBattlefieldPoint(
+            new Vector2(GameConstants.PlayAreaWidth - 1, GameConstants.PlayAreaHeight - 1))).IsTrue();
+
+        // The top bar overlays the grid, so clicks under it are HUD, not battlefield.
+        AssertThat(GameConstants.IsBattlefieldPoint(
+            new Vector2(100, GameConstants.TopBarHeight - 1))).IsFalse();
+
+        // Sidebar (side menu), the margin below the grid, and negative space are outside.
+        AssertThat(GameConstants.IsBattlefieldPoint(
+            new Vector2(GameConstants.PlayAreaWidth, 100))).IsFalse();
+        AssertThat(GameConstants.IsBattlefieldPoint(
+            new Vector2(100, GameConstants.PlayAreaHeight))).IsFalse();
+        AssertThat(GameConstants.IsBattlefieldPoint(new Vector2(-1, 100))).IsFalse();
+        AssertThat(GameConstants.IsBattlefieldPoint(new Vector2(100, -1))).IsFalse();
     }
 
     [TestCase]
