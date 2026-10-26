@@ -58,6 +58,59 @@ public static class GameConstants
     public const int ArmoredEnemyDiameter = 48;
     public const int ArmoredCoinDropPerKill = 2;
 
+    // Progenitor (boss). The toughest, slowest, largest enemy in the game. Every
+    // interval it enters a brief windup and summons a mixed squad directly ahead of
+    // itself on its route; the summon cadence, squad size, and mix escalate in three
+    // HP phases. Phase thresholds are percentages of max HP; HP exactly on a
+    // threshold belongs to the lower (harder) phase.
+    public const int ProgenitorHP = 250;
+    public const int ProgenitorArmor = 3;
+    public const float ProgenitorSpeed = 1.4f;
+    public const int ProgenitorDiameter = 64;
+    public const int ProgenitorCoinDrop = 12;
+    public const int ProgenitorBaseDamage = 1;
+    public const float ProgenitorSummonWindup = 0.5f;
+    public const float ProgenitorSummonSlowFactor = 0.35f;
+    public const float ProgenitorSummonLeadDistance = 100f;
+    public const float ProgenitorSummonOffsetRadius = 20f;
+
+    // Progenitor phases: cadence, squad size, and mix weights (Basic / Swarm / Armored).
+    public const float ProgenitorPhase1SummonInterval = 3.0f;
+    public const float ProgenitorPhase2SummonInterval = 2.25f;
+    public const float ProgenitorPhase3SummonInterval = 1.5f;
+    public const int ProgenitorPhase1SquadSize = 3;
+    public const int ProgenitorPhase2SquadSize = 4;
+    public const int ProgenitorPhase3SquadSize = 5;
+    public const float ProgenitorPhase2HPFraction = 2f / 3f;
+    public const float ProgenitorPhase3HPFraction = 1f / 3f;
+
+    // Phase 1: 70% Basic / 30% Swarm / 0% Armored.
+    public const double ProgenitorPhase1BasicWeight = 0.70;
+    public const double ProgenitorPhase1SwarmWeight = 0.30;
+    // Phase 2: 40% Basic / 35% Swarm / 25% Armored.
+    public const double ProgenitorPhase2BasicWeight = 0.40;
+    public const double ProgenitorPhase2SwarmWeight = 0.35;
+    public const double ProgenitorPhase2ArmoredWeight = 0.25;
+    // Phase 3: 15% Basic / 40% Swarm / 45% Armored.
+    public const double ProgenitorPhase3BasicWeight = 0.15;
+    public const double ProgenitorPhase3SwarmWeight = 0.40;
+    public const double ProgenitorPhase3ArmoredWeight = 0.45;
+
+    // Progenitor presentation — procedural geometry only (octagon, border, HP bar,
+    // telegraph pulse ring). The border shifts white -> amber -> red as phases fall.
+    public static readonly Color ProgenitorFillColor = new Color(0.55f, 0.06f, 0.4f);       // deep magenta
+    public static readonly Color ProgenitorPhase1BorderColor = new Color(1f, 1f, 1f);        // white
+    public static readonly Color ProgenitorPhase2BorderColor = new Color(1f, 0.72f, 0.15f); // amber
+    public static readonly Color ProgenitorPhase3BorderColor = new Color(1f, 0.15f, 0.15f); // red
+    public static readonly Color ProgenitorPulseColor = new Color(1f, 0.9f, 0.5f);           // pale gold telegraph
+    public const float ProgenitorBorderWidth = 4f;
+    public const float ProgenitorHealthBarWidthRatio = 0.8f;
+    public const float ProgenitorHealthBarHeight = 6f;
+    public const float ProgenitorHealthBarGap = 10f;      // px between octagon top and bar bottom
+    public const float ProgenitorPulseStartScale = 0.75f; // ring radius at windup start, x octagon radius
+    public const float ProgenitorPulseEndScale = 1.35f;   // ring radius at windup end
+    public const int ProgenitorPulseSegments = 32;
+
     // Laser Tower
     public const int LaserTowerRange = 3;
     public const float LaserTowerDps = 4f;
@@ -194,6 +247,12 @@ public static class GameConstants
     public static float CellCenterX(int col) => col * CellSize + CellSize / 2f;
     public static float CellCenterY(int row) => row * CellSize + CellSize / 2f;
     public static float CellDistanceInPixels(float cells) => cells * CellSize;
+
+    /// <summary>
+    /// Largest Progenitor summon squad any phase can produce (phase 3). Reused as the
+    /// bound for the allocation-free pending-composition buffer.
+    /// </summary>
+    public static int ProgenitorMaxSquadSize => ProgenitorPhase3SquadSize;
 
     // Tower type lookups (used by placement preview and UI before a tower instance exists)
     public static int TowerCost(TowerType type) => type switch

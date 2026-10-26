@@ -7,7 +7,8 @@ namespace GeometryTowerDefense;
 /// Registry of all playable levels. Level 1 is the original straight-path level;
 /// Level 2 adds the winding path, the Cannon tower, and Swarm enemies;
 /// Level 3 adds Armored enemies and the Laser tower;
-/// Level 4 adds a second spawn route and mixes all three enemy kinds.
+/// Level 4 adds a second spawn route and mixes all three enemy kinds;
+/// Level 5 adds a third route and the Progenitor boss.
 /// </summary>
 public static class Levels
 {
@@ -15,6 +16,7 @@ public static class Levels
     public static readonly LevelDefinition Level2 = CreateLevel2();
     public static readonly LevelDefinition Level3 = CreateLevel3();
     public static readonly LevelDefinition Level4 = CreateLevel4();
+    public static readonly LevelDefinition Level5 = CreateLevel5();
 
     /// <summary>
     /// Resolve a level by id. Unknown ids fall back to Level 1.
@@ -24,6 +26,7 @@ public static class Levels
         2 => Level2,
         3 => Level3,
         4 => Level4,
+        5 => Level5,
         _ => Level1
     };
 
@@ -158,6 +161,73 @@ public static class Levels
         };
 
         return new LevelDefinition(4, "Level 4", paths, allowCannonTower: true, allowLaserTower: true, waves);
+    }
+
+    private static LevelDefinition CreateLevel5()
+    {
+        // Three short, direct lanes that all converge on the shared base cell (19,7),
+        // sharing only the final (14,7) -> (19,7) run. Pressure comes from three
+        // simultaneous lanes rather than a long weave: a long lane gives towers more
+        // time to re-hit the same enemies.
+        var routeACorners = new[]
+        {
+            new Vector2I(0, 2), new Vector2I(4, 2), new Vector2I(4, 5), new Vector2I(9, 5),
+            new Vector2I(9, 3), new Vector2I(14, 3), new Vector2I(14, 7), new Vector2I(19, 7)
+        };
+        var routeBCorners = new[]
+        {
+            new Vector2I(0, 7), new Vector2I(19, 7)
+        };
+        var routeCCorners = new[]
+        {
+            new Vector2I(0, 11), new Vector2I(4, 11), new Vector2I(4, 8), new Vector2I(9, 8),
+            new Vector2I(9, 10), new Vector2I(14, 10), new Vector2I(14, 7), new Vector2I(19, 7)
+        };
+        var paths = new IReadOnlyList<Vector2I>[]
+        {
+            LevelDefinition.BuildPath(routeACorners),  // 29 cells, top
+            LevelDefinition.BuildPath(routeBCorners),  // 20 cells, middle straight lane
+            LevelDefinition.BuildPath(routeCCorners)   // 28 cells, bottom
+        };
+
+        var waves = new List<WaveDefinition>
+        {
+            // Wave 1: 4 Basic + 2 SwarmCluster + 2 Armored = 12 enemies
+            new WaveDefinition(
+                SpawnKind.Basic, SpawnKind.Basic, SpawnKind.Basic, SpawnKind.Basic,
+                SpawnKind.SwarmCluster, SpawnKind.SwarmCluster,
+                SpawnKind.Armored, SpawnKind.Armored),
+            // Wave 2: 4 Basic + 3 SwarmCluster + 2 Armored = 15 enemies
+            new WaveDefinition(
+                SpawnKind.Basic, SpawnKind.Basic, SpawnKind.Basic, SpawnKind.Basic,
+                SpawnKind.SwarmCluster, SpawnKind.SwarmCluster, SpawnKind.SwarmCluster,
+                SpawnKind.Armored, SpawnKind.Armored),
+            // Wave 3: 3 Basic + 4 SwarmCluster + 3 Armored = 18 enemies
+            new WaveDefinition(
+                SpawnKind.Basic, SpawnKind.Basic, SpawnKind.Basic,
+                SpawnKind.SwarmCluster, SpawnKind.SwarmCluster, SpawnKind.SwarmCluster, SpawnKind.SwarmCluster,
+                SpawnKind.Armored, SpawnKind.Armored, SpawnKind.Armored),
+            // Wave 4: 2 Basic + 5 SwarmCluster + 4 Armored = 21 enemies
+            new WaveDefinition(
+                SpawnKind.Basic, SpawnKind.Basic,
+                SpawnKind.SwarmCluster, SpawnKind.SwarmCluster, SpawnKind.SwarmCluster,
+                SpawnKind.SwarmCluster, SpawnKind.SwarmCluster,
+                SpawnKind.Armored, SpawnKind.Armored, SpawnKind.Armored, SpawnKind.Armored),
+            // Wave 5: 2 Basic + 2 SwarmCluster + 2 Armored + Progenitor
+            //         + 3 SwarmCluster + 2 Armored + 2 Basic = 24 enemies.
+            // The boss is the 7th of 14 spawn events (six normal events before it,
+            // seven after) so it appears mid-wave, never at the start.
+            new WaveDefinition(
+                SpawnKind.Basic, SpawnKind.Basic,
+                SpawnKind.SwarmCluster, SpawnKind.SwarmCluster,
+                SpawnKind.Armored, SpawnKind.Armored,
+                SpawnKind.Progenitor,
+                SpawnKind.SwarmCluster, SpawnKind.SwarmCluster, SpawnKind.SwarmCluster,
+                SpawnKind.Armored, SpawnKind.Armored,
+                SpawnKind.Basic, SpawnKind.Basic)
+        };
+
+        return new LevelDefinition(5, "Level 5", paths, allowCannonTower: true, allowLaserTower: true, waves);
     }
 
     private static WaveDefinition BasicWave(int count)
