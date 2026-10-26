@@ -19,6 +19,7 @@ metadata:
 | 2026-09-23 | Fifth distillation run | N/A | Stop hook (flag set 2026-09-21T04:37:00, counter 53) | 3 low-risk memory updates applied (this log, `harness-feedback.md`, `current-feature.md` staleness); 5 medium proposals queued (playtest-loop batching, state.json write pattern, post-merge status flip, CLAUDE.md `--run-stdout`, macOS `timeout`). H3 re-escalated. Run #4's P1/P2 verified landed via PR #17 |
 | 2026-09-24 | PR #21 — run #5 follow-ups applied | MEDIUM/HIGH | Human-approved distillation follow-ups | P3, P5, P6, P7 landed. H3 hook guard implemented: force-push matching now uses standalone tokens, command extraction parses stdin with jq, `HEAD:main`/`refs/heads/main` refspecs covered, destructive git ops gated on repo state. Guard verified 17/17 |
 | 2026-10-19 | Sixth distillation run | N/A | Stop hook (flag set 2026-09-24T02:12:12, counter 64) | 2 low-risk memory files updated; 3 medium proposals queued (stale `[RequireGodotRuntime]` convention, holdout enumeration, host shell facts); 1 high option (recursive `.claude` enumeration guard) |
+| 2026-10-25 | Seventh distillation run | N/A | Stop hook (flag set 2026-10-25T21:55:42, counter 62) | 4 low-risk memory files updated (run log, feedback, stale PR #25 status, grid-relative sizing + telegraph timing); P8 and P10 recurred and were re-queued with new evidence; 3 new proposals (P11 reviewer diff handoff, P12 spec visual scale, `.gitignore` test artifact); P9 and H5 unchanged |
 
 ## Distillation Log
 
@@ -179,3 +180,67 @@ metadata:
 - **H5 (HIGH — blocked, human must implement) — guard recursive `.claude` enumeration.** Extend the implementer's PreToolUse Bash pattern to deny recursive listings/searches rooted at `.claude/` (`find … .claude`, `ls -R .claude`, `tree .claude`, `grep -r … .claude`) while still allowing explicit reads of named harness files. Narrow the pattern so `cat .claude/settings.json` and `grep src .claude/specs/foo.md` remain allowed. Prompt-only mitigation is P9; this is the deterministic backstop.
 
 **Applied this run (LOW risk, memory only):** `harness-evolution.md` (change-history rows + this entry), `harness-feedback.md` (run #6 observations, H3 marked closed, stale current-feature item moved to Resolved, new proposals queued). No rule, skill, agent-prompt, command, template, or game file was modified; P8–P10 and H5 await human approval per the tier table in `harness-safety.md`.
+
+### 2026-10-25 — Seventh Distillation Run
+
+**Evidence base:** native JSONL. Main session `99297c2c-…` (Oct 25 20:22–22:29 CDT; 102 `Bash`, 29 `Edit`, 12 `Read`, 9 `Agent` spawns, 5 skills) covering PR #24 (skill-tree tab-switch fix via `/fix-bug`) and PR #25 (Level 5 + Progenitor via `/spec` → implementer → 3-lens review → fix batch → re-verify → 4-lens `/simplify` → 3 playtest batches → merge), plus its 11 subagent transcripts (8 reviewer lenses, 2 implementers, 1 forked `/fix-bug` investigator). Also the tail of `93e5a1e3-…` (PR #23 merge plus an unrelated Open Design desktop-app investigation, ~100 Bash/MCP calls) and `ad099386-…` (continuation of that investigation). No implementer transcript enumerated `.claude` or touched a holdout path; holdout content was not read.
+
+**Verification of run #6 proposals:** P8, P9, and P10 remain unapplied — the same references are present at the same anchors, and H5 remains open. P8 and P10 both recurred this window (Patterns 1 and 3).
+
+**Patterns found:**
+
+1. **P8 recurrence — the non-existent `[RequireGodotRuntime]` convention still costs every agent search time (MEDIUM).** The repo has 24 `[TestSuite]` classes and 261 `[TestCase]` methods and **zero** `RequireGodotRuntime` uses, but the attribute is still prescribed at `.claude/agents/implementer.md:55,67,90`, `.claude/rules/godot-csharp-conventions.md:44`, and `CLAUDE.md:34,76`. This window the forked `/fix-bug` agent grepped it 4×, both implementers 2× each, and the orchestrator checked once before concluding it does not exist. `implementer.md:80–98` still shows `[Test]` + `SceneRunner.Load` instead of the repo's `[TestCase]` pattern. P8 text is unchanged; re-queued.
+
+2. **Reviewers are told to run `git diff` but have no shell (MEDIUM, new P11).** All three lens prompts began “Run `git diff`”; `.claude/agents/reviewer.md` grants only Read/Glob/Grep. Every reviewer report closed with a disclaimer that `git diff`, `dotnet build`, and `dotnet test` were unavailable, so review happened by direct file inspection. `.claude/agents/orchestrator.md:61` says “Pass the diff or branch” — a branch is unactionable without a shell. Proposal P11.
+
+3. **P10 recurrence plus one new host guard (LOW–MEDIUM).** (a) The Level 5 implementer hit `PreToolUse:Bash hook error: rm -rf is blocked` during `/tmp` cleanup. (b) The main session hit `(eval):1: no matches found: GdUnitRunner_*.cfg` when chaining a cleanup glob (the whole command aborts before the intended removal). (c) New: the Bash tool blocked a foreground `sleep 30` with guidance to use Monitor/until-loop or `run_in_background`; one round trip. P10 is re-queued with a third bullet for the sleep guard.
+
+4. **Playtest-tuned visuals were under-specified at spec time (MEDIUM P12 + LOW memory applied).** Progenitor diameter 96 px (1.5 × 64 px cell) → 72 px (1.125 cells) after playtest 1 → 64 px (1 cell) after playtest 3. Cadence 6.0/4.5/3.0 s put the first summon at 6.5 s, which the human read as “never summoned”; it was halved to 3.0/2.25/1.5 s. Two of the three playtest passes were spent on values that could have been chosen relative to the cell and a first-telegraph budget. Applied a grid-relative sizing + telegraph-timing bullet to `game-design.md`; propose matching spec-template wording as P12.
+
+5. **`GdUnitRunner_<uuid>.cfg` leaks into the repo root (LOW, outside distiller write scope).** `dotnet test` left an untracked cfg at the repo root; it appeared in two git-status snapshots, and the later cleanup glob failed because the file had already gone. Add `GdUnitRunner_*.cfg` to `.gitignore`. Human applies (distiller cannot write repo-root files).
+
+6. **Flag honored at merge (INFO, positive).** Flag set 2026-10-25T21:55:42 (counter 62); PR #25 merged 22:28; Merge Cleanup step 6 ran `/evolve-harness` immediately. Step 6 worked when invoked — contrast run #6's 25-day advisory gap.
+
+7. **P3 batching followed (INFO, positive).** Three playtest passes produced exactly three implementer batches, one per pass; no per-issue spawns.
+
+8. **P5 single-`Write` state updates followed (INFO, positive).** `.claude/state.json` was written four times with `Write` and never edited; no stale-content `Edit` failure.
+
+9. **Review and simplify pipeline healthy (INFO, positive).** Three shell-free lenses produced 1 CRITICAL (found independently by both security and correctness — the post-base summon leak), 4 WARNING, and 2 INFO; all were fixed in one implementer batch, and the correctness lens re-verified every item with per-finding evidence and reported CLEAN. `/simplify` ran four quality lenses, applied 9 cleanups, and declined 14 with reasons. Final gates: build 0 warnings / 0 errors, 261 tests pass / 0 skipped, layout verifier PASS, holdouts 13/13.
+
+10. **Holdout discipline held (INFO, positive).** 0/2 implementer transcripts enumerated `.claude` or touched a holdout path; the P9 prompt language was not needed this window.
+
+11. **Merge hygiene held (INFO, positive).** Bookkeeping was committed on the feature branch pre-merge; `main` fast-forwarded; no destructive git operations; no stray post-merge PR. The only stale item was `current-feature.md`'s “awaiting playtest”, corrected by this run.
+
+12. **Unrelated session tripped the activity flag (INFO).** The Oct 25 afternoon session used this project directory to debug the unrelated Open Design desktop app (~100 Bash/MCP calls, no game edits), driving the tool counter to 62. The flag is activity-based, not project-work-based; scoping it to `src/`/`Tests/` edits would require a stop-hook change (HIGH, human-only). The `open-design` MCP server also failed to connect during this run. No action.
+
+**Queued proposals (await human approval — do not apply to skills/rules/CLAUDE.md without sign-off):**
+
+- **P8 (MEDIUM — re-queued from run #6, unchanged).** Remove `[RequireGodotRuntime]`:
+  - `.claude/rules/godot-csharp-conventions.md:44` → `- Tests are [TestSuite] classes with [TestCase] methods using GdUnit4 + AssertThat (see Tests/Towers/TowerTest.cs). There is no [RequireGodotRuntime] attribute in gdUnit4.api 4.3.1 — do not use it. Scene tests use GdUnit4's SceneRunner / ISceneRunner.`
+  - `.claude/agents/implementer.md:55` → drop `[RequireGodotRuntime]`; point at `[TestSuite]` + `[TestCase]`.
+  - `.claude/agents/implementer.md:67` → replace with the same “does not exist” statement and a pointer to `Tests/Towers/TowerTest.cs`.
+  - `.claude/agents/implementer.md:80–98` (Test Patterns) → replace `[Test]` with a `[TestSuite]` class containing `[TestCase]`; delete or correct the `[RequireGodotRuntime]` + `SceneRunner.Load` example.
+  - `CLAUDE.md:34,76` — **outside distiller write scope; human applies:** remove `[RequireGodotRuntime]`, state `[TestSuite]` + `[TestCase]`.
+
+- **P9 (MEDIUM — unchanged from run #6, no new evidence).** Prohibit holdout enumeration in `.claude/agents/implementer.md:61`: “NEVER read **or enumerate** `.claude/holdouts/`; do not run recursive listings or searches over `.claude/` (`find .claude`, `ls -R .claude`, `grep -r … .claude`). Scope searches to `src/`, `Tests/`, and named harness files.” Mirror in CLAUDE.md hard rule 4 (human applies).
+
+- **P10 (LOW–MEDIUM — re-queued from run #6 with new evidence).** In `.claude/rules/verification-gates.md` → `## Host: macOS (darwin)`, after the two existing bullets add:
+  - `- **`rm -rf` is denied by the PreToolUse hook**, including under `/tmp`. Create scratch dirs with `mktemp -d` or a unique `$(date +%s)` suffix instead of deleting and recreating.`
+  - `- **zsh aborts the entire command on an unmatched glob** (`no matches found`) before anything runs, so a preceding `rm -f` in the same command never executes. Quote patterns or use `find`; do not chain cleanup with a possibly-empty glob.`
+  - `- **Foreground `sleep` is blocked** when chained with another command. To wait for a condition, use Monitor with an until-loop (`until <check>; do sleep 2; done`) or `run_in_background: true`.`
+
+- **P11 (MEDIUM — new).** Make the reviewer handoff match the reviewer's tool set:
+  - `.claude/agents/orchestrator.md:61` → `- **Reviewer:** Reviewers have Read/Glob/Grep only — no shell. Pass the diff text (output of `git diff --stat` plus `git diff`, or the changed-file contents) in each spawn prompt alongside a focused lens. Never tell a reviewer to run git, build, or tests.`
+  - `.claude/skills/review-changes/SKILL.md` step 2 → `Include the diff text (or a `git diff --stat` plus each changed file) in every reviewer prompt. Reviewers are shell-free and cannot run `git diff` themselves.`
+  - `.claude/agents/reviewer.md` Review Process step 1 → `Read the diff or changed files provided by the orchestrator. You have no shell: do not attempt git diff, build, or test commands.`
+  - `.claude/memory/dark-factory-patterns.md` handoff section → add `### Orchestrator → Reviewer` with `- Supply the diff text or an explicit changed-file list; reviewers have no shell.`
+
+- **P12 (MEDIUM — new).** In `.claude/templates/spec-template.md` under `## Visual / Geometry Theme`, before `LAYOUT`, add:
+  - `- **Scale:** State rendered sizes for new entities in grid-cell units (cell = 64 px, GameConstants.CellSize) and state when the first signature behavior becomes visible (for example "first summon by 3.5 s").`
+  - Evidence: Progenitor 96 → 72 → 64 px over two playtest passes; cadence 6.0 → 3.0 s because a first summon at 6.5 s read as “never summoned”.
+
+- **Proposal (LOW — outside distiller write scope).** Add `GdUnitRunner_*.cfg` to `.gitignore`; the test adapter leaves it at the repo root and it shows up as untracked after `dotnet test`.
+
+- **H5 (HIGH — blocked, human must implement; unchanged).** Guard recursive `.claude` enumeration in the implementer PreToolUse Bash pattern while still allowing explicit reads of named harness files.
+
+**Applied this run (LOW risk, memory only):** `harness-evolution.md` (change-history row + this entry), `harness-feedback.md` (run #7 observations, recurrences, and queued proposals), `current-feature.md` (PR #25 marked merged), `game-design.md` (grid-relative sizing + telegraph timing). No rule, skill, agent-prompt, command, template, or game file was modified; P8–P12, the `.gitignore` proposal, and H5 await human approval per the tier table in `harness-safety.md`.
