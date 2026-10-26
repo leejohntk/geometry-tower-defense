@@ -41,7 +41,7 @@ Tests/
 ## Performance
 
 - Object pooling for projectiles and enemies (frequent spawn/despawn).
-- `[RequireGodotRuntime]` only on tests that need nodes/scenes/engine APIs.
+- Tests use `[TestSuite]` on the class and `[TestCase]` on each method. gdUnit4.api 4.3.1 has no `[RequireGodotRuntime]` attribute — do not use it.
 - Avoid `_Process` on every node. Centralize update loops where possible.
 - Use `VisibleOnScreenNotifier2D` for culling checks.
 

@@ -82,6 +82,8 @@ Incremental/idle-style progression across sessions. Playing earns XP. XP spent o
 - **Towers vs enemies visually distinct.** Towers use filled shapes with clean borders. Enemies use different shapes, sizes, or border styles so they are immediately distinguishable at a glance.
 - **Color coding.** Enemy types have distinct colors. Tower types have distinct colors.
 - **Clean UI.** Geometric HUD elements. Sans-serif fonts.
+- **Size in grid units.** The grid cell is 64 px (`GameConstants.CellSize`). Specify rendered sizes for new enemies, towers, and bosses as whole or half cells rather than arbitrary pixels. The Progenitor shipped at 1 cell (64 px) after playtest rejected 1.5 cells (96 px) and 1.125 cells (72 px); those two revisions cost two playtest passes.
+- **Telegraph timing.** A new boss/enemy signature behavior should be visible within roughly 3.5 s of engagement. The Progenitor's first summon at 6.5 s (6.0 s interval + 0.5 s windup) read as "never summoned" in playtest and was halved to 3.0 s + 0.5 s.
 - **2D plane.** All visuals flat on a single 2D plane. No 3D, no isometric perspective.
 
 ## Asset Policy

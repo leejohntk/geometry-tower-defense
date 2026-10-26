@@ -36,6 +36,12 @@
 - {Visual representation — which geometric shapes?}
 - {Color scheme}
 - {Animation style}
+- {Entity scale — for in-game objects, state rendered size in grid-cell units (cell = 64 px,
+  `GameConstants.CellSize`) as well as pixels, and how the silhouette compares with existing
+  entities. A 96 px boss reads as 1.5 cells; say that before implementation.}
+- {Telegraph timing — if the entity has a signature windup or attack tell, state when the first
+  tell appears relative to spawn or lifetime, not just the repeat interval. A first tell that
+  lands after the entity is usually dead reads as "never happens."}
 
 **LAYOUT:** {State the spatial intent of the UI, not its implementation. Name each visual
 group and how it relates to the others: alignment, anchoring, and relationships between

@@ -82,7 +82,7 @@ treated as **fail-closed exit 2**, never a pass. The verifier also carries its o
 
 ## Phase 4: Multi-Lens Review
 
-1. **Spawn 3 reviewer sub-agents in parallel** (Sonnet, `.claude/agents/reviewer.md`):
+1. **Spawn 3 reviewer sub-agents in parallel** (Sonnet, `.claude/agents/reviewer.md`). First generate the diff yourself (`git diff main...HEAD` plus `git diff HEAD` for working-tree changes and the untracked-file list) and paste that diff text into every reviewer prompt. Reviewers have Read/Glob/Grep only — never ask them to run git, build, or test commands:
    - Lens 1: Security
    - Lens 2: Performance
    - Lens 3: Correctness
