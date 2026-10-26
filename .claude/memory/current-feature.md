@@ -7,15 +7,41 @@ metadata:
 
 # Current Feature
 
-**Active feature:** level-5-progenitor — three-route Level 5 + The Progenitor boss (spec approved
-2026-10-25; `.claude/specs/level-5-progenitor.md`).
-
 **Live phase lives in `.claude/state.json`** — that file is the single source of truth for what is
 active right now (and is deleted at merge, which means "idle"). This file records *history*: what
 shipped, its gates, and open follow-ups. Do not track phase here — it goes stale the moment a PR
 merges.
 
-**Last feature:** layout-verifier — headless pre-playtest layout verification
+**Last feature:** level-5-progenitor — three-route Level 5 + The Progenitor boss
+**Branch:** `feature/level-5-progenitor`
+**Spec:** `.claude/specs/level-5-progenitor.md` (approved 2026-10-25)
+
+Adds Level 5: three simultaneous left-entering lanes (top/middle/bottom) that share only the
+final run into the base, with pressure from simultaneous paths rather than a long lane that
+lets towers re-hit enemies. Waves escalate 12/15/18/21/24 enemies and lean on Swarm clusters.
+The final wave is 14 spawn events; **The Progenitor** is event 7, so it arrives mid-wave.
+
+The Progenitor walks the middle route: 120 HP, 3 armor, speed 1.4, 96 px octagon, geometric HP
+bar with 66%/33% ticks. Every interval it slows to 35% speed for 0.5 s, pulses a ring, and
+releases a mixed squad directly ahead of itself on the path. Three HP phases tighten cadence
+(6/4.5/3 s), grow the squad (3/4/5), and shift the mix toward Armored (70/30/0 → 40/35/25 →
+15/40/45). Summons drop zero coins, count toward the wave's live total, and stop on boss death
+or base arrival. Boss leak costs 1 HP.
+
+Gates: build 0 warnings / 0 errors · 259 tests pass, 0 skipped · layout verifier PASS (142
+assertions, 144 evaluated, 2 skipped) · review 1 CRITICAL + 4 WARNING + 2 INFO, all fixed
+(critical: summons could spawn after the boss reached the base; warnings: game-over kept
+spawning, victory could overwrite defeat, pool prewarm too small, test bypassed the production
+tick) · holdouts 13/13 PASS · simplify 9 cleanups applied, 14 declined (cross-cutting refactors
+deferred).
+
+Holdouts: `.claude/holdouts/regression/level-5-progenitor/scenarios.md`.
+
+Known limitations: one tracked boss per level (a second Progenitor would silently be ignored);
+route selection for non-round-robin spawns is still a WaveManager branch; summon spawning uses
+a second pipeline beside `EnemySpawned`. Balance is test-verified, not playtested.
+
+**Previous feature:** layout-verifier — headless pre-playtest layout verification
 **Branch:** `feature/layout-verifier`
 **Spec:** `.claude/specs/layout-verifier.md` (approved 2026-10-19, AC-11 amended 2026-10-19)
 
@@ -54,6 +80,13 @@ Holdouts moved to `.claude/holdouts/regression/tower-skill-tree-mechanics/`.
 
 ## Post-Merge Follow-Up
 
+- **Progenitor architecture (deferred from /simplify)** — revisit when a second boss or summoner
+  ships: wave spawn routing is still a kind branch in `WaveManager.SpawnNext`; `GameManager`
+  tracks a single boss reference, so two Progenitors would silently tick only the last; summons
+  use a second spawn pipeline beside the `EnemySpawned` seam. Each is a design refactor, not a
+  bug.
+- **Progenitor balance** — HP 120 / armor 3 / phase cadences are test-verified only; tune after
+  the human playtests Level 5.
 - **Spec doc drift (part 1)** — the tower-skill-tree-framework spec's Description line claims Skill
   Points are awarded per kill, tiered by enemy kind; its own Currency Design section and the shipped
   code award them per level outcome (victory = `levelId * 2`, defeat = half). Correct that spec line.
@@ -67,6 +100,10 @@ Holdouts moved to `.claude/holdouts/regression/tower-skill-tree-mechanics/`.
 
 ## Recent Features
 
+- **Level 5 + The Progenitor** (PR pending) — three simultaneous lanes, waves 12/15/18/21/24,
+  first boss mid-wave. Progenitor slows and summons ahead on-path with HP-phase escalation;
+  zero-coin summons count toward wave completion. Review caught a critical post-base summon
+  leak (synthetic exit waypoint) plus game-over/victory races; all fixed with regression tests.
 - **Tower skill tree mechanics** (part 2/2, PR #19, merged) — activates the 7 hidden
   mechanic nodes: Arrow pierce + crit, Cannon cluster + stun, Laser ignite + chain (60%
   compounding falloff) + ramp (1.0→2.0× over 2s). First stun/burn status effects on `Enemy`;
