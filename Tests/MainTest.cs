@@ -16,13 +16,55 @@ namespace GeometryTowerDefense.Tests;
 [TestSuite]
 public class MainTest
 {
+    // The game's logical viewport size, as configured in project.godot. The
+    // headless root viewport is 64x64 no matter what the project says, so tests
+    // must apply this size themselves before pushing real input coordinates.
+    private const string ViewportWidthSetting = "display/window/size/viewport_width";
+    private const string ViewportHeightSetting = "display/window/size/viewport_height";
+
     // Cell (col 0, row 1): inside the battlefield, below the HUD top bar, and off
     // Level 1's path (row 10).
     private static readonly Vector2 BattlefieldPoint =
         new Vector2(GameConstants.CellCenterX(0), GameConstants.CellCenterY(1));
 
+    /// <summary>
+    /// Size the root window from project.godot before building <see cref="Main"/>.
+    /// Input pushed through <see cref="Viewport.PushInput"/> is transformed into the
+    /// viewport's coordinate space, so at the headless 64x64 default the game's real
+    /// coordinates (sidebar x~1390, battlefield y=96) fall outside it and never reach
+    /// <c>Main._Input</c>. Assigning the size later than this is not safe: the tests
+    /// assert the assignment took so an environment mismatch fails loudly here instead
+    /// of as a mysterious missing preview.
+    /// </summary>
+    private static void ApplyProjectViewportSize()
+    {
+        AssertThat(ProjectSettings.HasSetting(ViewportWidthSetting) &&
+                   ProjectSettings.HasSetting(ViewportHeightSetting))
+            .OverrideFailureMessage(
+                $"ProjectSettings is missing {ViewportWidthSetting} / {ViewportHeightSetting}; " +
+                "MainTest cannot establish the real game viewport size.")
+            .IsTrue();
+
+        var expected = new Vector2I(
+            ProjectSettings.GetSetting(ViewportWidthSetting).AsInt32(),
+            ProjectSettings.GetSetting(ViewportHeightSetting).AsInt32());
+
+        var root = (Window)((SceneTree)Engine.GetMainLoop()).Root;
+        root.Size = expected;
+
+        AssertThat(root.Size)
+            .OverrideFailureMessage(
+                $"Root viewport size did not take: expected {expected} from " +
+                $"{ViewportWidthSetting} / {ViewportHeightSetting}, got {root.Size}. " +
+                "MainTest pushes real game-coordinate input, so a wrong viewport size " +
+                "makes every event land outside the viewport.")
+            .IsEqual(expected);
+    }
+
     private static Main CreateStartedGame()
     {
+        ApplyProjectViewportSize();
+
         var main = new Main();
         ((SceneTree)Engine.GetMainLoop()).Root.AddChild(main);
 
