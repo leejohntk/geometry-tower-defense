@@ -7,7 +7,7 @@ namespace GeometryTowerDefense.Tests;
 
 /// <summary>
 /// Per-tower in-level upgrade math: rank stat layering (fresh and maxed skill
-/// trees), purchase visibility helpers, and the rank-3 archetype overlay rules.
+/// trees), purchase visibility helpers, and the rank-3 body-variant rules.
 /// </summary>
 [TestSuite]
 public class TowerUpgradeTest
@@ -482,17 +482,75 @@ public class TowerUpgradeTest
         AssertThat(ramp.RampMaxMultiplier).IsEqualApprox(1.2f, 0.0001f);
     }
 
-    [TestCase]
-    public void Rank3Tower_GetsAnArchetypeAccentOnItsBody()
+    private static Tower MakeTower(TowerType type) => type switch
     {
-        var tower = new ArrowTower();
-        AssertThat(tower.GetNodeOrNull<Control>("ArchetypeAccent")).IsNull();
+        TowerType.Cannon => new CannonTower(),
+        TowerType.Laser => new LaserTower(),
+        _ => new ArrowTower()
+    };
 
-        RaiseToRank2(tower);
-        AssertThat(tower.ApplyArchetype(TowerArchetype.Pierce)).IsTrue();
+    [TestCase]
+    public void Rank3Tower_ChangesItsOwnBody_WithoutAnyAccentOverlay()
+    {
+        var cases = new (TowerType Type, string Body)[]
+        {
+            (TowerType.Arrow, "ArrowBody"),
+            (TowerType.Cannon, "CannonBody"),
+            (TowerType.Laser, "LaserEmitter")
+        };
 
-        var accent = tower.GetNodeOrNull<Control>("ArchetypeAccent");
-        AssertThat(accent).IsNotNull();
-        AssertThat(accent!.MouseFilter).IsEqual(Control.MouseFilterEnum.Ignore);
+        foreach (var (type, bodyName) in cases)
+        {
+            var tower = MakeTower(type);
+            AssertThat(tower.GetNodeOrNull<Control>("ArchetypeAccent")).IsNull();
+
+            // Body Controls are built in _Ready, so the tower must be in the tree.
+            ((SceneTree)Engine.GetMainLoop()).Root.AddChild(tower);
+            try
+            {
+                var body = tower.GetNodeOrNull<Control>(bodyName);
+                AssertThat(body).IsNotNull();
+                AssertThat(body!.MouseFilter).IsEqual(Control.MouseFilterEnum.Ignore);
+
+                RaiseToRank2(tower);
+                var archetype = TowerArchetypes.OptionsFor(type)[0];
+                AssertThat(tower.ApplyArchetype(archetype)).IsTrue();
+
+                AssertThat(tower.Rank).IsEqual(GameConstants.TowerMaxRank);
+                AssertThat(tower.Archetype).IsEqual(archetype);
+                AssertThat(tower.GetNodeOrNull<Control>("ArchetypeAccent")).IsNull();
+                AssertThat(tower.GetNodeOrNull<Control>(bodyName)).IsNotNull();
+            }
+            finally
+            {
+                tower.GetParent()?.RemoveChild(tower);
+                tower.QueueFree();
+            }
+        }
+    }
+
+    [TestCase]
+    public void ApplyingEachArchetype_SetsTheArchetype_AndNeverCreatesAnAccentOverlay()
+    {
+        var cases = new (TowerType Type, TowerArchetype Archetype)[]
+        {
+            (TowerType.Arrow, TowerArchetype.Pierce),
+            (TowerType.Arrow, TowerArchetype.Crit),
+            (TowerType.Cannon, TowerArchetype.Cluster),
+            (TowerType.Cannon, TowerArchetype.Stun),
+            (TowerType.Laser, TowerArchetype.Chain),
+            (TowerType.Laser, TowerArchetype.RampUp)
+        };
+
+        foreach (var (type, archetype) in cases)
+        {
+            var tower = MakeTower(type);
+            RaiseToRank2(tower);
+
+            AssertThat(tower.ApplyArchetype(archetype)).IsTrue();
+            AssertThat(tower.Archetype).IsEqual(archetype);
+            AssertThat(tower.HasArchetype).IsTrue();
+            AssertThat(tower.GetNodeOrNull<Control>("ArchetypeAccent")).IsNull();
+        }
     }
 }

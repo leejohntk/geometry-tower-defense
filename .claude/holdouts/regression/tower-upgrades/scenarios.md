@@ -108,6 +108,19 @@ Maxed skill tree (all ranks 5):
 - The badge has `MouseFilter = Ignore`, uses a fixed tiny icon size at rank 1 and rank 2, and never blocks tower selection or panel input.
 - The badge is present whether the tower is selected or not, and survives opening/closing the upgrade panel.
 
+## H18 — Rank-3 body variants replace the base accent
+- No tower ever gains an `ArchetypeAccent` child; the old base ring/emblem overlay is gone.
+- Rank 3 modifies the tower's own body drawing:
+  - Arrow/Pierce: forked spearhead silhouette (two narrow triangle halves with a visible centre slit).
+  - Arrow/Crit: triangle body with a four-point star at its centre.
+  - Cannon/Cluster: three overlapping body circles in a triangular cluster, not one plain circle.
+  - Cannon/Stun: body reads as concentric shockwave rings.
+  - Laser/Chain: circle body with three linked rim nodes.
+  - Laser/Ramp-Up: circle body with a rising wedge core.
+- The three base silhouettes remain recognisable as Arrow (triangle), Cannon (circle/lobed), Laser (circle) at 1× scale.
+- The tiny top-right badge remains visible at rank 3 and shows the chosen archetype emblem.
+- Body variants are procedural geometry; no sprites or external assets.
+
 ## H14 — Panel input isolation
 - Clicking an upgrade button does not deselect the tower, toggle its range indicator, place a tower, or start a wave.
 - Clicking empty battlefield space closes the panel and deselects the tower.

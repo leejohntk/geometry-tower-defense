@@ -225,10 +225,6 @@ public static class GameConstants
     public static readonly Color TowerUpgradePanelBorderColor = new Color(0.3f, 0.3f, 0.5f, 0.8f);
     public static readonly Color TowerUpgradePanelDimColor = new Color(0.35f, 0.35f, 0.42f, 0.9f);
 
-    // Rank-3 archetype accent drawn at the base of the tower body (world geometry).
-    public const float TowerArchetypeAccentRadius = 11f;
-    public const float TowerArchetypeAccentRingWidth = 2f;
-
     // Crit hit flash: brief brightening of an enemy after a crit lands (presentation).
     public const float HitFlashDuration = 0.1f;               // seconds
 

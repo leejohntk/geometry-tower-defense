@@ -10,7 +10,6 @@ public abstract partial class Tower : Node2D
 {
     private float _fireCooldownTimer = 0f;
     private Control? _rangeIndicator;
-    private Control? _archetypeAccent;
     private Control? _rankBadge;
 
     /// <summary>
@@ -219,9 +218,18 @@ public abstract partial class Tower : Node2D
 
         Archetype = archetype;
         Rank = GameConstants.TowerMaxRank;
-        UpdateArchetypeAccent();
+        OnArchetypeChanged();
         UpdateRankBadge();
         return true;
+    }
+
+    /// <summary>
+    /// Called once after this tower's archetype is chosen. Variants repaint their own
+    /// procedural body so the rank-3 silhouette reflects the specialization; there is
+    /// no separate accent overlay. Default is a no-op.
+    /// </summary>
+    protected virtual void OnArchetypeChanged()
+    {
     }
 
     /// <summary>
@@ -377,56 +385,6 @@ public abstract partial class Tower : Node2D
     }
 
     /// <summary>
-    /// Creates (once) and repaints the small archetype accent at the tower's base so a
-    /// specialized tower is readable on the battlefield. Procedural geometry only —
-    /// a tower-colored ring plus the archetype's geometric emblem.
-    /// </summary>
-    private void UpdateArchetypeAccent()
-    {
-        if (Archetype == TowerArchetype.None)
-            return;
-
-        float cell = GameConstants.CellSize;
-        if (_archetypeAccent == null)
-        {
-            var accent = new Control();
-            accent.Name = "ArchetypeAccent";
-            accent.Size = new Vector2(cell, cell);
-            accent.Position = new Vector2(-cell / 2f, -cell / 2f);
-            accent.MouseFilter = Control.MouseFilterEnum.Ignore;
-            accent.Draw += DrawArchetypeAccent;
-            AddChild(accent);
-            _archetypeAccent = accent;
-        }
-
-        _archetypeAccent.QueueRedraw();
-    }
-
-    private void DrawArchetypeAccent()
-    {
-        if (_archetypeAccent == null || !IsInstanceValid(_archetypeAccent))
-            return;
-
-        float cell = GameConstants.CellSize;
-        Vector2 baseCenter = new Vector2(cell / 2f, cell / 2f + cell * 0.28f);
-        Color color = TowerColor;
-
-        _archetypeAccent.DrawCircle(
-            baseCenter,
-            GameConstants.TowerArchetypeAccentRadius,
-            color with { A = 0.9f },
-            false,
-            GameConstants.TowerArchetypeAccentRingWidth);
-
-        ArchetypeEmblem.Draw(
-            _archetypeAccent,
-            Archetype,
-            baseCenter,
-            GameConstants.TowerArchetypeAccentRadius * 0.55f,
-            color);
-    }
-
-    /// <summary>
     /// Creates (once) and repaints the tiny current-rank badge at the top-right of the
     /// tower's cell. Driven by rank purchases only — earning XP never creates or
     /// changes the badge. The badge never consumes mouse input, so it cannot block
@@ -450,8 +408,8 @@ public abstract partial class Tower : Node2D
                 halfCell - GameConstants.TowerRankBadgeWidth - GameConstants.TowerRankBadgeMargin,
                 -halfCell + GameConstants.TowerRankBadgeMargin);
             badge.MouseFilter = Control.MouseFilterEnum.Ignore;
-            // Keep the badge above the tower body and the rank-3 base accent no matter
-            // which order those body nodes were added in.
+            // Keep the badge above the tower body no matter which order the body nodes
+            // were added in.
             badge.ZIndex = 1;
             badge.Draw += DrawRankBadge;
             AddChild(badge);

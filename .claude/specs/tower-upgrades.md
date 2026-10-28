@@ -82,7 +82,14 @@ Adds in-level per-tower upgrades. Each placed tower starts at rank 0 and can be 
 - [ ] Rank chevrons use the tower's colour (arrow blue, cannon green, laser magenta); locked/disabled states are dimmed.
 - [ ] The tower badge is a scaled-down version of the current-rank icon: chevrons for rank 1/2, the chosen archetype emblem for rank 3. It sits inside the top-right of the tower cell and must not intercept clicks.
 - [ ] Archetype emblems are distinct geometric marks: Pierce = double chevron / arrow trail; Crit = four-point star; Cluster = three small circles; Stun = concentric ring; Chain = three linked nodes; Ramp-Up = rising wedge.
-- [ ] A rank-3 tower shows a small archetype accent on the tower body (for example a coloured ring or emblem at its base) so its specialization is readable on the battlefield.
+- [ ] At rank 3 the tower body itself changes per archetype; no separate base ring/emblem accent overlay is added. The base silhouette stays recognisable:
+  - Arrow/Pierce: forked spearhead triangle (two narrow halves with a centre slit).
+  - Arrow/Crit: base triangle with a four-point star inset at its centre.
+  - Cannon/Cluster: body becomes three overlapping circles in a triangular cluster.
+  - Cannon/Stun: body becomes a circle with concentric shockwave rings.
+  - Laser/Chain: body keeps its circle and gains three linked rim nodes.
+  - Laser/Ramp-Up: body keeps its circle and gains a rising wedge core.
+  The tiny top-right badge still shows the chosen archetype emblem.
 - [ ] Panel and emblems are readable at 1× scale and do not cover more than roughly one cell of the battlefield around the tower. The panel is a UI overlay, not world geometry.
 
 ## Edge Cases
@@ -128,7 +135,7 @@ Adds in-level per-tower upgrades. Each placed tower starts at rank 0 and can be 
 
 - Caret/chevron rank icons: `^`-shaped strokes, stacked vertically-centre or in a row, one per target rank. Rank 0 = no filled chevrons.
 - Archetype cards: geometric emblem + name + 25 coin cost, in the tower colour family, with a distinct selected/hover state.
-- Rank-3 tower accent: tower-coloured ring or small emblem on the tower silhouette.
+- Rank-3 body variants: the tower's own procedural body silhouette changes per archetype (no separate accent ring/emblem overlay).
 - Panel: dark translucent rounded rectangle matching HUD sidebar (`0.05, 0.05, 0.1`), thin separator, geometric sans-serif labels. No sprites.
 
 **LAYOUT:** `Panel_TowerUpgrade` is docked to the selected tower — horizontally centred on the tower's cell and offset above it, or below it when the tower is in the top row, clamped inside the battlefield. Inside the panel, `Block_Rank` sits at the top, `Block_Upgrade` or `Block_ArchetypeChoice` sits directly beneath it. The two archetype cards in `Block_ArchetypeChoice` mirror each other about the panel's vertical centre line. Every group is wrapped in a named `Control` with `MouseFilter = Ignore` on the wrapper; the panel itself uses `Stop`. The panel may overlap world geometry but must not extend outside the play area or under the top bar.

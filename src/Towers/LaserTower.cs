@@ -54,6 +54,10 @@ public partial class LaserTower : Tower
     private readonly List<Vector2> _chainTargets = new();
     private Vector2[] _chainBeamBuffer = System.Array.Empty<Vector2>();
 
+    // The tower's own procedural emitter body. Its drawing branches on the chosen
+    // archetype (linked rim nodes or a rising wedge core); no separate overlay.
+    private Control? _body;
+
     // Continuous-beam state: the held target (plus its identity generation), ramp
     // progress, and the ignite-roll accumulator. All reset together when the held
     // target changes, is reissued from the pool, or contact ends.
@@ -151,25 +155,15 @@ public partial class LaserTower : Tower
     public override void _Ready()
     {
         float cell = GameConstants.CellSize;
-        float radius = cell / 2f - 4;
 
         // Magenta/purple emitter body.
-        var body = new Control();
-        body.Name = "LaserEmitter";
-        body.Size = new Vector2(cell, cell);
-        body.Position = new Vector2(-cell / 2f, -cell / 2f);
-        body.MouseFilter = Control.MouseFilterEnum.Ignore;
-        body.Draw += () =>
-        {
-            if (!IsInstanceValid(body)) return;
-
-            Vector2 center = new Vector2(cell / 2f, cell / 2f);
-
-            body.DrawCircle(center, radius, new Color(0.8f, 0.3f, 1.0f));            // Magenta fill
-            body.DrawCircle(center, radius, new Color(0.4f, 0.1f, 0.6f), false, 2.0f); // Darker outline
-            body.DrawCircle(center, radius * 0.4f, new Color(0.5f, 0.15f, 0.8f));    // Inner core
-        };
-        AddChild(body);
+        _body = new Control();
+        _body.Name = "LaserEmitter";
+        _body.Size = new Vector2(cell, cell);
+        _body.Position = new Vector2(-cell / 2f, -cell / 2f);
+        _body.MouseFilter = Control.MouseFilterEnum.Ignore;
+        _body.Draw += DrawBody;
+        AddChild(_body);
 
         // Beam line drawn from the tower center to the current target.
         _beam = new Line2D();
@@ -191,6 +185,83 @@ public partial class LaserTower : Tower
         AddChild(_chainBeam);
         _chainBeamBuffer = new Vector2[GameConstants.SkillMaxRanks * GameConstants.SkillLaserChainPerRank + 1];
         _chainTargets.Capacity = GameConstants.SkillMaxRanks;
+    }
+
+    protected override void OnArchetypeChanged()
+    {
+        _body?.QueueRedraw();
+    }
+
+    /// <summary>
+    /// Paints the emitter silhouette for the current archetype:
+    /// none = magenta circle with outline and core; Chain = circle with three linked
+    /// rim nodes and a small core; Ramp-Up = circle with a rising wedge core.
+    /// </summary>
+    private void DrawBody()
+    {
+        if (_body == null || !IsInstanceValid(_body))
+            return;
+
+        float cell = GameConstants.CellSize;
+        float radius = cell / 2f - 4f;
+        Vector2 center = new(cell / 2f, cell / 2f);
+        var fill = new Color(0.8f, 0.3f, 1f);
+        var outline = new Color(0.4f, 0.1f, 0.6f);
+
+        switch (Archetype)
+        {
+            case TowerArchetype.Chain:
+                DrawChainBody(center, radius, fill, outline);
+                break;
+            case TowerArchetype.RampUp:
+                _body.DrawCircle(center, radius, fill);
+                _body.DrawCircle(center, radius, outline, false, 2f);
+                // Rising wedge core: a right triangle climbing from bottom-left to top-right.
+                var wedge = new[]
+                {
+                    center + new Vector2(-radius * 0.5f, radius * 0.5f),
+                    center + new Vector2(radius * 0.5f, radius * 0.5f),
+                    center + new Vector2(radius * 0.5f, -radius * 0.5f)
+                };
+                _body.DrawColoredPolygon(wedge, new Color(0.55f, 0.18f, 0.9f));
+                break;
+            default:
+                _body.DrawCircle(center, radius, fill);                             // Magenta fill
+                _body.DrawCircle(center, radius, outline, false, 2f);               // Darker outline
+                _body.DrawCircle(center, radius * 0.4f, new Color(0.5f, 0.15f, 0.8f)); // Inner core
+                break;
+        }
+    }
+
+    /// <summary>
+    /// Chain: circle body with three small rim nodes (top, lower-left, lower-right)
+    /// joined by thin lines, plus a small central core.
+    /// </summary>
+    private void DrawChainBody(Vector2 center, float radius, Color fill, Color outline)
+    {
+        if (_body == null || !IsInstanceValid(_body))
+            return;
+
+        _body.DrawCircle(center, radius, fill);
+        _body.DrawCircle(center, radius, outline, false, 2f);
+
+        float rim = radius * 0.78f;
+        float nodeRadius = radius * 0.16f;
+        var link = new Color(0.75f, 0.45f, 1f);
+        var nodes = new Vector2[3];
+        for (int i = 0; i < nodes.Length; i++)
+        {
+            float angle = Mathf.Tau * i / nodes.Length - Mathf.Pi / 2f;
+            nodes[i] = center + new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * rim;
+        }
+
+        _body.DrawLine(nodes[0], nodes[1], link, 1.5f);
+        _body.DrawLine(nodes[1], nodes[2], link, 1.5f);
+        _body.DrawLine(nodes[2], nodes[0], link, 1.5f);
+        foreach (var node in nodes)
+            _body.DrawCircle(node, nodeRadius, link);
+
+        _body.DrawCircle(center, radius * 0.28f, new Color(0.5f, 0.15f, 0.8f));
     }
 
     public override void _Process(double delta)
