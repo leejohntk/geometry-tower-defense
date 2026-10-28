@@ -28,6 +28,11 @@ via `Enemy.ClearAttribution` on every release path; 6 performance INFO items (cr
 panel style/icon allocations, polling) left as follow-ups; correctness reviewer agents stalled
 twice on harness/API errors, so the orchestrator completed the correctness audit.
 
+**Playtest fix (2026-10-27):** seed mechanics were still active at ranks 0–2 via the
+skill tree. They are now inert until rank 3: pierce/crit, cluster/stun, and chain/ramp
+read zero on ranks 0–2 even with maxed seed nodes; the chosen seed applies only after
+the archetype choice. Trunk nodes are unchanged. Spec and holdout H12 updated.
+
 **Open follow-ups:** the spec's double-click edge case is worded as "second click is a no-op",
 but each valid click buys one rank — a second click can legitimately buy the next rank when its
 gate is already open (a challenge at 15 XP bought rank 2). The layout verifier has no assertions
