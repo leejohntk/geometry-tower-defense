@@ -9,11 +9,29 @@ namespace GeometryTowerDefense;
 public partial class ArrowTower : Tower
 {
     public override TowerType Type => TowerType.Arrow;
-    public override int Damage => SkillStats.ArrowDamage(SkillRank(SkillTreeCatalog.ArrowDamage));
-    public override float FireRate => SkillStats.ArrowFireRate(SkillRank(SkillTreeCatalog.ArrowAttackSpeed));
+    public override float Damage =>
+        SkillStats.ArrowDamage(SkillRank(SkillTreeCatalog.ArrowDamage))
+        * TowerUpgrades.DamageMultiplier(Rank);
+    public override float FireRate =>
+        TowerUpgrades.FireInterval(
+            SkillStats.ArrowFireRate(SkillRank(SkillTreeCatalog.ArrowAttackSpeed)), Rank);
     public override int Cost => GameConstants.ArrowTowerCost;
-    public override int PierceCount => SkillMechanics.ArrowPierceCount(SkillRank(SkillTreeCatalog.ArrowPierce));
-    public override float CritChance => SkillMechanics.ArrowCritChance(SkillRank(SkillTreeCatalog.ArrowCritChance));
+
+    /// <summary>
+    /// Pierce count. Before specialization both seeds apply at their skill-tree ranks
+    /// exactly as before; after choosing Crit, pierce contributes zero.
+    /// </summary>
+    public override int PierceCount =>
+        SkillMechanics.ArrowPierceCount(
+            SeedRankFor(TowerArchetype.Pierce, SkillTreeCatalog.ArrowPierce));
+
+    /// <summary>
+    /// Crit chance. After choosing Pierce, crit contributes zero.
+    /// </summary>
+    public override float CritChance =>
+        SkillMechanics.ArrowCritChance(
+            SeedRankFor(TowerArchetype.Crit, SkillTreeCatalog.ArrowCritChance));
+
     protected override Color RangeColor => new Color(0.2f, 0.5f, 1.0f);
 
     public override void _Ready()

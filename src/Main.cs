@@ -12,6 +12,7 @@ public partial class Main : Node2D
     private SkillTreeScreen? _skillTreeScreen;
     private GameManager? _gameManager;
     private GameHUD? _gameHUD;
+    private TowerUpgradePanel? _upgradePanel;
     private ResultScreen? _gameOverScreen;
     private ResultScreen? _victoryScreen;
     private bool _gameRunning = false;
@@ -54,6 +55,15 @@ public partial class Main : Node2D
         _gameHUD.PlaceTowerPressed += OnPlaceTowerPressed;
         _gameHUD.Visible = false;
         AddChild(_gameHUD);
+
+        // Per-selection tower upgrade overlay (hidden until a tower is selected).
+        // Added before the result screens so those overlays always draw on top; the
+        // panel is also explicitly closed before a result screen is shown.
+        _upgradePanel = new TowerUpgradePanel();
+        _upgradePanel.UpgradeRequested += OnTowerUpgradeRequested;
+        _upgradePanel.ArchetypeChosen += OnTowerArchetypeChosen;
+        _gameManager.CoinsChanged += OnCoinsChangedForUpgradePanel;
+        AddChild(_upgradePanel);
 
         // Create game over screen (hidden initially)
         _gameOverScreen = new ResultScreen(
@@ -135,7 +145,7 @@ public partial class Main : Node2D
         }
 
         // Ensure no stale tower selection carries over
-        _selectedTower = null;
+        ClearTowerSelection();
 
         // Hide overlays
         if (_gameOverScreen != null)
@@ -201,9 +211,9 @@ public partial class Main : Node2D
             _gameHUD?.SetStartWaveEnabled(false); // Disable wave start during placement
             Input.SetDefaultCursorShape(Input.CursorShape.Cross);
 
-            // Hide any tower range that was showing
-            _selectedTower?.HideRange();
-            _selectedTower = null;
+            // Placement wins over the upgrade panel: close it and drop the selection
+            // (hiding any range that was showing).
+            ClearTowerSelection();
         }
     }
 
@@ -214,6 +224,9 @@ public partial class Main : Node2D
         // result overlay.
         ExitTowerPlacementMode();
 
+        // The upgrade panel must never linger over a result screen.
+        ClearTowerSelection();
+
         if (_gameOverScreen != null)
             _gameOverScreen.Visible = true;
         _gameRunning = false;
@@ -222,8 +235,9 @@ public partial class Main : Node2D
     private void OnVictoryTriggered()
     {
         // Same as game over: a victory landing mid-aim must not strand placement
-        // state beneath the result overlay.
+        // state beneath the result overlay, and no upgrade control may survive play.
         ExitTowerPlacementMode();
+        ClearTowerSelection();
 
         if (_victoryScreen != null)
             _victoryScreen.Visible = true;
@@ -240,6 +254,10 @@ public partial class Main : Node2D
 
     private void OnReturnToTitle()
     {
+        // Drop any per-level tower state before the level is torn down. Ranks, XP,
+        // and archetypes are per tower instance and die with the towers.
+        ClearTowerSelection();
+
         // Reset everything
         if (_gameManager != null)
         {
@@ -318,6 +336,31 @@ public partial class Main : Node2D
             return;
         }
 
+        // Escape closes the upgrade panel and drops the tower selection. Player input
+        // is keyboard + mouse, so this is the always-available way out. The cheap
+        // selection check runs first so mouse-motion events never pay for an InputMap
+        // action lookup.
+        if ((_selectedTower != null || (_upgradePanel?.IsOpen ?? false)) &&
+            @event.IsActionPressed("ui_cancel"))
+        {
+            ClearTowerSelection();
+            GetViewport().SetInputAsHandled();
+            return;
+        }
+
+        // The upgrade panel consumes its own clicks. _Input runs before GUI input, so
+        // a click on an upgrade action must be ignored here — otherwise it would also
+        // deselect the tower, toggle its range, or start placement handling. It is
+        // deliberately NOT marked handled: the button still needs the event.
+        if (_upgradePanel != null &&
+            @event is InputEventMouseButton panelClick &&
+            panelClick.ButtonIndex == MouseButton.Left &&
+            panelClick.Pressed &&
+            _upgradePanel.ContainsPoint(panelClick.Position))
+        {
+            return;
+        }
+
         // Handle tower selection / range display (not in placement mode). Only a
         // click on the battlefield can select a tower: the HUD top bar overlays
         // row 0, so a click there must not toggle a tower's range underneath it.
@@ -346,25 +389,81 @@ public partial class Main : Node2D
             {
                 if (_selectedTower == clickedTower)
                 {
-                    // Clicked the same tower again — toggle range off
-                    clickedTower.HideRange();
-                    _selectedTower = null;
+                    // Clicked the same tower again — toggle range off and close the
+                    // panel with the selection.
+                    ClearTowerSelection();
                 }
                 else
                 {
-                    // Clicked a different tower — hide previous, show new
+                    // Clicked a different tower — hide previous, show new, and dock
+                    // the upgrade panel to the new tower.
                     _selectedTower?.HideRange();
                     clickedTower.ShowRange();
                     _selectedTower = clickedTower;
+                    OpenUpgradePanel(clickedTower);
                 }
             }
             else
             {
-                // Clicked on empty space — hide range for the selected tower
-                _selectedTower?.HideRange();
-                _selectedTower = null;
+                // Clicked on empty space — drop the selection and close the panel.
+                ClearTowerSelection();
             }
         }
+    }
+
+    /// <summary>
+    /// Docks the upgrade panel to the given tower. Only opens during active play, so
+    /// no upgrade action can be surfaced after game over or victory.
+    /// </summary>
+    private void OpenUpgradePanel(Tower tower)
+    {
+        if (_gameManager == null || _gameManager.State != GameState.Playing)
+            return;
+
+        _upgradePanel?.ShowFor(tower, _gameManager.Coins);
+    }
+
+    /// <summary>
+    /// Drops the selected tower: hides its range indicator and closes the upgrade
+    /// panel. Idempotent and safe to call when nothing is selected.
+    /// </summary>
+    private void ClearTowerSelection()
+    {
+        if (_selectedTower != null && IsInstanceValid(_selectedTower))
+            _selectedTower.HideRange();
+
+        _selectedTower = null;
+        _upgradePanel?.Close();
+    }
+
+    private void OnCoinsChangedForUpgradePanel(int coins)
+    {
+        _upgradePanel?.UpdateCoins(coins);
+    }
+
+    private void OnTowerUpgradeRequested()
+    {
+        if (_gameManager == null || _selectedTower == null)
+            return;
+
+        // The transaction revalidates game state, the XP gate, coins, and rank, so a
+        // stale button press cannot bypass a gate. Each valid click buys exactly one
+        // rank (a second click may legitimately buy the next rank if its gate is open).
+        if (_gameManager.TryUpgradeTower(_selectedTower))
+            _selectedTower.RefreshRangeIndicator();
+        _upgradePanel?.Refresh();
+    }
+
+    private void OnTowerArchetypeChosen(int archetype)
+    {
+        if (_gameManager == null || _selectedTower == null)
+            return;
+
+        // Both cards firing in one frame still lands here twice; the second call is
+        // rejected because the tower is already rank 3 with an archetype recorded.
+        if (_gameManager.TryChooseArchetype(_selectedTower, (TowerArchetype)archetype))
+            _selectedTower.RefreshRangeIndicator();
+        _upgradePanel?.Refresh();
     }
 
     /// <summary>

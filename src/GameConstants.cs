@@ -166,6 +166,53 @@ public static class GameConstants
     public const float SkillLaserRampPerRank = 0.20f;         // max dps multiplier = 1 + 0.20 * rank
     public const float SkillLaserRampTime = 2.0f;             // seconds of continuous contact to full ramp
 
+    // Tower Upgrades — in-level, per-tower ranks. Every placed tower starts at rank 0
+    // and can be raised by spending coins, gated by a hidden kill-XP accumulator.
+    // Ranks, XP, and archetype are per tower instance and are discarded with the level.
+    public const int TowerMaxRank = 3;
+    public const int TowerUpgradeCostRank1 = 5;
+    public const int TowerUpgradeCostRank2 = 15;
+    public const int TowerUpgradeCostRank3 = 25;
+    public const float TowerRankDamageBonusPerRank = 0.03f;   // multiplier = 1 + 0.03 x rank
+    public const float TowerRankRangeBonusPerRank = 0.5f;     // cells, additive
+    public const float TowerRankFireRateBonusPerRank = 0.03f; // interval / (1 + 0.03 x rank)
+    public const float TowerXpThresholdRank1 = 5f;            // cumulative kill XP
+    public const float TowerXpThresholdRank2 = 15f;
+    public const float TowerXpThresholdRank3 = 30f;
+
+    // Kill XP awarded per enemy kind. Split across every tower that damaged the
+    // enemy, in proportion to credited (effective, non-overkill) damage.
+    public const int EnemyXpBasic = 1;
+    public const int EnemyXpSwarm = 1;
+    public const int EnemyXpArmored = 3;
+    public const int EnemyXpProgenitor = 10;
+
+    // Archetype specialization: the chosen seed mechanic applies at least at this
+    // rank, even when the player's skill tree has no rank in that seed.
+    public const int ArchetypeMinSeedRank = 1;
+
+    // Tower Upgrade panel (UI overlay). One panel per selection, docked to the
+    // selected tower's cell. Dark translucent fill matching the HUD sidebar.
+    public const float TowerUpgradePanelWidth = 180f;
+    public const float TowerUpgradePanelPadding = 8f;
+    public const float TowerUpgradePanelRankHeight = 28f;
+    public const float TowerUpgradePanelUpgradeHeight = 40f;
+    public const float TowerUpgradePanelArchetypeHeight = 84f;
+    public const float TowerUpgradePanelBlockGap = 6f;
+    public const float TowerUpgradePanelCellGap = 8f;         // px between cell edge and panel
+    public const float TowerUpgradePanelIconSize = 22f;
+    public const float TowerUpgradePanelCardIconSize = 26f;
+    public const float RankChevronSize = 14f;                 // px, one ^ mark
+    public const float RankChevronGap = 3f;
+    public const float RankChevronStroke = 2.5f;
+    public static readonly Color TowerUpgradePanelBackgroundColor = new Color(0.05f, 0.05f, 0.1f, 0.92f);
+    public static readonly Color TowerUpgradePanelBorderColor = new Color(0.3f, 0.3f, 0.5f, 0.8f);
+    public static readonly Color TowerUpgradePanelDimColor = new Color(0.35f, 0.35f, 0.42f, 0.9f);
+
+    // Rank-3 archetype accent drawn at the base of the tower body (world geometry).
+    public const float TowerArchetypeAccentRadius = 11f;
+    public const float TowerArchetypeAccentRingWidth = 2f;
+
     // Crit hit flash: brief brightening of an enemy after a crit lands (presentation).
     public const float HitFlashDuration = 0.1f;               // seconds
 

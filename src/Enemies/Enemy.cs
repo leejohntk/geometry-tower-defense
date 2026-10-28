@@ -62,6 +62,18 @@ public partial class Enemy : Node2D
     private float _burnDps = 0f;
     private float _hitFlashRemaining = 0f;
 
+    // Kill-XP attribution: credited (effective, non-overkill) damage per source tower
+    // for this enemy's current life. Pre-sized, reused, and cleared on pool reset and
+    // on every reconfigure so a pooled enemy never leaks contributions into reuse.
+    // Dictionary lookup/assignment on an existing key allocates nothing, so steady
+    // combat adds no per-hit garbage.
+    private const int DamageCreditCapacity = 8;
+    private readonly Dictionary<Tower, float> _damageCredit = new(DamageCreditCapacity);
+
+    // The tower that applied the active burn, retained until the DoT ends so a burn
+    // killing blow still credits the laser even after contact has stopped.
+    private Tower? _burnSource;
+
     // Burn presentation: a hot flash on proc, plus a quantized pulse phase/step for the
     // tint while the DoT drains. The step (not the phase) is what the draw reads, so the
     // burning tint only redraws when the quantized level changes — see TickStatuses.
@@ -123,6 +135,37 @@ public partial class Enemy : Node2D
     /// Coin value awarded when this enemy is destroyed.
     /// </summary>
     public int CoinDrop { get; private set; } = GameConstants.CoinDropPerKill;
+
+    /// <summary>
+    /// Kill XP awarded to the towers that damaged this enemy, split in proportion to
+    /// credited damage. Summons keep their rolled kind's value even though their coin
+    /// drop is zero.
+    /// </summary>
+    public int XpValue { get; private set; } = GameConstants.EnemyXpBasic;
+
+    /// <summary>
+    /// Number of distinct towers currently holding damage credit on this enemy.
+    /// </summary>
+    public int CreditSourceCount => _damageCredit.Count;
+
+    /// <summary>
+    /// Credited (effective, non-overkill) damage this enemy has taken from the given
+    /// tower during its current life. Zero when the tower never damaged it.
+    /// </summary>
+    public float CreditedDamage(Tower tower) =>
+        _damageCredit.TryGetValue(tower, out float credited) ? credited : 0f;
+
+    /// <summary>
+    /// Drops every strong reference to the towers that damaged this enemy: the per-tower
+    /// credit table and the retained burn source. Called by GameManager on every pool
+    /// release path (kill, base arrival, level reset) so a released enemy never keeps a
+    /// (possibly freed) tower alive. Idempotent and allocation-free once warm.
+    /// </summary>
+    public void ClearAttribution()
+    {
+        _damageCredit.Clear();
+        _burnSource = null;
+    }
 
     /// <summary>
     /// Collision radius in pixels (half of the rendered diameter).
@@ -267,6 +310,11 @@ public partial class Enemy : Node2D
         // branch below re-seeds its phase machine. This is what keeps a pooled boss
         // from leaking phase/windup/coin state when reused as a normal enemy.
         ResetSummonState();
+
+        // A reconfigure starts a brand-new life: prior damage credit and any burn
+        // source must never survive into the new kind (pooled reuse safety).
+        ClearAttribution();
+        XpValue = TowerUpgrades.EnemyXpValue(kind);
 
         switch (kind)
         {
@@ -864,6 +912,11 @@ public partial class Enemy : Node2D
         _burnPulsePhase = 0f;
         _burnPulseStep = 0;
 
+        // Drop all kill-XP attribution: a pooled enemy must never carry one tower's
+        // damage credit (or a boss's XP value) into its next life.
+        ClearAttribution();
+        XpValue = GameConstants.EnemyXpBasic;
+
         // Clear every Progenitor field: phase, summon timer, windup, pending
         // composition, roll source, and the zero-coin summon override. The next
         // Configure re-seeds what its kind needs, so a boss reused as a Basic enemy
@@ -881,14 +934,27 @@ public partial class Enemy : Node2D
     /// <summary>
     /// Apply damage to this enemy. Flat armor reduces the damage (clamped to >= 0)
     /// unless ignoreArmor is true. If HP reaches 0, enemy is destroyed.
-    /// The Destroyed signal is emitted; GameManager handles release to pool.
+    ///
+    /// When <paramref name="source"/> is given, the hit credits that tower with the
+    /// effective damage actually removed from HP — <c>min(applied, HP before hit)</c> —
+    /// so overkill is never credited. On death the enemy's kill XP is split across
+    /// every credited tower in proportion to its credit, before the Destroyed signal
+    /// releases and resets the enemy. Omitting the source keeps the old behavior:
+    /// damage applies normally but awards no XP.
     /// </summary>
-    public void TakeDamage(float damage, bool ignoreArmor = false)
+    public void TakeDamage(float damage, bool ignoreArmor = false, Tower? source = null)
     {
         if (_isDead)
             return;
 
         float applied = Mathf.Max(ignoreArmor ? damage : damage - _armor, 0f);
+
+        if (source != null && applied > 0f && _currentHP > 0f)
+        {
+            float credited = Mathf.Min(applied, _currentHP);
+            CreditDamage(source, credited);
+        }
+
         _currentHP -= applied;
 
         if (_currentHP <= 0)
@@ -899,6 +965,7 @@ public partial class Enemy : Node2D
             // telegraph ring is cleared before the enemy is hidden and pooled.
             _summonWindupRemaining = 0f;
             _pendingSummonCount = 0;
+            AwardKillExperience();
             EmitSignal(SignalName.Destroyed, this);
             // GameManager.OnEnemyDestroyed handles release to pool
             return;
@@ -909,6 +976,45 @@ public partial class Enemy : Node2D
             // Phase recompute on every damaging hit, and repaint the border/bar.
             UpdateProgenitorPhase();
             RedrawVisual();
+        }
+    }
+
+    /// <summary>
+    /// Adds effective damage to one tower's credit entry. The table is keyed by tower
+    /// so repeated hits accumulate on a single entry (and allocate nothing once the
+    /// entry exists).
+    /// </summary>
+    private void CreditDamage(Tower source, float amount)
+    {
+        _damageCredit.TryGetValue(source, out float existing);
+        _damageCredit[source] = existing + amount;
+    }
+
+    /// <summary>
+    /// Splits this enemy's kill XP across its credited towers by credited-damage
+    /// share. Called exactly once, on death, before the Destroyed signal. A tower
+    /// freed mid-level is skipped so no dangling node is dereferenced.
+    /// </summary>
+    private void AwardKillExperience()
+    {
+        if (XpValue <= 0 || _damageCredit.Count == 0)
+            return;
+
+        float total = 0f;
+        foreach (var entry in _damageCredit)
+            total += entry.Value;
+
+        if (!(total > 0f))
+            return;
+
+        float enemyXp = XpValue;
+        foreach (var entry in _damageCredit)
+        {
+            var tower = entry.Key;
+            if (tower == null || !IsInstanceValid(tower))
+                continue;
+
+            tower.AddXp(enemyXp * entry.Value / total);
         }
     }
 
@@ -929,14 +1035,17 @@ public partial class Enemy : Node2D
     /// Applies a burn DoT of the given dps for the given duration. Re-proc refreshes
     /// the duration and does not stack. A proc (first or refresh) also flashes the
     /// enemy briefly and restarts the pulse phase so the moment it lands is visible.
+    /// The optional <paramref name="source"/> laser is retained until the burn ends so
+    /// every tick — including a killing blow — credits its tower.
     /// </summary>
-    public void ApplyBurn(float dps, float duration)
+    public void ApplyBurn(float dps, float duration, Tower? source = null)
     {
         if (_isDead || dps <= 0f || duration <= 0f)
             return;
 
         _burnDps = dps;
         _burnRemaining = Mathf.Max(_burnRemaining, duration);
+        _burnSource = source;
         _burnFlashRemaining = GameConstants.BurnProcFlashDuration;
         _burnPulsePhase = 0f;
         _burnPulseStep = 0;
@@ -978,10 +1087,15 @@ public partial class Enemy : Node2D
         if (_burnRemaining > 0f)
         {
             // Burn the portion of this frame the DoT was still active, then advance
-            // the timer. Total burn damage is dps * duration (2 dps x 2s = 4).
+            // the timer. Total burn damage is dps * duration (2 dps x 2s = 4). The
+            // credited source survives contact so the killing tick still awards XP.
             float burnTime = Mathf.Min(delta, _burnRemaining);
-            TakeDamage(_burnDps * burnTime, ignoreArmor: true);
+            TakeDamage(_burnDps * burnTime, ignoreArmor: true, _burnSource);
+            if (_isDead)
+                return;
             _burnRemaining = Mathf.Max(0f, _burnRemaining - delta);
+            if (_burnRemaining <= 0f)
+                _burnSource = null;
 
             // Burn is the one status whose tint is not a pure function of "active or
             // not": it pulses so the drain reads as ongoing. Advance the phase and

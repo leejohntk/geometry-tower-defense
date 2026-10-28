@@ -401,7 +401,7 @@ public partial class GameManager : Node2D
 
             float rampMultiplier = laser.UpdateRamp(target, delta);
             float tickDamage = laser.Dps * rampMultiplier * delta;
-            target.TakeDamage(tickDamage, ignoreArmor: true);
+            target.TakeDamage(tickDamage, ignoreArmor: true, source: laser);
 
             if (target.IsDead)
             {
@@ -415,7 +415,10 @@ public partial class GameManager : Node2D
             for (int i = 0; i < igniteRolls; i++)
             {
                 if (laser.Rolls.Roll(laser.IgniteChancePerSecond))
-                    target.ApplyBurn(GameConstants.SkillLaserBurnDps, GameConstants.SkillLaserBurnDuration);
+                    target.ApplyBurn(
+                        GameConstants.SkillLaserBurnDps,
+                        GameConstants.SkillLaserBurnDuration,
+                        laser);
             }
         }
     }
@@ -447,7 +450,7 @@ public partial class GameManager : Node2D
                 break;
 
             damage *= GameConstants.SkillLaserChainFalloff;
-            next.TakeDamage(damage, ignoreArmor: true);
+            next.TakeDamage(damage, ignoreArmor: true, source: laser);
             _chainHitEnemies.Add(next);
             _chainTargets.Add(next.Position);
             from = next;
@@ -648,6 +651,9 @@ public partial class GameManager : Node2D
         if (_state == GameState.GameOver)
         {
             _waveManager?.NotifyEnemyReachedEnd();
+            // Drop tower credit before pooling: a released enemy must never keep a
+            // strong reference to a tower (which the level reset frees).
+            enemy.ClearAttribution();
             _enemyPool?.Release(enemy);
             return;
         }
@@ -682,6 +688,8 @@ public partial class GameManager : Node2D
             EmitSignal(SignalName.GameOver);
         }
 
+        // BaseDamage was consumed above; drop tower credit before pooling.
+        enemy.ClearAttribution();
         _enemyPool?.Release(enemy);
     }
 
@@ -701,6 +709,10 @@ public partial class GameManager : Node2D
 
         // Notify wave manager
         _waveManager?.NotifyEnemyDestroyed();
+
+        // Drop tower credit before pooling so a released enemy never keeps a strong
+        // reference to a tower that a level reset may free.
+        enemy.ClearAttribution();
 
         // Return enemy to pool
         _enemyPool?.Release(enemy);
@@ -905,6 +917,74 @@ public partial class GameManager : Node2D
     }
 
     /// <summary>
+    /// True when the tower belongs to this game's live level: a valid node that is
+    /// still in the active tower list. Upgrades reject anything else so a stale panel
+    /// (or a tower from a previous level) can never spend coins.
+    /// </summary>
+    public bool IsTowerActive(Tower? tower) =>
+        tower != null && IsInstanceValid(tower) && _activeTowers.Contains(tower);
+
+    /// <summary>
+    /// Buys the next generic rank (0 -> 1 or 1 -> 2) for a live tower. Exactly one
+    /// rank and one coin deduction per success. Rejected with no state change when
+    /// the game is not playing, the tower is not active, XP is below the next
+    /// threshold, coins are short, or the tower is at rank 2 (the third step is the
+    /// archetype choice, never a generic upgrade).
+    /// </summary>
+    public bool TryUpgradeTower(Tower? tower)
+    {
+        if (_state != GameState.Playing)
+            return false;
+
+        if (!IsTowerActive(tower))
+            return false;
+
+        var target = tower!;
+        if (!TowerUpgrades.CanBuyNextRank(target.Rank, target.Xp, _coins))
+            return false;
+
+        int cost = TowerUpgrades.CostToReachRank(target.Rank + 1);
+        if (!target.ApplyRankUpgrade())
+            return false;
+
+        _coins -= cost;
+        EmitSignal(SignalName.CoinsChanged, _coins);
+        EmitSignal(SignalName.TowerPlacementStateChanged, _coins >= GameConstants.ArrowTowerCost);
+        return true;
+    }
+
+    /// <summary>
+    /// Buys the rank 2 -> 3 archetype specialization. Spends the rank-3 cost, sets
+    /// the tower's final rank, and records the chosen seed. Rejected with no state
+    /// change unless the game is playing, the tower is live and exactly rank 2, the
+    /// hidden rank-3 XP gate is reached, coins cover the cost, and the archetype
+    /// belongs to that tower type. Final — there is no respec or refund.
+    /// </summary>
+    public bool TryChooseArchetype(Tower? tower, TowerArchetype archetype)
+    {
+        if (_state != GameState.Playing)
+            return false;
+
+        if (!IsTowerActive(tower))
+            return false;
+
+        var target = tower!;
+        if (!TowerUpgrades.CanBuyArchetype(target.Rank, target.Xp, _coins))
+            return false;
+
+        if (!TowerArchetypes.IsValidFor(target.Type, archetype))
+            return false;
+
+        if (!target.ApplyArchetype(archetype))
+            return false;
+
+        _coins -= TowerUpgrades.CostToReachRank(GameConstants.TowerMaxRank);
+        EmitSignal(SignalName.CoinsChanged, _coins);
+        EmitSignal(SignalName.TowerPlacementStateChanged, _coins >= GameConstants.ArrowTowerCost);
+        return true;
+    }
+
+    /// <summary>
     /// Test-only seam: grants coins without combat so placement-lifecycle tests can
     /// start above one tower's cost and observe that a successful placement consumes
     /// the selection while coins remain. Internal to the game assembly; not part of
@@ -921,6 +1001,35 @@ public partial class GameManager : Node2D
     }
 
     /// <summary>
+    /// Test-only seam: forces the game state so transaction rejection can be exercised
+    /// without driving a full defeat/victory. Internal to the game assembly; production
+    /// transitions only through enemy arrivals and wave completion.
+    /// </summary>
+    internal void SetStateForTesting(GameState state) => _state = state;
+
+    /// <summary>
+    /// Test-only seam: registers an externally constructed enemy into the live
+    /// lifecycle so the centralized damage pass (laser drain, chain jumps, statuses)
+    /// can be exercised without a wave timer. Internal to the game assembly;
+    /// production spawns only through <see cref="WaveManager"/>.
+    /// </summary>
+    internal void RegisterEnemyForTesting(Enemy enemy, int routeIndex = 0)
+    {
+        if (_state != GameState.Playing)
+            return;
+
+        if (enemy == null || !IsInstanceValid(enemy))
+            return;
+
+        // Registering twice would double-subscribe the lifecycle signals and add a
+        // duplicate list entry (double coins on death). Treat it as a no-op.
+        if (_activeEnemies.Contains(enemy))
+            return;
+
+        RegisterEnemy(enemy, routeIndex);
+    }
+
+    /// <summary>
     /// Reset the game state (for starting a new game after game over / victory).
     /// Does NOT call Initialize() — Main.StartNewGame() is the sole caller of Initialize.
     /// </summary>
@@ -931,7 +1040,13 @@ public partial class GameManager : Node2D
         {
             if (IsInstanceValid(enemy))
             {
+                // Unregister while the enemy still reports its real Kind, so a boss
+                // unhooks SummonReady before ResetForPool turns it back into a Basic.
                 UnregisterEnemy(enemy);
+                // Reset immediately (not just on the next Acquire) so no credit entry
+                // keeps a tower reference alive after the level's towers are freed.
+                // ResetForPool also clears damage attribution and the burn source.
+                enemy.ResetForPool();
                 _enemyPool?.Release(enemy);
             }
         }

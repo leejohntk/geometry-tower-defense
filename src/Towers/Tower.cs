@@ -10,6 +10,7 @@ public abstract partial class Tower : Node2D
 {
     private float _fireCooldownTimer = 0f;
     private Control? _rangeIndicator;
+    private Control? _archetypeAccent;
 
     /// <summary>
     /// Grid row position of this tower.
@@ -33,17 +34,53 @@ public abstract partial class Tower : Node2D
     private SkillTreeState? _skillState;
 
     public abstract TowerType Type { get; }
-    public abstract int Damage { get; }
+
+    /// <summary>
+    /// Damage per hit before enemy armor. Kept as a float end to end: rank multipliers
+    /// produce fractional values (rank 3 arrow = 10.9) and the exact value must reach
+    /// <see cref="Enemy.TakeDamage"/> without integer truncation.
+    /// </summary>
+    public abstract float Damage { get; }
     public abstract float FireRate { get; }
     public abstract int Cost { get; }
     protected abstract Color RangeColor { get; }
 
     /// <summary>
-    /// Final range (cells), base plus skill ranks. Concrete here so the placement
-    /// preview (via <see cref="SkillStats.RangeCells"/>) and every placed tower
-    /// share exactly one "type → range" mapping.
+    /// This tower's geometric theme color (arrow blue, cannon green, laser magenta).
+    /// Used by the upgrade panel's chevrons and archetype emblems.
     /// </summary>
-    public float RangeCells => SkillStats.RangeCells(Type, _skillState);
+    public Color TowerColor => RangeColor;
+
+    /// <summary>
+    /// In-level upgrade rank (0..3). Raised by <see cref="GameManager"/> through
+    /// <see cref="ApplyRankUpgrade"/>; rank 3 is only reachable by choosing an
+    /// archetype. Per tower instance — never shared or persisted across levels.
+    /// </summary>
+    public int Rank { get; private set; }
+
+    /// <summary>
+    /// Hidden kill-XP accumulator for this tower. Fractional shares are kept; the
+    /// value is never rounded per hit and only gates the next upgrade's visibility.
+    /// </summary>
+    public float Xp { get; private set; }
+
+    /// <summary>
+    /// Chosen archetype, or <see cref="TowerArchetype.None"/> before rank 3.
+    /// Final for this tower instance (no respec, no refund).
+    /// </summary>
+    public TowerArchetype Archetype { get; private set; } = TowerArchetype.None;
+
+    /// <summary>
+    /// True once this tower has specialized into one of its seed branches.
+    /// </summary>
+    public bool HasArchetype => Archetype != TowerArchetype.None;
+
+    /// <summary>
+    /// Final range (cells): skill-tree range plus the additive per-rank bonus. Applies
+    /// to every tower type, including the cannon (which has no range trunk node).
+    /// </summary>
+    public float RangeCells =>
+        TowerUpgrades.RangeCells(SkillStats.RangeCells(Type, _skillState), Rank);
 
     /// <summary>
     /// Multiplier applied to projectile speed at launch. Base is 1.0; the cannon's
@@ -125,6 +162,66 @@ public abstract partial class Tower : Node2D
     protected int SkillRank(string nodeId) => _skillState?.GetRank(nodeId) ?? 0;
 
     /// <summary>
+    /// Rank that applies to a seed mechanic for this tower's current life. Before
+    /// specialization both seeds use their skill-tree ranks; after it, the chosen
+    /// branch applies at least at rank 1 and the unchosen branch contributes zero.
+    /// </summary>
+    protected int SeedRankFor(TowerArchetype branch, string nodeId) =>
+        Archetype == TowerArchetype.None
+            ? SkillRank(nodeId)
+            : Archetype == branch
+                ? TowerArchetypes.EffectiveSeedRank(SkillRank(nodeId))
+                : 0;
+
+    // === In-level upgrades ===
+
+    /// <summary>
+    /// Credits kill XP to this tower. Fractional shares are accumulated exactly (never
+    /// rounded per hit); negative or non-finite amounts are ignored.
+    /// </summary>
+    public void AddXp(float amount)
+    {
+        if (!(amount > 0f) || !float.IsFinite(amount))
+            return;
+
+        Xp += amount;
+    }
+
+    /// <summary>
+    /// Raises the rank by exactly one for a completed purchase. Ranks 0 -> 1 and
+    /// 1 -> 2 are the only generic steps: rank 2 -> 3 is the archetype choice, so
+    /// there is no third chevron. Callers (GameManager) own the coin/XP transaction.
+    /// </summary>
+    internal bool ApplyRankUpgrade()
+    {
+        if (Rank >= GameConstants.TowerMaxRank - 1)
+            return false;
+
+        Rank++;
+        return true;
+    }
+
+    /// <summary>
+    /// Installs the chosen archetype and sets the tower to the final rank. Rejected
+    /// unless the tower is exactly at rank 2, has no archetype yet, and the archetype
+    /// belongs to this tower type. The only rank 2 -> 3 path.
+    /// </summary>
+    internal bool ApplyArchetype(TowerArchetype archetype)
+    {
+        if (Rank != GameConstants.TowerMaxRank - 1)
+            return false;
+        if (Archetype != TowerArchetype.None)
+            return false;
+        if (!TowerArchetypes.IsValidFor(Type, archetype))
+            return false;
+
+        Archetype = archetype;
+        Rank = GameConstants.TowerMaxRank;
+        UpdateArchetypeAccent();
+        return true;
+    }
+
+    /// <summary>
     /// Initialize tower at a specific grid position.
     /// </summary>
     public void Initialize(int gridRow, int gridCol)
@@ -191,19 +288,21 @@ public abstract partial class Tower : Node2D
     {
         if (_rangeIndicator != null) return;
 
-        float rangePixels = RangePixels;
-
         _rangeIndicator = new Control();
         _rangeIndicator.Name = "RangeIndicator";
-        _rangeIndicator.Size = new Vector2(rangePixels * 2, rangePixels * 2);
-        _rangeIndicator.Position = new Vector2(-rangePixels, -rangePixels);
+        // Visual-only overlay: it must never swallow a UI click (the upgrade panel can
+        // overlap the range circle).
+        _rangeIndicator.MouseFilter = Control.MouseFilterEnum.Ignore;
+        LayoutRangeIndicator();
 
         _rangeIndicator.Draw += () =>
         {
             if (_rangeIndicator == null) return;
 
-            float radius = rangePixels;
-            Vector2 center = new Vector2(rangePixels, rangePixels);
+            // Read the live range so a rank purchase that widens the range can repaint
+            // the same control instead of replacing it.
+            float radius = RangePixels;
+            Vector2 center = _rangeIndicator.Size / 2f;
 
             // Filled semi-transparent circle
             _rangeIndicator.DrawCircle(
@@ -226,6 +325,33 @@ public abstract partial class Tower : Node2D
     }
 
     /// <summary>
+    /// Resizes and repaints a visible range indicator after a stat change (a rank
+    /// purchase widens the range). No-op when the indicator is hidden.
+    /// </summary>
+    public void RefreshRangeIndicator()
+    {
+        if (_rangeIndicator == null)
+            return;
+
+        LayoutRangeIndicator();
+        _rangeIndicator.QueueRedraw();
+    }
+
+    /// <summary>
+    /// Sizes and centers the range control from the tower's current range. Shared by
+    /// the initial show and the rank-purchase refresh so both stay in sync.
+    /// </summary>
+    private void LayoutRangeIndicator()
+    {
+        if (_rangeIndicator == null)
+            return;
+
+        float rangePixels = RangePixels;
+        _rangeIndicator.Size = new Vector2(rangePixels * 2, rangePixels * 2);
+        _rangeIndicator.Position = new Vector2(-rangePixels, -rangePixels);
+    }
+
+    /// <summary>
     /// Hide and remove the circular range indicator.
     /// No-op if already hidden.
     /// </summary>
@@ -245,6 +371,56 @@ public abstract partial class Tower : Node2D
             HideRange();
         else
             ShowRange();
+    }
+
+    /// <summary>
+    /// Creates (once) and repaints the small archetype accent at the tower's base so a
+    /// specialized tower is readable on the battlefield. Procedural geometry only —
+    /// a tower-colored ring plus the archetype's geometric emblem.
+    /// </summary>
+    private void UpdateArchetypeAccent()
+    {
+        if (Archetype == TowerArchetype.None)
+            return;
+
+        float cell = GameConstants.CellSize;
+        if (_archetypeAccent == null)
+        {
+            var accent = new Control();
+            accent.Name = "ArchetypeAccent";
+            accent.Size = new Vector2(cell, cell);
+            accent.Position = new Vector2(-cell / 2f, -cell / 2f);
+            accent.MouseFilter = Control.MouseFilterEnum.Ignore;
+            accent.Draw += DrawArchetypeAccent;
+            AddChild(accent);
+            _archetypeAccent = accent;
+        }
+
+        _archetypeAccent.QueueRedraw();
+    }
+
+    private void DrawArchetypeAccent()
+    {
+        if (_archetypeAccent == null || !IsInstanceValid(_archetypeAccent))
+            return;
+
+        float cell = GameConstants.CellSize;
+        Vector2 baseCenter = new Vector2(cell / 2f, cell / 2f + cell * 0.28f);
+        Color color = TowerColor;
+
+        _archetypeAccent.DrawCircle(
+            baseCenter,
+            GameConstants.TowerArchetypeAccentRadius,
+            color with { A = 0.9f },
+            false,
+            GameConstants.TowerArchetypeAccentRingWidth);
+
+        ArchetypeEmblem.Draw(
+            _archetypeAccent,
+            Archetype,
+            baseCenter,
+            GameConstants.TowerArchetypeAccentRadius * 0.55f,
+            color);
     }
 
     public override void _Process(double delta)

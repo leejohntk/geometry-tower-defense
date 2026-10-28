@@ -11,14 +11,42 @@ namespace GeometryTowerDefense;
 public partial class LaserTower : Tower
 {
     public override TowerType Type => TowerType.Laser;
-    public override int Damage => 0;
+    public override float Damage => 0f;
     public override float FireRate => 0f;
     public override int Cost => GameConstants.LaserTowerCost;
-    public override float Dps => SkillStats.LaserDps(SkillRank(SkillTreeCatalog.LaserDps));
+
+    /// <summary>
+    /// Continuous DPS: the skill-tree DPS scaled by the per-rank fire-rate bonus (the
+    /// laser has no fire interval, so the interval divisor applies to DPS as a
+    /// multiplier instead).
+    /// </summary>
+    public override float Dps =>
+        SkillStats.LaserDps(SkillRank(SkillTreeCatalog.LaserDps))
+        * TowerUpgrades.FireRateMultiplier(Rank);
     public override bool IsContinuous => true;
-    public override int ChainJumps => SkillMechanics.LaserChainJumps(SkillRank(SkillTreeCatalog.LaserChain));
+
+    /// <summary>
+    /// Beam jumps. Before specialization both seeds apply at their skill-tree ranks;
+    /// after choosing Ramp-Up, chain contributes zero jumps.
+    /// </summary>
+    public override int ChainJumps =>
+        SkillMechanics.LaserChainJumps(
+            SeedRankFor(TowerArchetype.Chain, SkillTreeCatalog.LaserChain));
+
+    /// <summary>
+    /// Per-second ignite chance. Ignite is a trunk node, so it keeps applying
+    /// regardless of the chosen archetype.
+    /// </summary>
     public override float IgniteChancePerSecond => SkillMechanics.LaserIgniteChancePerSecond(SkillRank(SkillTreeCatalog.LaserIgnite));
-    public override float RampMaxMultiplier => SkillMechanics.LaserRampMaxMultiplier(SkillRank(SkillTreeCatalog.LaserRampUp));
+
+    /// <summary>
+    /// Maximum ramp multiplier. After choosing Chain, ramp contributes nothing (1.0x);
+    /// after choosing Ramp-Up it uses the effective seed rank.
+    /// </summary>
+    public override float RampMaxMultiplier =>
+        SkillMechanics.LaserRampMaxMultiplier(
+            SeedRankFor(TowerArchetype.RampUp, SkillTreeCatalog.LaserRampUp));
+
     protected override Color RangeColor => new Color(0.8f, 0.3f, 1.0f);
 
     private Line2D? _beam;

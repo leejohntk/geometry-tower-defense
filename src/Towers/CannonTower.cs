@@ -11,15 +11,33 @@ namespace GeometryTowerDefense;
 public partial class CannonTower : Tower
 {
     public override TowerType Type => TowerType.Cannon;
-    public override int Damage => SkillStats.CannonDamage(SkillRank(SkillTreeCatalog.CannonPowderCharge));
-    public override float FireRate => SkillStats.CannonFireRate(SkillRank(SkillTreeCatalog.CannonAttackSpeed));
+    public override float Damage =>
+        SkillStats.CannonDamage(SkillRank(SkillTreeCatalog.CannonPowderCharge))
+        * TowerUpgrades.DamageMultiplier(Rank);
+    public override float FireRate =>
+        TowerUpgrades.FireInterval(
+            SkillStats.CannonFireRate(SkillRank(SkillTreeCatalog.CannonAttackSpeed)), Rank);
     public override int Cost => GameConstants.CannonTowerCost;
     public override float ProjectileSpeedMultiplier => SkillStats.CannonProjectileSpeedMultiplier(SkillRank(SkillTreeCatalog.CannonPowderCharge));
-    public override int ClusterCount => SkillMechanics.CannonClusterCount(SkillRank(SkillTreeCatalog.CannonCluster));
-    public override float StunChance => SkillMechanics.CannonStunChance(SkillRank(SkillTreeCatalog.CannonStunChance));
 
     /// <summary>
-    /// Final AoE radius (px) with the Splash Radius node applied.
+    /// Shells per volley. Before specialization both seeds apply at their skill-tree
+    /// ranks; after choosing Stun, cluster contributes nothing (one shell).
+    /// </summary>
+    public override int ClusterCount =>
+        SkillMechanics.CannonClusterCount(
+            SeedRankFor(TowerArchetype.Cluster, SkillTreeCatalog.CannonCluster));
+
+    /// <summary>
+    /// Per-hit stun chance. After choosing Cluster, stun contributes zero.
+    /// </summary>
+    public override float StunChance =>
+        SkillMechanics.CannonStunChance(
+            SeedRankFor(TowerArchetype.Stun, SkillTreeCatalog.CannonStunChance));
+
+    /// <summary>
+    /// Final AoE radius (px) with the Splash Radius trunk node applied. This is a
+    /// trunk-only stat: the per-rank range bonus never touches the splash radius.
     /// </summary>
     public override float SplashRadius => SkillStats.CannonSplashRadius(SkillRank(SkillTreeCatalog.CannonSplashRadius));
     protected override Color RangeColor => new Color(0.3f, 0.6f, 0.4f);

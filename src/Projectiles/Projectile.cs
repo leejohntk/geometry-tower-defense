@@ -28,7 +28,9 @@ public abstract partial class Projectile : Node2D
     protected float _distanceTraveled = 0f;
     protected float _maxRangePixels;
     protected float _speed;
-    protected int _damage;
+    // Damage stays a float end to end so rank multipliers (10.9, 16.35) reach the
+    // enemy with no integer truncation before armor.
+    protected float _damage;
     private bool _hasHit = false;
 
     // Pierce state: how many enemies this projectile may still hit, and which enemies
@@ -208,7 +210,8 @@ public partial class ArrowProjectile : Projectile
     {
         // Apply single-target damage synchronously. This ensures that when two
         // projectiles hit the same enemy in one frame, the second hit correctly
-        // sees the enemy as dead (via HitEnemy's IsDead guard).
+        // sees the enemy as dead (via HitEnemy's IsDead guard). The firing tower is
+        // passed through so the hit credits its kill XP (pierced hits included).
         float damage = _damage;
 
         // Independent per-hit crit roll: 2x the (already skill-boosted) damage.
@@ -220,6 +223,6 @@ public partial class ArrowProjectile : Projectile
             enemy.ApplyHitFlash();
         }
 
-        enemy.TakeDamage(damage);
+        enemy.TakeDamage(damage, source: tower);
     }
 }
