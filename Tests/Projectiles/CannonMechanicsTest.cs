@@ -13,17 +13,37 @@ namespace GeometryTowerDefense.Tests;
 [TestSuite]
 public class CannonMechanicsTest
 {
+    /// <summary>
+    /// Seed mechanics are inert until rank 3, so cluster/stun tests must specialize
+    /// the tower first (rank 3 + the matching archetype).
+    /// </summary>
+    private static CannonTower Rank3Cannon(SkillTreeState state, TowerArchetype archetype)
+    {
+        var cannon = new CannonTower();
+        cannon.Initialize(0, 0);
+        cannon.SetSkillTree(state);
+        AssertThat(cannon.ApplyRankUpgrade()).IsTrue();
+        AssertThat(cannon.ApplyRankUpgrade()).IsTrue();
+        AssertThat(cannon.ApplyArchetype(archetype)).IsTrue();
+        return cannon;
+    }
+
     [TestCase]
     public void Cluster_ShellCount_IncreasesPerRank()
     {
         var state = new SkillTreeState();
         state.SetRank(SkillTreeCatalog.CannonCluster, 5);
 
-        var cannon = new CannonTower();
-        cannon.SetSkillTree(state);
-
+        var cannon = Rank3Cannon(state, TowerArchetype.Cluster);
         AssertThat(cannon.ClusterCount).IsEqual(6);
-        AssertThat(new CannonTower().ClusterCount).IsEqual(1); // rank 0 → single shell
+
+        // Pre-specialization the seed is inert: rank 0 and rank 2 stay at one shell.
+        AssertThat(new CannonTower().ClusterCount).IsEqual(1);
+        var unspent = new CannonTower();
+        unspent.SetSkillTree(state);
+        AssertThat(unspent.ApplyRankUpgrade()).IsTrue();
+        AssertThat(unspent.ApplyRankUpgrade()).IsTrue();
+        AssertThat(unspent.ClusterCount).IsEqual(1);
     }
 
     [TestCase]
@@ -52,9 +72,7 @@ public class CannonMechanicsTest
         var state = new SkillTreeState();
         state.SetRank(SkillTreeCatalog.CannonStunChance, 5); // 30%
 
-        var cannon = new CannonTower();
-        cannon.Initialize(0, 0);
-        cannon.SetSkillTree(state);
+        var cannon = Rank3Cannon(state, TowerArchetype.Stun);
         cannon.SetSkillRandom(new ScriptedRandom(0.0)); // always succeeds
 
         var target = new Enemy();
@@ -67,10 +85,10 @@ public class CannonMechanicsTest
         armored.Configure(EnemyKind.Armored); // 14 HP, 5 armor
         armored.Position = Vector2.Zero;
 
-        // Cannon damage 15 - 5 armor = 10 → HP 4, survives, then stun lands.
+        // Rank-3 cannon damage 16.35 - 5 armor = 11.35 → HP 2.65, survives, stun lands.
         shell.Explode(new List<Enemy> { armored }, Vector2.Zero, cannon.Damage);
 
-        AssertThat(armored.CurrentHP).IsEqual(4f);
+        AssertThat(armored.CurrentHP).IsEqualApprox(2.65f, 0.001f);
         AssertThat(armored.IsStunned).IsTrue();
         AssertThat(armored.StunRemaining).IsEqual(GameConstants.SkillCannonStunDuration);
     }
@@ -81,9 +99,7 @@ public class CannonMechanicsTest
         var state = new SkillTreeState();
         state.SetRank(SkillTreeCatalog.CannonStunChance, 5); // 30%
 
-        var cannon = new CannonTower();
-        cannon.Initialize(0, 0);
-        cannon.SetSkillTree(state);
+        var cannon = Rank3Cannon(state, TowerArchetype.Stun);
         cannon.SetSkillRandom(new ScriptedRandom(1.0)); // always fails
 
         var target = new Enemy();
@@ -98,7 +114,7 @@ public class CannonMechanicsTest
 
         shell.Explode(new List<Enemy> { armored }, Vector2.Zero, cannon.Damage);
 
-        AssertThat(armored.CurrentHP).IsEqual(4f);
+        AssertThat(armored.CurrentHP).IsEqualApprox(2.65f, 0.001f);
         AssertThat(armored.IsStunned).IsFalse();
     }
 
@@ -108,9 +124,7 @@ public class CannonMechanicsTest
         var state = new SkillTreeState();
         state.SetRank(SkillTreeCatalog.CannonStunChance, 5);
 
-        var cannon = new CannonTower();
-        cannon.Initialize(0, 0);
-        cannon.SetSkillTree(state);
+        var cannon = Rank3Cannon(state, TowerArchetype.Stun);
         cannon.SetSkillRandom(new ScriptedRandom(0.0));
 
         var target = new Enemy();

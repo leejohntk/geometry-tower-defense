@@ -26,8 +26,8 @@ public partial class LaserTower : Tower
     public override bool IsContinuous => true;
 
     /// <summary>
-    /// Beam jumps. Before specialization both seeds apply at their skill-tree ranks;
-    /// after choosing Ramp-Up, chain contributes zero jumps.
+    /// Beam jumps. Seed mechanics are inert before rank 3 (zero jumps). After
+    /// choosing Chain it is max(1, skill rank); after choosing Ramp-Up it is zero.
     /// </summary>
     public override int ChainJumps =>
         SkillMechanics.LaserChainJumps(
@@ -40,8 +40,8 @@ public partial class LaserTower : Tower
     public override float IgniteChancePerSecond => SkillMechanics.LaserIgniteChancePerSecond(SkillRank(SkillTreeCatalog.LaserIgnite));
 
     /// <summary>
-    /// Maximum ramp multiplier. After choosing Chain, ramp contributes nothing (1.0x);
-    /// after choosing Ramp-Up it uses the effective seed rank.
+    /// Maximum ramp multiplier. Inert before rank 3 (1.0x). After choosing Ramp-Up it
+    /// is 1 + max(1, skill rank) x 0.20; after choosing Chain it stays 1.0x.
     /// </summary>
     public override float RampMaxMultiplier =>
         SkillMechanics.LaserRampMaxMultiplier(

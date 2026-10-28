@@ -82,9 +82,11 @@ Maxed skill tree (all ranks 5):
 - Laser + Chain: 5 jumps, ramp max 1.0. Laser + Ramp-Up: 0 jumps, ramp max 2.0.
 - Trunk nodes still apply: maxed Arrow + Crit keeps 21.8 damage, 0.917s interval, 8.0 range; maxed Laser + Chain keeps DPS 8.72 and Ignite at rank 5.
 
-## H12 — Pre-rank-3 behaviour unchanged
-- Rank 0–2 towers with both seeds purchased apply both seed mechanics exactly as before this feature (pierce and crit both active, cluster and stun both active, chain and ramp both active).
-- The archetype lock only activates once an archetype is selected.
+## H12 — Pre-rank-3 seed mechanics are inert
+- Rank 0, 1, and 2 towers with every seed node maxed still have: pierce 0, crit 0%, cluster exactly 1 shell, stun 0%, chain 0 jumps, ramp max multiplier 1.0×.
+- Trunk nodes still apply at ranks 0–2: maxed Damage / Attack Speed / Range on Arrow; Powder Charge / Attack Speed / Splash Radius on Cannon; DPS / Range / Ignite on Laser.
+- Seed ranks are not deleted or consumed; once the tower reaches rank 3 and chooses a branch, the chosen seed applies at `max(1, skill-tree rank)`.
+- The archetype gate only opens the chosen seed; the unchosen seed remains zero at rank 3.
 
 ## H13 — Archetype emblems and rank chevrons
 - Rank 0 panel: zero filled chevrons.

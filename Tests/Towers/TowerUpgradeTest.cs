@@ -280,24 +280,73 @@ public class TowerUpgradeTest
     }
 
     [TestCase]
-    public void BeforeRank3_BothSeedMechanicsApplyAtSkillRanks()
+    public void BeforeRank3_AllSeedMechanicsAreInert_EvenWithMaxedSeeds()
     {
+        // Seed ranks do not apply until an archetype is chosen. Rank 0, 1, and 2 must
+        // read zero seed effect even on a fully maxed seed tree.
         var arrow = new ArrowTower();
         arrow.SetSkillTree(MaxedArrowTree());
-        AssertThat(arrow.Rank).IsEqual(0);
-        AssertThat(arrow.PierceCount).IsEqual(5);
-        AssertThat(arrow.CritChance).IsEqualApprox(0.4f, 0.0001f);
+        for (int rank = 0; rank <= 2; rank++)
+        {
+            AssertThat(arrow.Rank).IsEqual(rank);
+            AssertThat(arrow.PierceCount).IsEqual(0);
+            AssertThat(arrow.CritChance).IsEqual(0f);
+            if (rank < 2)
+                AssertThat(arrow.ApplyRankUpgrade()).IsTrue();
+        }
 
         var cannon = new CannonTower();
         cannon.SetSkillTree(MaxedCannonTree());
-        AssertThat(cannon.ClusterCount).IsEqual(6);
-        AssertThat(cannon.StunChance).IsEqualApprox(0.3f, 0.0001f);
+        for (int rank = 0; rank <= 2; rank++)
+        {
+            AssertThat(cannon.Rank).IsEqual(rank);
+            AssertThat(cannon.ClusterCount).IsEqual(1);
+            AssertThat(cannon.StunChance).IsEqual(0f);
+            if (rank < 2)
+                AssertThat(cannon.ApplyRankUpgrade()).IsTrue();
+        }
 
         var laser = new LaserTower();
         laser.SetSkillTree(MaxedLaserTree());
-        AssertThat(laser.ChainJumps).IsEqual(5);
-        AssertThat(laser.RampMaxMultiplier).IsEqualApprox(2f, 0.0001f);
+        for (int rank = 0; rank <= 2; rank++)
+        {
+            AssertThat(laser.Rank).IsEqual(rank);
+            AssertThat(laser.ChainJumps).IsEqual(0);
+            AssertThat(laser.RampMaxMultiplier).IsEqual(1f);
+            // Ignite is a trunk node: it keeps applying before rank 3.
+            AssertThat(laser.IgniteChancePerSecond).IsEqualApprox(0.25f, 0.0001f);
+            if (rank < 2)
+                AssertThat(laser.ApplyRankUpgrade()).IsTrue();
+        }
+    }
+
+    [TestCase]
+    public void BeforeRank3_TrunkBonusesStillApply()
+    {
+        var arrow = new ArrowTower();
+        arrow.SetSkillTree(MaxedArrowTree());
+        AssertThat(arrow.Damage).IsEqualApprox(20f, 0.0001f);
+        AssertThat(arrow.FireRate).IsEqualApprox(1f, 0.0001f);
+        AssertThat(arrow.RangeCells).IsEqualApprox(6.5f, 0.0001f);
+
+        var cannon = new CannonTower();
+        cannon.SetSkillTree(MaxedCannonTree());
+        AssertThat(cannon.Damage).IsEqualApprox(20f, 0.0001f);
+        AssertThat(cannon.SplashRadius).IsEqual(104);
+
+        var laser = new LaserTower();
+        laser.SetSkillTree(MaxedLaserTree());
+        AssertThat(laser.Dps).IsEqualApprox(8f, 0.0001f);
+        AssertThat(laser.RangeCells).IsEqualApprox(5.5f, 0.0001f);
         AssertThat(laser.IgniteChancePerSecond).IsEqualApprox(0.25f, 0.0001f);
+
+        // The same trunk values survive a rank-2 tower that has not specialized yet.
+        RaiseToRank2(arrow);
+        AssertThat(arrow.Damage).IsEqualApprox(
+            20f * (1f + GameConstants.TowerRankDamageBonusPerRank * 2), 0.001f);
+        AssertThat(arrow.RangeCells).IsEqualApprox(7.5f, 0.0001f);
+        AssertThat(arrow.PierceCount).IsEqual(0);
+        AssertThat(arrow.CritChance).IsEqual(0f);
     }
 
     [TestCase]

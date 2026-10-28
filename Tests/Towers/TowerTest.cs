@@ -174,9 +174,12 @@ public class TowerTest
     public void LaserTower_RampProgress_MatchesTheMultiplierUpdateRampReturns()
     {
         var state = new SkillTreeState();
-        state.SetRank(SkillTreeCatalog.LaserRampUp, 5); // max 2.0x
+        state.SetRank(SkillTreeCatalog.LaserRampUp, 5); // max 2.0x after specialization
         var laser = new LaserTower();
         laser.SetSkillTree(state);
+        AssertThat(laser.ApplyRankUpgrade()).IsTrue();
+        AssertThat(laser.ApplyRankUpgrade()).IsTrue();
+        AssertThat(laser.ApplyArchetype(TowerArchetype.RampUp)).IsTrue();
 
         var enemy = new Enemy();
         enemy.Configure(EnemyKind.Basic);
@@ -224,10 +227,13 @@ public class TowerTest
     public void CannonTower_ClusterVolley_FlashesTheMuzzle()
     {
         var state = new SkillTreeState();
-        state.SetRank(SkillTreeCatalog.CannonCluster, 2); // 3 shells
+        state.SetRank(SkillTreeCatalog.CannonCluster, 2); // 3 shells after specialization
         var tower = new CannonTower();
         tower.Initialize(0, 0);
         tower.SetSkillTree(state);
+        AssertThat(tower.ApplyRankUpgrade()).IsTrue();
+        AssertThat(tower.ApplyRankUpgrade()).IsTrue();
+        AssertThat(tower.ApplyArchetype(TowerArchetype.Cluster)).IsTrue();
 
         var enemy = new Enemy();
         enemy.Configure(EnemyKind.Basic);
@@ -244,10 +250,13 @@ public class TowerTest
     public void CannonTower_MuzzleFlash_ExpiresAfterItsDuration()
     {
         var state = new SkillTreeState();
-        state.SetRank(SkillTreeCatalog.CannonCluster, 1); // 2 shells
+        state.SetRank(SkillTreeCatalog.CannonCluster, 1); // 2 shells after specialization
         var tower = new CannonTower();
         tower.Initialize(0, 0);
         tower.SetSkillTree(state);
+        AssertThat(tower.ApplyRankUpgrade()).IsTrue();
+        AssertThat(tower.ApplyRankUpgrade()).IsTrue();
+        AssertThat(tower.ApplyArchetype(TowerArchetype.Cluster)).IsTrue();
 
         var enemy = new Enemy();
         enemy.Configure(EnemyKind.Basic);

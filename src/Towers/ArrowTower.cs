@@ -18,15 +18,17 @@ public partial class ArrowTower : Tower
     public override int Cost => GameConstants.ArrowTowerCost;
 
     /// <summary>
-    /// Pierce count. Before specialization both seeds apply at their skill-tree ranks
-    /// exactly as before; after choosing Crit, pierce contributes zero.
+    /// Pierce count. Seed mechanics are inert before rank 3: a rank 0-2 tower always
+    /// reads zero, even with skill ranks in the seed. After choosing Pierce the count
+    /// is max(1, skill rank); after choosing Crit it contributes zero.
     /// </summary>
     public override int PierceCount =>
         SkillMechanics.ArrowPierceCount(
             SeedRankFor(TowerArchetype.Pierce, SkillTreeCatalog.ArrowPierce));
 
     /// <summary>
-    /// Crit chance. After choosing Pierce, crit contributes zero.
+    /// Crit chance. Inert (zero) before rank 3. After choosing Crit it is
+    /// max(1, skill rank) x 0.08; after choosing Pierce it contributes zero.
     /// </summary>
     public override float CritChance =>
         SkillMechanics.ArrowCritChance(

@@ -21,15 +21,17 @@ public partial class CannonTower : Tower
     public override float ProjectileSpeedMultiplier => SkillStats.CannonProjectileSpeedMultiplier(SkillRank(SkillTreeCatalog.CannonPowderCharge));
 
     /// <summary>
-    /// Shells per volley. Before specialization both seeds apply at their skill-tree
-    /// ranks; after choosing Stun, cluster contributes nothing (one shell).
+    /// Shells per volley. Seed mechanics are inert before rank 3 (always one shell).
+    /// After choosing Cluster it is 1 + max(1, skill rank); after choosing Stun,
+    /// cluster contributes nothing (one shell).
     /// </summary>
     public override int ClusterCount =>
         SkillMechanics.CannonClusterCount(
             SeedRankFor(TowerArchetype.Cluster, SkillTreeCatalog.CannonCluster));
 
     /// <summary>
-    /// Per-hit stun chance. After choosing Cluster, stun contributes zero.
+    /// Per-hit stun chance. Inert (zero) before rank 3. After choosing Stun it is
+    /// max(1, skill rank) x 0.06; after choosing Cluster it contributes zero.
     /// </summary>
     public override float StunChance =>
         SkillMechanics.CannonStunChance(

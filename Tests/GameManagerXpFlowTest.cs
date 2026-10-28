@@ -82,13 +82,16 @@ public class GameManagerXpFlowTest
         manager.Initialize(Levels.Level3);
         manager.AddCoinsForTesting(100);
 
-        // One Chain rank turns on chain jumps (pre-archetype: the seed applies at its
-        // skill-tree rank, exactly as before).
+        // One Chain rank plus the rank-3 Chain archetype turns on chain jumps; a seed
+        // is inert before specialization.
         var treeState = new SkillTreeState();
         treeState.SetRank(SkillTreeCatalog.LaserChain, 1);
         manager.SkillTree = new SkillTree(treeState, _ => true);
 
         var laser = PlaceTower(manager, TowerType.Laser, row: 4, col: 2);
+        AssertThat(laser.ApplyRankUpgrade()).IsTrue();
+        AssertThat(laser.ApplyRankUpgrade()).IsTrue();
+        AssertThat(laser.ApplyArchetype(TowerArchetype.Chain)).IsTrue();
 
         var primary = new Enemy();
         primary.Configure(EnemyKind.Basic);
@@ -103,10 +106,12 @@ public class GameManagerXpFlowTest
 
         manager._Process(0.25);
 
-        // 4 dps x 0.25s = 1 damage to the primary; the chain jump lands 60% = 0.6
-        // on the second enemy. Both credit the same tower.
-        AssertThat(primary.CreditedDamage(laser)).IsEqualApprox(1f, 0.0001f);
-        AssertThat(chained.CreditedDamage(laser)).IsEqualApprox(0.6f, 0.0001f);
+        // Rank-3 laser DPS x 0.25s goes to the primary; the chain jump lands 60% of
+        // that on the second enemy. Both credit the same tower.
+        float expectedPrimary = laser.Dps * 0.25f;
+        float expectedChained = expectedPrimary * GameConstants.SkillLaserChainFalloff;
+        AssertThat(primary.CreditedDamage(laser)).IsEqualApprox(expectedPrimary, 0.0001f);
+        AssertThat(chained.CreditedDamage(laser)).IsEqualApprox(expectedChained, 0.0001f);
 
         // Finish both and confirm the per-enemy XP split still pays the laser.
         for (int i = 0; i < 80 && (!primary.IsDead || !chained.IsDead); i++)

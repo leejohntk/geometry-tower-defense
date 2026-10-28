@@ -162,16 +162,16 @@ public abstract partial class Tower : Node2D
     protected int SkillRank(string nodeId) => _skillState?.GetRank(nodeId) ?? 0;
 
     /// <summary>
-    /// Rank that applies to a seed mechanic for this tower's current life. Before
-    /// specialization both seeds use their skill-tree ranks; after it, the chosen
-    /// branch applies at least at rank 1 and the unchosen branch contributes zero.
+    /// Rank that applies to a seed mechanic for this tower's current life. Seed
+    /// mechanics are inert until the tower reaches rank 3 and chooses an archetype:
+    /// before that every branch reads 0, and afterwards only the chosen branch applies
+    /// (at least at rank 1). Skill-tree seed ranks are not consumed — they simply
+    /// become effective when the archetype is chosen. Trunk nodes never route here.
     /// </summary>
     protected int SeedRankFor(TowerArchetype branch, string nodeId) =>
-        Archetype == TowerArchetype.None
-            ? SkillRank(nodeId)
-            : Archetype == branch
-                ? TowerArchetypes.EffectiveSeedRank(SkillRank(nodeId))
-                : 0;
+        Archetype == branch
+            ? TowerArchetypes.EffectiveSeedRank(SkillRank(nodeId))
+            : 0;
 
     // === In-level upgrades ===
 

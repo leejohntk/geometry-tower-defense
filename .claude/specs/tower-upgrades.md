@@ -6,7 +6,7 @@
 
 ## Description
 
-Adds in-level per-tower upgrades. Each placed tower starts at rank 0 and can be upgraded three times with coins (5 / 15 / 25). Every rank adds a small stat boost (+3% damage, +0.5 cell range, +3% fire rate). Upgrades are gated by hidden combat experience: a tower must earn enough kill XP before each rank's upgrade option appears. Kill XP is awarded per enemy kind and split between every tower that damaged the enemy, in proportion to effective damage dealt. At rank 2 → 3, instead of a third chevron, the upgrade panel offers the tower's two archetype branches (matching the skill-tree seed nodes). Choosing one spends the 25 coins, sets rank 3 permanently for that tower, and specializes the tower into that seed. Once specialized, only the chosen seed mechanic applies; the unchosen seed has no effect on that tower. Trunk nodes (damage, attack speed, range, laser ignite) still apply normally.
+Adds in-level per-tower upgrades. Each placed tower starts at rank 0 and can be upgraded three times with coins (5 / 15 / 25). Every rank adds a small stat boost (+3% damage, +0.5 cell range, +3% fire rate). Upgrades are gated by hidden combat experience: a tower must earn enough kill XP before each rank's upgrade option appears. Kill XP is awarded per enemy kind and split between every tower that damaged the enemy, in proportion to effective damage dealt. At rank 2 → 3, instead of a third chevron, the upgrade panel offers the tower's two archetype branches (matching the skill-tree seed nodes). Choosing one spends the 25 coins, sets rank 3 permanently for that tower, and specializes the tower into that seed. Seed mechanics are inert until specialization: a rank 0–2 tower applies no seed effect even if the skill tree has ranks in it. At rank 3 only the chosen seed mechanic applies; the unchosen seed has no effect on that tower. Trunk nodes (damage, attack speed, range, laser ignite) still apply normally.
 
 ## Acceptance Criteria
 
@@ -62,7 +62,7 @@ Adds in-level per-tower upgrades. Each placed tower starts at rank 0 and can be 
 - [ ] Arrow options: **Pierce** (`arrow.pierce`) and **Crit** (`arrow.crit_chance`).
 - [ ] Cannon options: **Cluster** (`cannon.cluster`) and **Stun** (`cannon.stun_chance`).
 - [ ] Laser options: **Chain** (`laser.chain`) and **Ramp-Up** (`laser.ramp_up`).
-- [ ] Before rank 3, tower behaviour is unchanged: both seed nodes apply at their skill-tree ranks.
+- [ ] Before rank 3, **no seed mechanic applies**: even with skill-tree ranks in the seed nodes, a rank 0–2 tower has pierce 0, crit 0%, cluster 1 shell, stun 0%, chain 0 jumps, and ramp max 1.0×. Trunk nodes still apply.
 - [ ] After rank 3, the chosen seed mechanic applies at effective rank `max(1, skill-tree rank of that seed)`. The unchosen seed mechanic contributes zero. Trunk nodes are unaffected.
   - Arrow/Pierce: pierce count `max(1, rank)`.
   - Arrow/Crit: crit chance `max(1, rank) × 0.08`.
@@ -94,7 +94,7 @@ Adds in-level per-tower upgrades. Each placed tower starts at rank 0 and can be 
 - **Summoned adds:** Grant kind XP but still 0 coins. XP distribution follows the same damage-share rule.
 - **Enemy reaches the base:** No XP is awarded to towers that damaged it.
 - **Archetype with zero skill-tree ranks:** Effective seed rank is 1, so the chosen mechanic is always active at minimum strength.
-- **Both seeds maxed in the skill tree:** Before rank 3 both apply; after choosing one, the other contributes nothing.
+- **Both seeds maxed in the skill tree:** Before rank 3 neither applies; after choosing one, the chosen seed applies at its effective rank and the other contributes nothing.
 - **Rank 3 while both upgrade and archetype conditions are true:** Only the two archetype cards render. There is no generic rank-3 purchase.
 - **Double click / repeated click on an upgrade action:** Coins and rank change once; the second click is a no-op because the panel has refreshed or the tower is maxed.
 - **Game over or victory with the panel open:** Panel closes before the result overlay appears; no upgrade can be bought after play ends.
