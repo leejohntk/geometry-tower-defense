@@ -22,6 +22,17 @@ damaged the enemy in proportion to effective damage. Rank 3 is an archetype choi
 tower's two skill-tree seed nodes: the chosen seed applies at minimum rank 1, the unchosen seed
 contributes nothing. Rank, XP and archetype live on the tower instance and never persist.
 
+**Gates (2026-10-27):** build 0 warnings; 373 tests pass; layout verifier PASS (142 assertions,
+0 findings); holdouts 16/16. Security lens 1 WARNING (pooled enemies retained tower refs) fixed
+via `Enemy.ClearAttribution` on every release path; 6 performance INFO items (credit lookup,
+panel style/icon allocations, polling) left as follow-ups; correctness reviewer agents stalled
+twice on harness/API errors, so the orchestrator completed the correctness audit.
+
+**Open follow-ups:** the spec's double-click edge case is worded as "second click is a no-op",
+but each valid click buys one rank — a second click can legitimately buy the next rank when its
+gate is already open (a challenge at 15 XP bought rank 2). The layout verifier has no assertions
+for the new `Panel_TowerUpgrade` groups yet (advisory gate only).
+
 **Previous feature:** level-5-progenitor — three-route Level 5 + The Progenitor boss
 **Branch:** `feature/level-5-progenitor`
 **Spec:** `.claude/specs/level-5-progenitor.md` (approved 2026-10-25)
