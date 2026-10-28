@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Godot;
 
 namespace GeometryTowerDefense;
@@ -134,23 +135,153 @@ public static class ArchetypeEmblem
 public static class RankChevron
 {
     /// <summary>
-    /// Draws one '^' caret inside a square of <paramref name="size"/> at
-    /// <paramref name="topLeft"/>.
+    /// Draws one thick '^' chevron inside <paramref name="slot"/>. The stroke is inset
+    /// so it stays fully inside the slot and stacked chevrons never touch.
     /// </summary>
-    public static void Draw(CanvasItem target, Vector2 topLeft, float size, Color color)
+    public static void Draw(CanvasItem target, Rect2 slot, Color color, float stroke)
     {
-        if (target == null || !GodotObject.IsInstanceValid(target) || !(size > 0f))
+        if (target == null || !GodotObject.IsInstanceValid(target))
+            return;
+        if (!(slot.Size.X > 0f) || !(slot.Size.Y > 0f))
+            return;
+
+        float width = Mathf.Max(1f, stroke);
+        float inset = width / 2f;
+        float left = slot.Position.X + inset;
+        float right = slot.End.X - inset;
+        float top = slot.Position.Y + inset;
+        float bottom = slot.End.Y - inset;
+        if (right <= left || bottom <= top)
             return;
 
         target.DrawPolyline(
             new[]
             {
-                new Vector2(topLeft.X, topLeft.Y + size * 0.78f),
-                new Vector2(topLeft.X + size / 2f, topLeft.Y + size * 0.28f),
-                new Vector2(topLeft.X + size, topLeft.Y + size * 0.78f)
+                new Vector2(left, bottom),
+                new Vector2((left + right) / 2f, top),
+                new Vector2(right, bottom)
             },
             color,
-            GameConstants.RankChevronStroke,
+            width,
             antialiased: true);
+    }
+}
+
+/// <summary>
+/// Layout and drawing helpers for a fixed-size rank icon box. Every icon uses the
+/// same box; only the number of chevrons changes, and the stack stays centred
+/// vertically inside it. Chevrons are thick V polylines, never text glyphs.
+/// </summary>
+public static class RankIcon
+{
+    /// <summary>
+    /// Vertical offset of the top chevron in a stack of <paramref name="count"/>
+    /// chevrons centred inside a box of <paramref name="boxHeight"/>.
+    /// </summary>
+    public static float StackTop(float boxHeight, int count, float chevronHeight, float gap)
+    {
+        if (count <= 0)
+            return 0f;
+
+        float content = count * chevronHeight + (count - 1) * gap;
+        return (boxHeight - content) / 2f;
+    }
+
+    /// <summary>
+    /// Shows the first <paramref name="visibleCount"/> chevron controls and positions
+    /// them as a centred vertical column: all visible children share x, with
+    /// increasing y.
+    /// </summary>
+    public static void LayoutStack(
+        IReadOnlyList<Control> chevrons,
+        int visibleCount,
+        float boxHeight,
+        float chevronHeight,
+        float gap)
+    {
+        int count = Mathf.Clamp(visibleCount, 0, chevrons.Count);
+        float top = StackTop(boxHeight, count, chevronHeight, gap);
+
+        for (int i = 0; i < chevrons.Count; i++)
+        {
+            var chevron = chevrons[i];
+            bool visible = i < count;
+            chevron.Visible = visible;
+            if (!visible)
+                continue;
+
+            chevron.Position = new Vector2(0f, top + i * (chevronHeight + gap));
+            chevron.QueueRedraw();
+        }
+    }
+
+    /// <summary>
+    /// Draws a centred vertical stack of <paramref name="count"/> thick V chevrons
+    /// inside <paramref name="box"/> (used by the single-control tower badge).
+    /// </summary>
+    public static void DrawStack(
+        CanvasItem target,
+        Rect2 box,
+        int count,
+        Color color,
+        float chevronHeight,
+        float gap,
+        float stroke)
+    {
+        if (target == null || !GodotObject.IsInstanceValid(target) || count <= 0)
+            return;
+
+        float top = StackTop(box.Size.Y, count, chevronHeight, gap);
+        for (int i = 0; i < count; i++)
+        {
+            var slot = new Rect2(
+                box.Position.X,
+                box.Position.Y + top + i * (chevronHeight + gap),
+                box.Size.X,
+                chevronHeight);
+            RankChevron.Draw(target, slot, color, stroke);
+        }
+    }
+
+    /// <summary>
+    /// True when a rank badge renders the archetype emblem instead of chevrons:
+    /// only a fully specialized rank-3 tower with a chosen archetype qualifies.
+    /// </summary>
+    public static bool BadgeUsesEmblem(int rank, TowerArchetype archetype) =>
+        rank >= GameConstants.TowerMaxRank && archetype != TowerArchetype.None;
+
+    /// <summary>
+    /// Draws the tiny current-rank badge content: a centred chevron stack for rank
+    /// 1/2, or the chosen archetype emblem at rank 3, inside the fixed badge box.
+    /// </summary>
+    public static void DrawBadge(
+        CanvasItem target,
+        Rect2 box,
+        int rank,
+        TowerArchetype archetype,
+        Color color)
+    {
+        if (target == null || !GodotObject.IsInstanceValid(target))
+            return;
+
+        if (BadgeUsesEmblem(rank, archetype))
+        {
+            ArchetypeEmblem.Draw(
+                target,
+                archetype,
+                box.GetCenter(),
+                Mathf.Min(box.Size.X, box.Size.Y) / 2f * 0.85f,
+                color);
+            return;
+        }
+
+        DrawStack(
+            target,
+            box,
+            Mathf.Max(0, rank),
+            color,
+            GameConstants.TowerRankBadgeChevronHeight,
+            GameConstants.TowerRankBadgeChevronGap,
+            GameConstants.TowerRankBadgeStroke);
     }
 }

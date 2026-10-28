@@ -244,30 +244,29 @@ public partial class TowerUpgradePanel : Control
         return block;
     }
 
-    private Control CreateChevronRow(string name, List<Control> chevrons, System.Action<Control> draw)
+    private Control CreateChevronStack(string name, List<Control> chevrons, System.Action<Control> draw)
     {
-        var row = new Control();
-        row.Name = name;
-        row.MouseFilter = MouseFilterEnum.Ignore;
-        row.Size = new Vector2(
-            GameConstants.TowerMaxRank * GameConstants.RankChevronSize
-                + (GameConstants.TowerMaxRank - 1) * GameConstants.RankChevronGap,
-            GameConstants.RankChevronSize);
+        var stack = new Control();
+        stack.Name = name;
+        stack.MouseFilter = MouseFilterEnum.Ignore;
+        // One shared fixed-size box for 1, 2, and 3 chevrons. Children share x and are
+        // repositioned into a centred vertical column whenever the rank changes.
+        stack.Size = new Vector2(GameConstants.RankIconWidth, GameConstants.RankIconHeight);
 
         for (int i = 0; i < GameConstants.TowerMaxRank; i++)
         {
             var chevron = new Control();
             chevron.Name = $"Chevron_{i + 1}";
-            chevron.Size = new Vector2(GameConstants.RankChevronSize, GameConstants.RankChevronSize);
-            chevron.Position = new Vector2(
-                i * (GameConstants.RankChevronSize + GameConstants.RankChevronGap), 0f);
+            chevron.Size = new Vector2(GameConstants.RankIconWidth, GameConstants.RankChevronHeight);
+            chevron.Position = Vector2.Zero;
+            chevron.Visible = false;
             chevron.MouseFilter = MouseFilterEnum.Ignore;
             chevron.Draw += () => draw(chevron);
-            row.AddChild(chevron);
+            stack.AddChild(chevron);
             chevrons.Add(chevron);
         }
 
-        return row;
+        return stack;
     }
 
     private void BuildRankBlock()
@@ -301,8 +300,10 @@ public partial class TowerUpgradePanel : Control
         _nameLabel.MouseFilter = MouseFilterEnum.Ignore;
         _rankBlock.AddChild(_nameLabel);
 
-        _rankChevronsRoot = CreateChevronRow("Rank", _rankChevrons, DrawRankChevron);
-        _rankChevronsRoot.Position = new Vector2(width - _rankChevronsRoot.Size.X, (height - _rankChevronsRoot.Size.Y) / 2f);
+        _rankChevronsRoot = CreateChevronStack("Rank", _rankChevrons, DrawRankChevron);
+        _rankChevronsRoot.Position = new Vector2(
+            width - GameConstants.RankIconWidth,
+            (height - GameConstants.RankIconHeight) / 2f);
         _rankBlock.AddChild(_rankChevronsRoot);
     }
 
@@ -332,8 +333,10 @@ public partial class TowerUpgradePanel : Control
         // The chevrons and cost are siblings drawn above the button (the button's own
         // background paints first). Ignore mouse so the click lands on the button, and
         // keep them addressable directly under Block_Upgrade.
-        _buyChevronsRoot = CreateChevronRow("Chevrons", _buyChevrons, DrawBuyChevron);
-        _buyChevronsRoot.Position = new Vector2(10f, (height - _buyChevronsRoot.Size.Y) / 2f);
+        _buyChevronsRoot = CreateChevronStack("Chevrons", _buyChevrons, DrawBuyChevron);
+        _buyChevronsRoot.Position = new Vector2(
+            10f,
+            (height - GameConstants.RankIconHeight) / 2f);
         _upgradeBlock.AddChild(_buyChevronsRoot);
 
         _buyCostLabel = new Label();
@@ -446,14 +449,14 @@ public partial class TowerUpgradePanel : Control
         _rankChevronsRoot.Visible = !maxRank;
         _rankChevronColor = color;
 
-        for (int i = 0; i < _rankChevrons.Count; i++)
-        {
-            var chevron = _rankChevrons[i];
-            bool filled = !maxRank && i < tower.Rank;
-            chevron.Visible = filled;
-            if (filled)
-                chevron.QueueRedraw();
-        }
+        // The icon box never changes size; only the number of visible chevrons in the
+        // centred vertical column changes with rank.
+        RankIcon.LayoutStack(
+            _rankChevrons,
+            maxRank ? 0 : tower.Rank,
+            GameConstants.RankIconHeight,
+            GameConstants.RankChevronHeight,
+            GameConstants.RankChevronVerticalGap);
     }
 
     private void UpdateUpgradeBlock(Tower tower, Color color, bool upgradeVisible)
@@ -467,8 +470,12 @@ public partial class TowerUpgradePanel : Control
         {
             // No generic upgrade is offered: make sure no stale chevron can read as a
             // (forbidden) three-chevron rank-3 purchase even though the block is hidden.
-            foreach (var chevron in _buyChevrons)
-                chevron.Visible = false;
+            RankIcon.LayoutStack(
+                _buyChevrons,
+                0,
+                GameConstants.RankIconHeight,
+                GameConstants.RankChevronHeight,
+                GameConstants.RankChevronVerticalGap);
             return;
         }
 
@@ -482,14 +489,12 @@ public partial class TowerUpgradePanel : Control
         ApplyButtonStyle(_buyButton, color, canAfford);
 
         _buyChevronColor = canAfford ? color : GameConstants.TowerUpgradePanelDimColor;
-        for (int i = 0; i < _buyChevrons.Count; i++)
-        {
-            var chevron = _buyChevrons[i];
-            bool filled = i < targetRank;
-            chevron.Visible = filled;
-            if (filled)
-                chevron.QueueRedraw();
-        }
+        RankIcon.LayoutStack(
+            _buyChevrons,
+            targetRank,
+            GameConstants.RankIconHeight,
+            GameConstants.RankChevronHeight,
+            GameConstants.RankChevronVerticalGap);
     }
 
     private void UpdateArchetypeBlock(Tower tower, Color color, bool choiceVisible)
@@ -581,14 +586,22 @@ public partial class TowerUpgradePanel : Control
     {
         if (!IsInstanceValid(chevron))
             return;
-        RankChevron.Draw(chevron, Vector2.Zero, GameConstants.RankChevronSize, _rankChevronColor);
+        RankChevron.Draw(
+            chevron,
+            new Rect2(Vector2.Zero, chevron.Size),
+            _rankChevronColor,
+            GameConstants.RankChevronStroke);
     }
 
     private void DrawBuyChevron(Control chevron)
     {
         if (!IsInstanceValid(chevron))
             return;
-        RankChevron.Draw(chevron, Vector2.Zero, GameConstants.RankChevronSize, _buyChevronColor);
+        RankChevron.Draw(
+            chevron,
+            new Rect2(Vector2.Zero, chevron.Size),
+            _buyChevronColor,
+            GameConstants.RankChevronStroke);
     }
 
     private void DrawRankIcon()

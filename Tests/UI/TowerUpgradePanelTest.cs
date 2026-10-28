@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using GeometryTowerDefense;
 using GdUnit4;
@@ -50,6 +51,9 @@ public class TowerUpgradePanelTest
 
     private static int VisibleChildren(Node root) =>
         root.GetChildren().Count(child => child is Control control && control.Visible);
+
+    private static List<Control> VisibleControls(Node root) =>
+        root.GetChildren().OfType<Control>().Where(control => control.Visible).ToList();
 
     private static void AssertNoXpHintText(Node node)
     {
@@ -186,6 +190,60 @@ public class TowerUpgradePanelTest
             RaiseToRank2(tower);
             panel.Refresh();
             AssertThat(VisibleChildren(panel.GetNode("Block_Rank/Rank"))).IsEqual(2);
+        }
+        finally
+        {
+            Free(panel);
+        }
+    }
+
+    [TestCase]
+    public void RankIcon_IsAFixedSizeVerticalStack_CentredInTheSameBoxForAnyRank()
+    {
+        var tower = MakeTower(TowerType.Arrow, 5, 10);
+        var panel = CreatePanel(tower, 100);
+        try
+        {
+            var rankStack = panel.GetNode<Control>("Block_Rank/Rank");
+            var buyStack = panel.GetNode<Control>("Block_Upgrade/Chevrons");
+            var box = new Vector2(GameConstants.RankIconWidth, GameConstants.RankIconHeight);
+
+            // One shared fixed-size box for the rank display and the upgrade preview.
+            AssertThat(rankStack.Size).IsEqual(box);
+            AssertThat(buyStack.Size).IsEqual(box);
+            AssertThat(VisibleChildren(rankStack)).IsEqual(0);
+
+            // Rank 1: one chevron, centred vertically inside the same box.
+            tower.ApplyRankUpgrade();
+            panel.Refresh();
+            var one = VisibleControls(rankStack);
+            AssertThat(one.Count).IsEqual(1);
+            AssertThat(rankStack.Size).IsEqual(box);
+            AssertThat(one[0].Position.X).IsEqual(0f);
+            AssertThat(one[0].Position.Y + one[0].Size.Y / 2f)
+                .IsEqual(GameConstants.RankIconHeight / 2f);
+
+            // Upgrade preview at rank 1 (target rank 2): two chevrons in the fixed box,
+            // sharing x and increasing in y.
+            tower.AddXp(15f);
+            panel.Refresh();
+            var buy = VisibleControls(buyStack);
+            AssertThat(buy.Count).IsEqual(2);
+            AssertThat(buyStack.Size).IsEqual(box);
+            AssertThat(buy[0].Position.X).IsEqual(buy[1].Position.X);
+            AssertThat(buy[1].Position.Y).IsGreater(buy[0].Position.Y);
+            AssertThat(buy[0].Size).IsEqual(buy[1].Size);
+
+            // Rank 2: two chevrons, same icon box, stack still centred as a column.
+            tower.ApplyRankUpgrade();
+            panel.Refresh();
+            var two = VisibleControls(rankStack);
+            AssertThat(two.Count).IsEqual(2);
+            AssertThat(rankStack.Size).IsEqual(box);
+            AssertThat(two[0].Position.X).IsEqual(two[1].Position.X);
+            AssertThat(two[1].Position.Y).IsGreater(two[0].Position.Y);
+            float stackCenter = (two[0].Position.Y + two[^1].Position.Y + two[^1].Size.Y) / 2f;
+            AssertThat(stackCenter).IsEqual(GameConstants.RankIconHeight / 2f);
         }
         finally
         {

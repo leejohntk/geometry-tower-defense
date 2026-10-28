@@ -11,6 +11,7 @@ public abstract partial class Tower : Node2D
     private float _fireCooldownTimer = 0f;
     private Control? _rangeIndicator;
     private Control? _archetypeAccent;
+    private Control? _rankBadge;
 
     /// <summary>
     /// Grid row position of this tower.
@@ -198,6 +199,7 @@ public abstract partial class Tower : Node2D
             return false;
 
         Rank++;
+        UpdateRankBadge();
         return true;
     }
 
@@ -218,6 +220,7 @@ public abstract partial class Tower : Node2D
         Archetype = archetype;
         Rank = GameConstants.TowerMaxRank;
         UpdateArchetypeAccent();
+        UpdateRankBadge();
         return true;
     }
 
@@ -421,6 +424,54 @@ public abstract partial class Tower : Node2D
             baseCenter,
             GameConstants.TowerArchetypeAccentRadius * 0.55f,
             color);
+    }
+
+    /// <summary>
+    /// Creates (once) and repaints the tiny current-rank badge at the top-right of the
+    /// tower's cell. Driven by rank purchases only — earning XP never creates or
+    /// changes the badge. The badge never consumes mouse input, so it cannot block
+    /// tower selection or upgrade-panel clicks.
+    /// </summary>
+    private void UpdateRankBadge()
+    {
+        if (Rank < 1)
+            return;
+
+        if (_rankBadge == null)
+        {
+            float halfCell = GameConstants.CellSize / 2f;
+            var badge = new Control();
+            badge.Name = "RankBadge";
+            badge.Size = new Vector2(
+                GameConstants.TowerRankBadgeWidth,
+                GameConstants.TowerRankBadgeHeight);
+            // Tower origin is the cell centre; the badge sits at the cell's top-right.
+            badge.Position = new Vector2(
+                halfCell - GameConstants.TowerRankBadgeWidth - GameConstants.TowerRankBadgeMargin,
+                -halfCell + GameConstants.TowerRankBadgeMargin);
+            badge.MouseFilter = Control.MouseFilterEnum.Ignore;
+            // Keep the badge above the tower body and the rank-3 base accent no matter
+            // which order those body nodes were added in.
+            badge.ZIndex = 1;
+            badge.Draw += DrawRankBadge;
+            AddChild(badge);
+            _rankBadge = badge;
+        }
+
+        _rankBadge.QueueRedraw();
+    }
+
+    private void DrawRankBadge()
+    {
+        if (_rankBadge == null || !IsInstanceValid(_rankBadge))
+            return;
+
+        RankIcon.DrawBadge(
+            _rankBadge,
+            new Rect2(Vector2.Zero, _rankBadge.Size),
+            Rank,
+            Archetype,
+            TowerColor);
     }
 
     public override void _Process(double delta)

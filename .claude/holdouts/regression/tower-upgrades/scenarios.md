@@ -88,13 +88,25 @@ Maxed skill tree (all ranks 5):
 - Seed ranks are not deleted or consumed; once the tower reaches rank 3 and chooses a branch, the chosen seed applies at `max(1, skill-tree rank)`.
 - The archetype gate only opens the chosen seed; the unchosen seed remains zero at rank 3.
 
-## H13 — Archetype emblems and rank chevrons
+## H13 — Archetype emblems and vertical rank icons
 - Rank 0 panel: zero filled chevrons.
 - Rank 1 panel: one chevron. Rank 2 panel: two chevrons.
-- Rank 2 with 30 XP: two archetype emblems/cards, never a three-chevron icon.
+- All rank chevrons are stacked vertically: every visible chevron shares the same x, and later chevrons have greater y.
+- The rank icon container has the same fixed size at rank 1, rank 2, and target-rank 1/2; the chevron stack is centred inside it. One chevron does not render a smaller/larger box than two.
+- Chevrons are drawn V strokes, not text caret characters.
+- Rank 2 with 30 XP: two archetype emblems/cards, never a three-chevron upgrade icon.
 - Rank 3 panel: exactly one archetype emblem + name, zero chevrons, zero upgrade buttons.
 - Chevron and emblem nodes are named groups (`Block_Rank`, `Block_Upgrade`, `Block_ArchetypeChoice`) with stable child names; no generated `@Label@…` names appear in findings.
 - All icons are drawn procedurally; no new external or AI-generated asset files exist in the repo.
+
+## H17 — Tiny tower rank badge
+- A rank-0 tower has no rank badge.
+- A rank-0 tower whose rank-1 XP gate is open (5 XP) but has not purchased still has no badge — the badge follows the purchase, not availability.
+- After buying rank 1, the tower shows a tiny badge at the top-right of its cell (`x > 0`, `y < 0` in tower-local coordinates), visible with no panel open.
+- After buying rank 2, the badge is still present and represents rank 2.
+- After choosing an archetype at rank 3, the badge shows the chosen archetype emblem instead of chevrons.
+- The badge has `MouseFilter = Ignore`, uses a fixed tiny icon size at rank 1 and rank 2, and never blocks tower selection or panel input.
+- The badge is present whether the tower is selected or not, and survives opening/closing the upgrade panel.
 
 ## H14 — Panel input isolation
 - Clicking an upgrade button does not deselect the tower, toggle its range indicator, place a tower, or start a wave.

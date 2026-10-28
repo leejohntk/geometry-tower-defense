@@ -195,16 +195,32 @@ public static class GameConstants
     // selected tower's cell. Dark translucent fill matching the HUD sidebar.
     public const float TowerUpgradePanelWidth = 180f;
     public const float TowerUpgradePanelPadding = 8f;
-    public const float TowerUpgradePanelRankHeight = 28f;
+    public const float TowerUpgradePanelRankHeight = 34f;     // tall enough for the 30 px rank icon box
     public const float TowerUpgradePanelUpgradeHeight = 40f;
     public const float TowerUpgradePanelArchetypeHeight = 84f;
     public const float TowerUpgradePanelBlockGap = 6f;
     public const float TowerUpgradePanelCellGap = 8f;         // px between cell edge and panel
     public const float TowerUpgradePanelIconSize = 22f;
     public const float TowerUpgradePanelCardIconSize = 26f;
-    public const float RankChevronSize = 14f;                 // px, one ^ mark
-    public const float RankChevronGap = 3f;
+
+    // Rank icon: one fixed-size box for 1, 2, or 3 chevrons, with the stack centred
+    // vertically inside it so the icon never jumps as ranks are gained and the icon
+    // box never changes size. Chevrons are thick V polylines, never text glyphs.
+    public const float RankIconWidth = 16f;
+    public const float RankIconHeight = 30f;
+    public const float RankChevronHeight = 8f;                // px, one V stroke slot
+    public const float RankChevronVerticalGap = 1f;
     public const float RankChevronStroke = 2.5f;
+
+    // Tiny current-rank badge at the top-right of a placed tower's cell, created by
+    // the rank purchase itself. Same fixed size at every rank (rank 1/2 chevrons,
+    // rank 3 archetype emblem).
+    public const float TowerRankBadgeWidth = 10f;
+    public const float TowerRankBadgeHeight = 18f;
+    public const float TowerRankBadgeMargin = 2f;             // px inset from the cell edge
+    public const float TowerRankBadgeChevronHeight = 5f;
+    public const float TowerRankBadgeChevronGap = 1f;
+    public const float TowerRankBadgeStroke = 1.5f;
     public static readonly Color TowerUpgradePanelBackgroundColor = new Color(0.05f, 0.05f, 0.1f, 0.92f);
     public static readonly Color TowerUpgradePanelBorderColor = new Color(0.3f, 0.3f, 0.5f, 0.8f);
     public static readonly Color TowerUpgradePanelDimColor = new Color(0.35f, 0.35f, 0.42f, 0.9f);
