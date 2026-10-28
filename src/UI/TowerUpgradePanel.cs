@@ -1,13 +1,13 @@
 using Godot;
-using System.Collections.Generic;
 
 namespace GeometryTowerDefense;
 
 /// <summary>
-/// In-level tower upgrade overlay, docked to the selected tower's cell. Shows the
-/// tower's current rank as filled chevrons, offers the next rank (chevrons + coin
-/// cost) while its hidden XP gate is reached, and at rank 2 replaces the generic
-/// upgrade with the tower's two archetype cards. All marks are procedural geometry.
+/// In-level tower upgrade overlay, docked to the selected tower's cell. The panel is
+/// a single action: one full-width "Upgrade {cost}" button for a generic rank, or the
+/// tower's two archetype cards at rank 2. It has no title block and no rank display —
+/// the tower's top-right badge is the only current-rank marker. The whole panel is
+/// hidden whenever no upgrade action is currently available.
 ///
 /// The panel is a UI overlay: its root consumes mouse input (MouseFilter = Stop) and
 /// every child group is a named Control with MouseFilter = Ignore, so clicking an
@@ -32,12 +32,8 @@ public partial class TowerUpgradePanel : Control
     private (int Rank, int Archetype, bool Affordable, bool Upgrade, bool Choice) _lastState;
 
     private ColorRect? _background;
-    private Control? _rankBlock;
-    private Label? _nameLabel;
     private Control? _upgradeBlock;
     private Button? _buyButton;
-    private Control? _buyChevronsRoot;
-    private Label? _buyCostLabel;
     private Control? _archetypeBlock;
     private Button? _leftCard;
     private Button? _rightCard;
@@ -51,12 +47,9 @@ public partial class TowerUpgradePanel : Control
     private TowerArchetype _leftArchetype = TowerArchetype.None;
     private TowerArchetype _rightArchetype = TowerArchetype.None;
 
-    private Color _buyChevronColor = Colors.White;
-
-    private readonly List<Control> _buyChevrons = new();
-
     /// <summary>
-    /// The tower currently displayed, or null when the panel is closed.
+    /// The tower currently tracked, or null when the panel is closed. The panel may be
+    /// tracking a selected tower while hidden (no upgrade available yet).
     /// </summary>
     public Tower? DisplayedTower => _tower;
 
@@ -75,12 +68,14 @@ public partial class TowerUpgradePanel : Control
     public override void _Ready()
     {
         EnsureUi();
-        // Normally built hidden; keep processing on if a caller already opened it.
-        SetProcess(IsOpen);
+        // Processing follows the selection, not visibility: a hidden panel must still
+        // notice the selected tower's XP gate opening and reveal itself.
+        SetProcess(_tower != null);
     }
 
     /// <summary>
-    /// Opens the panel for a tower and positions it against that tower's cell.
+    /// Tracks and docks the panel to a tower. The panel stays hidden unless an upgrade
+    /// action is currently available; <see cref="Refresh"/> decides visibility.
     /// </summary>
     public void ShowFor(Tower tower, int coins)
     {
@@ -92,7 +87,6 @@ public partial class TowerUpgradePanel : Control
         _anchorCol = tower.GridCol;
         _hasState = false;
 
-        Visible = true;
         SetProcess(true);
         Refresh();
     }
@@ -112,8 +106,9 @@ public partial class TowerUpgradePanel : Control
     }
 
     /// <summary>
-    /// Rebuilds all labels, chevrons, cards, and the docked position from the current
-    /// tower/coin state. Safe to call after an upgrade transaction.
+    /// Rebuilds the action button or cards from the current tower/coin state, docks the
+    /// panel, and shows it only when an upgrade action exists. Safe to call after an
+    /// upgrade transaction.
     /// </summary>
     public void Refresh()
     {
@@ -132,10 +127,13 @@ public partial class TowerUpgradePanel : Control
         // evaluated differently between the blocks and the recorded signature.
         var state = ComputeState();
 
-        UpdateRankBlock(tower, color);
         UpdateUpgradeBlock(tower, color, state.Upgrade);
         UpdateArchetypeBlock(tower, color, state.Choice);
         LayoutPanel(state.Upgrade, state.Choice);
+
+        // No upgrade available means no panel at all: the tower badge shows the rank
+        // and the selected tower keeps its range indicator.
+        Visible = state.Upgrade || state.Choice;
 
         _lastState = state;
         _hasState = true;
@@ -162,17 +160,15 @@ public partial class TowerUpgradePanel : Control
 
     public override void _Process(double delta)
     {
-        if (!Visible)
-            return;
-
         if (_tower == null || !IsInstanceValid(_tower))
         {
             Close();
             return;
         }
 
-        // The XP gate is live: crossing a threshold while the panel is open reveals
-        // the next option without a reselect. Repaint only on an actual state change.
+        // The XP gate is live: process while the tower is selected even when the panel
+        // is hidden, so crossing a threshold reveals the next option without a
+        // reselect. Repaint only on an actual state change.
         if (!_hasState || ComputeState() != _lastState)
             Refresh();
     }
@@ -214,19 +210,6 @@ public partial class TowerUpgradePanel : Control
         _background.MouseFilter = MouseFilterEnum.Ignore;
         AddChild(_background);
 
-        var separator = new ColorRect();
-        separator.Name = "Separator";
-        separator.Color = GameConstants.TowerUpgradePanelBorderColor;
-        separator.MouseFilter = MouseFilterEnum.Ignore;
-        separator.Position = new Vector2(
-            GameConstants.TowerUpgradePanelPadding,
-            GameConstants.TowerUpgradePanelPadding + GameConstants.TowerUpgradePanelRankHeight + 1f);
-        separator.Size = new Vector2(
-            GameConstants.TowerUpgradePanelWidth - 2f * GameConstants.TowerUpgradePanelPadding,
-            1f);
-        AddChild(separator);
-
-        BuildRankBlock();
         BuildUpgradeBlock();
         BuildArchetypeBlock();
     }
@@ -239,56 +222,6 @@ public partial class TowerUpgradePanel : Control
         return block;
     }
 
-    private Control CreateChevronStack(string name, List<Control> chevrons, System.Action<Control> draw)
-    {
-        var stack = new Control();
-        stack.Name = name;
-        stack.MouseFilter = MouseFilterEnum.Ignore;
-        // One shared fixed-size box for 1, 2, and 3 chevrons. Children share x and are
-        // repositioned into a centred vertical column whenever the rank changes.
-        stack.Size = new Vector2(GameConstants.RankIconWidth, GameConstants.RankIconHeight);
-
-        for (int i = 0; i < GameConstants.TowerMaxRank; i++)
-        {
-            var chevron = new Control();
-            chevron.Name = $"Chevron_{i + 1}";
-            chevron.Size = new Vector2(GameConstants.RankIconWidth, GameConstants.RankChevronHeight);
-            chevron.Position = Vector2.Zero;
-            chevron.Visible = false;
-            chevron.MouseFilter = MouseFilterEnum.Ignore;
-            chevron.Draw += () => draw(chevron);
-            stack.AddChild(chevron);
-            chevrons.Add(chevron);
-        }
-
-        return stack;
-    }
-
-    private void BuildRankBlock()
-    {
-        float pad = GameConstants.TowerUpgradePanelPadding;
-        float width = GameConstants.TowerUpgradePanelWidth - 2f * pad;
-        float height = GameConstants.TowerUpgradePanelRankHeight;
-
-        _rankBlock = CreateBlock("Block_Rank");
-        _rankBlock.Position = new Vector2(pad, pad);
-        _rankBlock.Size = new Vector2(width, height);
-        AddChild(_rankBlock);
-
-        // The header is the tower (or archetype) name only. The placed tower's
-        // top-right RankBadge is the single current-rank display; the panel never
-        // duplicates it with its own chevrons or emblem.
-        _nameLabel = new Label();
-        _nameLabel.Name = "Name";
-        _nameLabel.Position = Vector2.Zero;
-        _nameLabel.Size = new Vector2(width, height);
-        _nameLabel.VerticalAlignment = VerticalAlignment.Center;
-        _nameLabel.AddThemeFontSizeOverride("font_size", 14);
-        _nameLabel.AddThemeColorOverride("font_color", new Color(0.9f, 0.9f, 1f));
-        _nameLabel.MouseFilter = MouseFilterEnum.Ignore;
-        _rankBlock.AddChild(_nameLabel);
-    }
-
     private void BuildUpgradeBlock()
     {
         float pad = GameConstants.TowerUpgradePanelPadding;
@@ -296,41 +229,25 @@ public partial class TowerUpgradePanel : Control
         float height = GameConstants.TowerUpgradePanelUpgradeHeight;
 
         _upgradeBlock = CreateBlock("Block_Upgrade");
-        _upgradeBlock.Position = new Vector2(
-            pad,
-            pad + GameConstants.TowerUpgradePanelRankHeight + GameConstants.TowerUpgradePanelBlockGap);
+        _upgradeBlock.Position = new Vector2(pad, pad);
         _upgradeBlock.Size = new Vector2(width, height);
         AddChild(_upgradeBlock);
 
+        // The simplest panel: one full-width button whose visible text is the action
+        // itself. No chevrons, cost label, or header.
         _buyButton = new Button();
         _buyButton.Name = "Buy";
         _buyButton.Position = Vector2.Zero;
         _buyButton.Size = new Vector2(width, height);
         _buyButton.Text = string.Empty;
         _buyButton.FocusMode = FocusModeEnum.None;
-        MakeButtonTextInvisible(_buyButton);
+        _buyButton.AddThemeFontSizeOverride("font_size", 14);
+        _buyButton.AddThemeColorOverride("font_color", new Color(0.95f, 0.95f, 1f));
+        _buyButton.AddThemeColorOverride("font_hover_color", Colors.White);
+        _buyButton.AddThemeColorOverride("font_pressed_color", Colors.White);
+        _buyButton.AddThemeColorOverride("font_disabled_color", GameConstants.TowerUpgradePanelDimColor);
         _buyButton.Pressed += OnBuyPressed;
         _upgradeBlock.AddChild(_buyButton);
-
-        // The chevrons and cost are siblings drawn above the button (the button's own
-        // background paints first). Ignore mouse so the click lands on the button, and
-        // keep them addressable directly under Block_Upgrade.
-        _buyChevronsRoot = CreateChevronStack("Chevrons", _buyChevrons, DrawBuyChevron);
-        _buyChevronsRoot.Position = new Vector2(
-            10f,
-            (height - GameConstants.RankIconHeight) / 2f);
-        _upgradeBlock.AddChild(_buyChevronsRoot);
-
-        _buyCostLabel = new Label();
-        _buyCostLabel.Name = "Cost";
-        _buyCostLabel.Position = new Vector2(width - 80f, 0f);
-        _buyCostLabel.Size = new Vector2(70f, height);
-        _buyCostLabel.HorizontalAlignment = HorizontalAlignment.Right;
-        _buyCostLabel.VerticalAlignment = VerticalAlignment.Center;
-        _buyCostLabel.AddThemeFontSizeOverride("font_size", 14);
-        _buyCostLabel.AddThemeColorOverride("font_color", new Color(1f, 0.9f, 0.3f));
-        _buyCostLabel.MouseFilter = MouseFilterEnum.Ignore;
-        _upgradeBlock.AddChild(_buyCostLabel);
     }
 
     private void BuildArchetypeBlock()
@@ -340,9 +257,7 @@ public partial class TowerUpgradePanel : Control
         float height = GameConstants.TowerUpgradePanelArchetypeHeight;
 
         _archetypeBlock = CreateBlock("Block_ArchetypeChoice");
-        _archetypeBlock.Position = new Vector2(
-            pad,
-            pad + GameConstants.TowerUpgradePanelRankHeight + GameConstants.TowerUpgradePanelBlockGap);
+        _archetypeBlock.Position = new Vector2(pad, pad);
         _archetypeBlock.Size = new Vector2(width, height);
         AddChild(_archetypeBlock);
 
@@ -414,54 +329,22 @@ public partial class TowerUpgradePanel : Control
 
     // === Refresh ===
 
-    private void UpdateRankBlock(Tower tower, Color color)
-    {
-        if (_nameLabel == null)
-            return;
-
-        bool maxRank = TowerUpgrades.IsMaxRank(tower.Rank);
-        _nameLabel.Text = maxRank
-            ? TowerArchetypes.DisplayName(tower.Archetype)
-            : tower.Type.ToString();
-        _nameLabel.AddThemeColorOverride("font_color", maxRank ? color : new Color(0.9f, 0.9f, 1f));
-    }
-
     private void UpdateUpgradeBlock(Tower tower, Color color, bool upgradeVisible)
     {
-        if (_upgradeBlock == null || _buyButton == null || _buyCostLabel == null || _buyChevronsRoot == null)
+        if (_upgradeBlock == null || _buyButton == null)
             return;
 
         _upgradeBlock.Visible = upgradeVisible;
         _buyButton.Visible = upgradeVisible;
         if (!upgradeVisible)
-        {
-            // No generic upgrade is offered: make sure no stale chevron can read as a
-            // (forbidden) three-chevron rank-3 purchase even though the block is hidden.
-            RankIcon.LayoutStack(
-                _buyChevrons,
-                0,
-                GameConstants.RankIconHeight,
-                GameConstants.RankChevronHeight,
-                GameConstants.RankChevronVerticalGap);
             return;
-        }
 
-        int targetRank = tower.Rank + 1;
-        int cost = TowerUpgrades.CostToReachRank(targetRank);
+        int cost = TowerUpgrades.CostToReachRank(tower.Rank + 1);
         bool canAfford = _coins >= cost;
 
-        _buyCostLabel.Text = $"{cost}$";
+        _buyButton.Text = $"Upgrade {cost}";
         _buyButton.Disabled = !canAfford;
-        _buyButton.Text = $"{cost}$";
         ApplyButtonStyle(_buyButton, color, canAfford);
-
-        _buyChevronColor = canAfford ? color : GameConstants.TowerUpgradePanelDimColor;
-        RankIcon.LayoutStack(
-            _buyChevrons,
-            targetRank,
-            GameConstants.RankIconHeight,
-            GameConstants.RankChevronHeight,
-            GameConstants.RankChevronVerticalGap);
     }
 
     private void UpdateArchetypeBlock(Tower tower, Color color, bool choiceVisible)
@@ -516,12 +399,12 @@ public partial class TowerUpgradePanel : Control
     private void LayoutPanel(bool upgradeVisible, bool choiceVisible)
     {
         float pad = GameConstants.TowerUpgradePanelPadding;
-        float height = pad + GameConstants.TowerUpgradePanelRankHeight + pad;
+        float height = pad * 2f;
 
         if (upgradeVisible)
-            height += GameConstants.TowerUpgradePanelBlockGap + GameConstants.TowerUpgradePanelUpgradeHeight;
+            height += GameConstants.TowerUpgradePanelUpgradeHeight;
         else if (choiceVisible)
-            height += GameConstants.TowerUpgradePanelBlockGap + GameConstants.TowerUpgradePanelArchetypeHeight;
+            height += GameConstants.TowerUpgradePanelArchetypeHeight;
 
         Size = new Vector2(GameConstants.TowerUpgradePanelWidth, height);
 
@@ -548,17 +431,6 @@ public partial class TowerUpgradePanel : Control
     }
 
     // === Drawing ===
-
-    private void DrawBuyChevron(Control chevron)
-    {
-        if (!IsInstanceValid(chevron))
-            return;
-        RankChevron.Draw(
-            chevron,
-            new Rect2(Vector2.Zero, chevron.Size),
-            _buyChevronColor,
-            GameConstants.RankChevronStroke);
-    }
 
     private void DrawLeftIcon()
     {
@@ -606,7 +478,8 @@ public partial class TowerUpgradePanel : Control
     /// <summary>
     /// Keeps a button's Text for programmatic inspection (layout verification, screen
     /// readers) while drawing it transparently — the visible copy is the named child
-    /// labels stacked over the button.
+    /// labels stacked over the button. Used by the archetype cards only; the generic
+    /// upgrade button shows its own text.
     /// </summary>
     private static void MakeButtonTextInvisible(Button button)
     {

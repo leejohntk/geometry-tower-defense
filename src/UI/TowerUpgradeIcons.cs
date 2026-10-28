@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using Godot;
 
 namespace GeometryTowerDefense;
@@ -185,34 +184,6 @@ public static class RankIcon
 
         float content = count * chevronHeight + (count - 1) * gap;
         return (boxHeight - content) / 2f;
-    }
-
-    /// <summary>
-    /// Shows the first <paramref name="visibleCount"/> chevron controls and positions
-    /// them as a centred vertical column: all visible children share x, with
-    /// increasing y.
-    /// </summary>
-    public static void LayoutStack(
-        IReadOnlyList<Control> chevrons,
-        int visibleCount,
-        float boxHeight,
-        float chevronHeight,
-        float gap)
-    {
-        int count = Mathf.Clamp(visibleCount, 0, chevrons.Count);
-        float top = StackTop(boxHeight, count, chevronHeight, gap);
-
-        for (int i = 0; i < chevrons.Count; i++)
-        {
-            var chevron = chevrons[i];
-            bool visible = i < count;
-            chevron.Visible = visible;
-            if (!visible)
-                continue;
-
-            chevron.Position = new Vector2(0f, top + i * (chevronHeight + gap));
-            chevron.QueueRedraw();
-        }
     }
 
     /// <summary>

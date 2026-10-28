@@ -45,17 +45,18 @@ Adds in-level per-tower upgrades. Each placed tower starts at rank 0 and can be 
 
 ### Upgrade UI
 
-- [ ] Clicking a placed tower selects it (existing behaviour) and opens `Panel_TowerUpgrade`.
+- [ ] Clicking a placed tower selects it (existing range indication) but only opens `Panel_TowerUpgrade` when the next upgrade is currently available: rank 0/1 with its XP gate reached, or rank 2 with 30 XP (the archetype choice). If no upgrade is available (closed XP gate or rank 3), no panel appears.
 - [ ] The panel is positioned above the selected tower's cell, kept inside the battlefield bounds. For row-0 towers it opens below the cell so it never sits under the top bar.
-- [ ] `Block_Rank` shows only the tower's name (its archetype name at rank 3). It does **not** repeat the current rank as chevrons or an emblem: the tiny tower badge already shows the current rank on the battlefield. No duplicate rank display exists inside the panel.
-- [ ] When an upgrade is available, `Block_Upgrade` shows the target rank as a fixed-size vertical chevron stack plus the coin cost (rank 1 = one chevron, rank 2 = two chevrons). The button is disabled while coins are below the cost. This target-rank icon is the only chevron display in the panel.
-- [ ] At rank 2, when 30 XP is reached, `Block_Upgrade` is replaced by `Block_ArchetypeChoice` with exactly two labelled cards. No three-chevron upgrade icon is ever shown.
+- [ ] The panel shows **no tower type, name, rank chevrons, or archetype emblem**. The selected tower and its top-right badge already identify it.
+- [ ] A generic rank upgrade is a single clickable button in `Block_Upgrade` whose text is exactly `Upgrade {cost}` (5 / 10 / 15). It is disabled while coins are below the cost. No rank icon is shown in the panel.
+- [ ] At rank 2, when 30 XP is reached, `Block_Upgrade` is replaced by `Block_ArchetypeChoice` with exactly two labelled cards. No header is shown above the cards.
 - [ ] Selecting an archetype card spends 15 coins, sets rank 3, records the archetype, and permanently removes all further upgrade actions for that tower.
-- [ ] At rank 3 the panel shows the chosen archetype's name and no upgrade/archetype controls. It does not repeat the archetype emblem; the top-right tower badge shows it.
-- [ ] The panel closes on: clicking empty battlefield space, clicking another tower (the new tower's panel opens), entering placement mode, Escape, game over, victory, or level reset. It never lingers over a result screen.
-- [ ] The panel consumes mouse input (`MouseFilter = Stop`) so clicking an upgrade action never also deselects the tower, toggles its range, or places a tower.
-- [ ] The panel works for all three tower types and is rebuilt/refreshed when the selected tower's rank, XP gate, coins, or archetype changes.
-- [ ] The existing range-indicator toggle on tower click still works alongside the panel.
+- [ ] At rank 3 no panel is shown (no upgrade remains).
+- [ ] The panel appears live if the selected tower's XP gate opens while it is selected; if no upgrade is available it stays hidden.
+- [ ] The panel closes on: clicking empty battlefield space, clicking another tower (the new tower's panel opens if it has an upgrade), entering placement mode, Escape, game over, victory, or level reset. It never lingers over a result screen.
+- [ ] The panel consumes mouse input (`MouseFilter = Stop`) so clicking the upgrade button never also deselects the tower, toggles its range, or places a tower.
+- [ ] The simplest upgrade panel is one button (generic rank) or two cards (archetype choice); it never contains a title block or decorative header.
+- [ ] The existing range-indicator toggle on tower click still works when no panel is shown.
 - [ ] A placed tower shows a tiny current-rank badge at the top-right of its cell once rank ≥ 1, whether or not it is selected: a fixed-size vertical chevron stack for rank 1/2, and a tiny archetype emblem at rank 3. Rank 0 shows no badge. The badge is created/refreshed by the rank purchase itself, not by the next rank's XP gate opening, and never consumes mouse input.
 
 ### Archetypes
@@ -78,7 +79,7 @@ Adds in-level per-tower upgrades. Each placed tower starts at rank 0 and can be 
 ### Visuals
 
 - [ ] Chevrons and archetype emblems are procedural `Control.Draw*` geometry. No AI-generated or external art assets.
-- [ ] Chevrons are drawn as thick V strokes, never as text caret characters. Rank icons stack the chevrons vertically and use one fixed icon box for 1, 2, or 3 chevrons; the stack is centred inside the box. The panel only uses this icon for the next-rank upgrade preview; the current rank lives on the tower badge.
+- [ ] Chevrons are drawn as thick V strokes, never as text caret characters. The tower badge uses one fixed tiny icon box with a vertically centred stack for 1/2 chevrons. The upgrade panel uses no chevrons at all — its generic upgrade is a text button.
 - [ ] Rank chevrons use the tower's colour (arrow blue, cannon green, laser magenta); locked/disabled states are dimmed.
 - [ ] The tower badge is a scaled-down version of the current-rank icon: chevrons for rank 1/2, the chosen archetype emblem for rank 3. It sits inside the top-right of the tower cell and must not intercept clicks.
 - [ ] Archetype emblems are distinct geometric marks: Pierce = double chevron / arrow trail; Crit = four-point star; Cluster = three small circles; Stun = concentric ring; Chain = three linked nodes; Ramp-Up = rising wedge.
@@ -90,7 +91,7 @@ Adds in-level per-tower upgrades. Each placed tower starts at rank 0 and can be 
   - Laser/Chain: body keeps its circle and gains three linked rim nodes.
   - Laser/Ramp-Up: body keeps its circle and gains a rising wedge core.
   The tiny top-right badge still shows the chosen archetype emblem.
-- [ ] Panel and emblems are readable at 1× scale and do not cover more than roughly one cell of the battlefield around the tower. The panel is a UI overlay, not world geometry.
+- [ ] Panel and emblems are readable at 1× scale and the panel stays a compact context action. The panel is a UI overlay, not world geometry.
 
 ## Edge Cases
 
@@ -138,7 +139,7 @@ Adds in-level per-tower upgrades. Each placed tower starts at rank 0 and can be 
 - Rank-3 body variants: the tower's own procedural body silhouette changes per archetype (no separate accent ring/emblem overlay).
 - Panel: dark translucent rounded rectangle matching HUD sidebar (`0.05, 0.05, 0.1`), thin separator, geometric sans-serif labels. No sprites.
 
-**LAYOUT:** `Panel_TowerUpgrade` is docked to the selected tower — horizontally centred on the tower's cell and offset above it, or below it when the tower is in the top row, clamped inside the battlefield. Inside the panel, `Block_Rank` sits at the top, `Block_Upgrade` or `Block_ArchetypeChoice` sits directly beneath it. The two archetype cards in `Block_ArchetypeChoice` mirror each other about the panel's vertical centre line. Every group is wrapped in a named `Control` with `MouseFilter = Ignore` on the wrapper; the panel itself uses `Stop`. The panel may overlap world geometry but must not extend outside the play area or under the top bar.
+**LAYOUT:** `Panel_TowerUpgrade` is docked to the selected tower — horizontally centred on the tower's cell and offset above it, or below it when the tower is in the top row, clamped inside the battlefield. It contains exactly one group: `Block_Upgrade` with a single full-width `Buy` button (`Upgrade {cost}`), or `Block_ArchetypeChoice` with two mirrored cards. There is no title/header block. Every group is wrapped in a named `Control` with `MouseFilter = Ignore` on the wrapper; the panel itself uses `Stop`. The panel may overlap world geometry but must not extend outside the play area or under the top bar. When no upgrade is available the panel is hidden entirely.
 
 ## Out of Scope
 

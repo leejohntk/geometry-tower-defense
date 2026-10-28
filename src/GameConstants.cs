@@ -192,24 +192,15 @@ public static class GameConstants
     public const int ArchetypeMinSeedRank = 1;
 
     // Tower Upgrade panel (UI overlay). One panel per selection, docked to the
-    // selected tower's cell. Dark translucent fill matching the HUD sidebar.
+    // selected tower's cell. Dark translucent fill matching the HUD sidebar. The
+    // panel is a single action (upgrade button or two archetype cards) with no
+    // header, and it is hidden entirely when no upgrade is available.
     public const float TowerUpgradePanelWidth = 180f;
     public const float TowerUpgradePanelPadding = 8f;
-    public const float TowerUpgradePanelRankHeight = 24f;     // name-only row; the badge shows the rank
     public const float TowerUpgradePanelUpgradeHeight = 40f;
     public const float TowerUpgradePanelArchetypeHeight = 84f;
-    public const float TowerUpgradePanelBlockGap = 6f;
     public const float TowerUpgradePanelCellGap = 8f;         // px between cell edge and panel
     public const float TowerUpgradePanelCardIconSize = 26f;
-
-    // Rank icon: one fixed-size box for 1, 2, or 3 chevrons, with the stack centred
-    // vertically inside it so the icon never jumps as ranks are gained and the icon
-    // box never changes size. Chevrons are thick V polylines, never text glyphs.
-    public const float RankIconWidth = 16f;
-    public const float RankIconHeight = 30f;
-    public const float RankChevronHeight = 8f;                // px, one V stroke slot
-    public const float RankChevronVerticalGap = 1f;
-    public const float RankChevronStroke = 2.5f;
 
     // Tiny current-rank badge at the top-right of a placed tower's cell, created by
     // the rank purchase itself. Same fixed size at every rank (rank 1/2 chevrons,
@@ -221,7 +212,6 @@ public static class GameConstants
     public const float TowerRankBadgeChevronGap = 1f;
     public const float TowerRankBadgeStroke = 1.5f;
     public static readonly Color TowerUpgradePanelBackgroundColor = new Color(0.05f, 0.05f, 0.1f, 0.92f);
-    public static readonly Color TowerUpgradePanelBorderColor = new Color(0.3f, 0.3f, 0.5f, 0.8f);
     public static readonly Color TowerUpgradePanelDimColor = new Color(0.35f, 0.35f, 0.42f, 0.9f);
 
     // Crit hit flash: brief brightening of an enemy after a crit lands (presentation).

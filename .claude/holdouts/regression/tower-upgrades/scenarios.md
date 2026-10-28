@@ -27,8 +27,8 @@ Set every node to rank 5.
 - Laser rank 3 DPS = `(4 + 0.8×5) × 1.09 = 8.72`.
 
 ## H4 — Hidden XP gate
-- Rank 0 tower with 4.999 XP shows no upgrade action anywhere in its panel: no button, progress bar, label, percentage, tooltip, or colour cue.
-- At exactly 5 XP the rank-1 upgrade action appears while the panel is already open, with no reselect.
+- A rank-0 tower with 4.999 XP shows **no panel at all** when selected: no button, progress bar, label, percentage, tooltip, or colour cue.
+- At exactly 5 XP the rank-1 upgrade button appears while the tower is selected, with no reselect.
 - 15 XP unlocks rank 2; 30 XP unlocks the rank-3 archetype choice.
 - XP is cumulative: a tower with 15 XP can buy rank 1 and rank 2 back to back (coins permitting), and after rank 2 still has 15 XP toward the 30 threshold.
 - No public UI text contains "XP", "exp", or an XP count at any rank.
@@ -62,9 +62,9 @@ Set every node to rank 5.
 - XP split follows the normal damage-share rule.
 
 ## H10 — Archetype purchase flow
-- At rank 2 with 30 XP, the panel shows exactly two archetype cards and no third-chevron upgrade icon.
+- At rank 2 with 30 XP, the panel shows exactly two archetype cards and no header. There is no generic upgrade button and no three-chevron icon.
 - Arrow cards are Pierce and Crit; Cannon cards are Cluster and Stun; Laser cards are Chain and Ramp-Up.
-- Clicking a card deducts 15 coins, sets rank 3, records the archetype, and continues to show the chosen archetype name in the panel with no further upgrade or card controls. The top-right tower badge shows the chosen emblem.
+- Clicking a card deducts 15 coins, sets rank 3, records the archetype, and closes the panel (no upgrade remains). The top-right tower badge shows the chosen emblem.
 - Clicking one card twice / both cards in one frame results in exactly one purchase and one archetype.
 - With 14 coins the cards are visible but not purchasable.
 
@@ -88,15 +88,15 @@ Maxed skill tree (all ranks 5):
 - Seed ranks are not deleted or consumed; once the tower reaches rank 3 and chooses a branch, the chosen seed applies at `max(1, skill-tree rank)`.
 - The archetype gate only opens the chosen seed; the unchosen seed remains zero at rank 3.
 
-## H13 — Upgrade preview icons; no current-rank duplication
-- The panel never shows the tower's current rank as chevrons or an emblem; `Block_Rank` contains only the tower/archetype name. The top-right tower badge is the current-rank display.
-- When a rank-1/2 upgrade is available, `Block_Upgrade/Chevrons` shows exactly the target rank: one chevron for target rank 1, two for target rank 2.
-- The target-rank icon container has the same fixed size for 1 and 2 chevrons; the stack is centred vertically, every visible chevron shares x, and later chevrons have greater y.
-- Chevrons are drawn V strokes, not text caret characters.
-- Rank 2 with 30 XP: two archetype emblems/cards, never a three-chevron upgrade icon.
-- Rank 3 panel: chosen archetype name only, zero chevrons, zero emblem, zero upgrade buttons; the badge shows the emblem.
-- Chevron and emblem nodes are named groups (`Block_Rank`, `Block_Upgrade`, `Block_ArchetypeChoice`) with stable child names; no generated `@Label@…` names appear in findings.
-- All icons are drawn procedurally; no new external or AI-generated asset files exist in the repo.
+## H13 — Panel is a single action; no header or rank display
+- The panel has no `Block_Rank`, no tower name/type label, no chevrons, and no archetype emblem. Its only content is `Block_Upgrade` or `Block_ArchetypeChoice`.
+- Rank 0 with 5 XP: panel visible, `Block_Upgrade/Buy` text is exactly `Upgrade 5`; no chevron nodes exist in the panel.
+- Rank 1 with 15 XP: button text is exactly `Upgrade 10`.
+- Rank 2 with 30 XP: `Block_ArchetypeChoice` with exactly two cards and no header; card cost 15; no generic button.
+- Coins short: the button/cards are visible but disabled.
+- No panel when no upgrade is available: rank 0 with <5 XP, rank 1 with <15 XP, rank 2 with <30 XP, and rank 3 all show no panel.
+- Named groups are `Block_Upgrade` / `Block_ArchetypeChoice` with stable child names; no generated `@Label@…` names appear in findings.
+- The only chevron displays left are the tiny tower badge; all icons are procedural; no external assets.
 
 ## H17 — Tiny tower rank badge
 - A rank-0 tower has no rank badge.
@@ -120,12 +120,14 @@ Maxed skill tree (all ranks 5):
 - The tiny top-right badge remains visible at rank 3 and shows the chosen archetype emblem.
 - Body variants are procedural geometry; no sprites or external assets.
 
-## H14 — Panel input isolation
-- Clicking an upgrade button does not deselect the tower, toggle its range indicator, place a tower, or start a wave.
+## H14 — Panel visibility and input isolation
+- Clicking a tower with no upgrade available shows its range indicator but **no panel**. Clicking it again still toggles the range off.
+- Clicking a tower with an upgrade available opens the panel. Clicking the upgrade button does not deselect the tower, toggle its range indicator, place a tower, or start a wave.
+- If a selected tower's XP gate opens, the panel appears live; if the gate is still closed it stays hidden.
 - Clicking empty battlefield space closes the panel and deselects the tower.
-- Clicking another tower closes the old panel and opens the new tower's panel.
-- Escape closes the panel. Entering placement mode closes it.
-- Panel is clamped inside the battlefield: row-0 tower → panel below; left/right edge columns → panel stays within play-area X bounds; never under the top bar.
+- Clicking another tower closes the old panel and opens the new tower's panel only if that tower has an upgrade; otherwise the panel stays hidden.
+- Escape closes the panel and drops the selection. Entering placement mode closes it.
+- When visible, the panel is clamped inside the battlefield: row-0 tower → panel below; left/right edge columns → panel stays within play-area X bounds; never under the top bar.
 - Panel closes before the Game Over / Victory overlay becomes visible; no upgrade succeeds after play ends.
 
 ## H15 — Reset and lifecycle
