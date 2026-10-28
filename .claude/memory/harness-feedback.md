@@ -16,8 +16,22 @@ metadata:
 - **Merge Cleanup step 6 honored (2026-10-25)** — the flag was set at 21:55:42 and `/evolve-harness` ran immediately after PR #25 merged at 22:28, so the advisory gap from runs #5–#6 did not recur.
 - **Fix-batch re-verification (2026-10-25)** — after the Level 5 fix batch, the orchestrator sent the batch back to the same correctness lens with a per-finding checklist; it returned CLEAN with line-level evidence for every item. This caught the “test bypasses the production tick” warning and is worth repeating.
 - **Agent-scoped holdouts deny + GODOT_BIN (PR #9)** — global `Read(.claude/holdouts/**)` removed; implementer blocked from holdouts via a frontmatter PreToolUse hook (correct `hookSpecificOutput.permissionDecision` format — the old `{"decision": "deny"}` shape was silently ignored). Reviewer + orchestrator keep access. `env.GODOT_BIN` set so bare `dotnet test` passes. Verified: implementer Read denied, reviewer Read allowed, orchestrator `ls` allowed.
+- **P3 playtest batching held (2026-10-28)** — five human playtest passes produced exactly five fix batches, each sent to one still-live implementer via `SendMessage` (`aceb750…`, then `a525fc…`); no per-issue respawn, no per-fix gate cycle.
+- **P5 single-`Write` state updates held (2026-10-28)** — `state.json` written 12× with `Write`, 0 `Edit`; no stale-content edit failure.
+- **Merge Cleanup step 6 honored (2026-10-28)** — flag set 2026-10-26T04:31:03; PR #29 merged 05:10:41Z and `/evolve-harness` invoked 05:11:31Z, 50 s later. Second consecutive merge to honor the check (PRs #25, #29).
+- **Implementer holdout deny held under pressure (2026-10-28)** — despite four fix prompts naming holdout IDs, the implementer's Read deny fired and its handback explicitly stated it did not open `.claude/holdouts/`. The deterministic guard works; the leak was in the orchestrator's prompt text, not the data path.
+- **Pre-merge bookkeeping held (2026-10-28)** — holdouts moved to `regression/tower-upgrades/`, `current-feature.md` updated, and PR #29 checklist filled on the feature branch before squash merge; no post-merge sync PR.
+- **Gates all green (2026-10-28)** — build 0 warnings / 0 errors, 384 tests pass, layout verifier PASS, holdouts 16/16; squash `5db78bb`, post-merge fast-forward re-verified (build clean, 384 tests), local + remote branch deleted, `state.json` removed. No destructive git ops, no `.tscn` hand-edits, no MCP calls (feature was procedural C#).
 
 ## What's Broken
+
+### Open 2026-10-28
+
+- **Holdout IDs leaked through orchestrator `SendMessage` prompts (P13)** — four playtest fix batches named H12, H13/H17, H18, and H4/H10/H13/H14. The implementer's deny blocked reads, but the verification set's identity was disclosed, violating the dark-factory handoff rule. Medium.
+- **Correctness lens never returned an independent report (P14/P15)** — first reviewer killed at 9m26s, retry at 2m03s, caveman fallback at 3m26s, general-purpose audit at 1m42s; orchestrator self-audited instead ("I completed the correctness audit manually"). Successful lenses took 4m36s–5m44s, so two kills were earlier than a normal successful run. Medium.
+- **Orchestrator busy-waits on background agents (P15)** — 116 `sleep`, 101 no-op `true`, 85 `ListAgents`, 5 "start editing now" nudges, 11 `TaskStop` in one 2h56m feature. Task notifications already work. Medium.
+- **Forked skills die with API 422 `tool_definition` (P16)** — four failures across two sessions (`/fix-bug` ×2, `/evolve-harness`, `/implement-feature`), request bodies 292–456 KB on `deepseek-flash`. Recovery that worked: adopt the still-live child implementer via `SendMessage` instead of re-spawning. Medium.
+- **Five playtest rounds on UI state/visibility (P17)** — 22 spec edits, 15 holdout edits; most fixes were state-table facts (when a badge appears, when a panel hides, which fact is shown where). Medium.
 
 ### Open 2026-10-25
 
@@ -108,6 +122,19 @@ Window: PR #23 (run #6 memory updates), PR #24 (skill-tree tab-switch fix via `/
 - **Holdout discipline held** — 0/2 implementer transcripts enumerated `.claude` or touched a holdout path.
 - **Unrelated activity tripped the flag** — the Oct 25 Open Design debugging session (~100 Bash/MCP calls, no game edits) drove the counter to 62. Scoping the stop hook to game edits would be a HIGH (human-only) change; no action taken.
 
+### 2026-10-28 — Eighth Distillation
+
+Window: PR #29 (tower-upgrades: ranks, hidden XP gates, archetype specialization) plus run #7's memory PR #26. Evidence: main session `2d66f169-…` (462 Bash, 85 ListAgents, 73 Edit, 57 Read, 17 Write, 14 SendMessage, 11 TaskStop, 11 Agent) and its 13 subagent transcripts. Prior session `99297c2c-…` used only for API-422 recurrence.
+
+- **P11/P12 verified landed** (PR #26): reviewer prompts carried diff text and no longer asked for git; spec template carried grid-cell scale + telegraph timing. No reviewer complained it had no shell this window.
+- **Holdout-ID leak (new P13, highest-value finding)** — four fix batches named H12, H13/H17, H18, H4/H10/H13/H14. The frontmatter deny blocked reads (implementer handback confirmed), but the orchestrator's prompt text disclosed the verification set. `dark-factory-patterns.md` already forbids mentioning holdouts; it needs IDs and scenario names named explicitly.
+- **Review-gate integrity weakened (new P14)** — correctness was self-audited after four failed reviewer attempts. `reviewer.md` has no budget, and the diff was 4,387 lines; the first lens read 38 source files / 23 greps before being killed. Two kills happened before a normal successful lens would have finished.
+- **Cover-waiting (new P15)** — 116 sleeps totaling 7,170 s nominal (119.5 min) in a 2h56m session, 101 no-op `true`, 85 `ListAgents`. Notifications work; polling is pure overhead and drives the premature kills.
+- **Forked-skill API 422 recurred (new P16)** — four failures / two sessions on `deepseek-flash`; recovery by adopting the live child agent worked. Document it so the next run doesn't restart the loop.
+- **UI state matrix missing (new P17)** — five playtest rounds, all state/visibility fidelity; 22 spec edits, 15 holdout edits. A states × visible-groups × triggers table would have front-loaded most of it.
+- **Minor: NUnit `Assert.That` slipped in** — implementer wrote 8 occurrences in `Tests/UI/TowerUpgradePanelTest.cs`, converted to `AssertThat` after a failing test run. Final repo clean. No formal proposal; consider an explicit "not NUnit" line if it recurs.
+- **Healthy:** P3 batching, P5 single-Write, pre-merge bookkeeping, fast-forward merge, merge cleanup step 6 all held; 0 destructive git ops; 0 `.tscn` hand edits; build 0 warnings, 384 tests, verifier PASS, holdouts 16/16; holdouts moved to `regression/tower-upgrades/`.
+
 **Queued proposals (await human approval — do not apply to skills/rules/CLAUDE.md without sign-off):**
 
 *(Run #4's P1 and P2 were approved and landed as PR #17 — closed. Run #5's P3/P5/P6/P7 landed as PR #21 — closed. H3 closed by PR #21.)*
@@ -161,6 +188,24 @@ Progenitor diameter was 96 px (1.5 × 64 px cell) → 72 px → 64 px across two
 
 **H5 — DECLINED 2026-10-26 by human (deterministic guard not implemented) — guard recursive `.claude` enumeration.**
 Extend the implementer's PreToolUse Bash pattern to deny recursive listings/searches rooted at `.claude/` (`find … .claude`, `ls -R .claude`, `tree .claude`, `grep -r … .claude`) while still allowing explicit reads of named harness files (e.g. `cat .claude/settings.json`). P9 is the prompt-level mitigation; this is the deterministic backstop.
+
+**P13 — QUEUED 2026-10-28 (MEDIUM): never name holdout files, IDs, or scenario names to the implementer.**
+`orchestrator.md` Delegation Rules, `implement-feature/SKILL.md` Phase 8, and `dark-factory-patterns.md` handoff should say: pass the full spec; never mention holdout scenarios, files, IDs (`H<n>`), or paths; for a playtest fix, update the spec and pass the affected spec sections. Evidence: four leaked batches (H12; H13/H17; H18; H4/H10/H13/H14) while the Read deny held. Full text in run #8, P13.
+
+**P14 — QUEUED 2026-10-28 (MEDIUM): reviewer budget + large-diff splitting.**
+`reviewer.md`: diff is primary target; ≤10 source reads / ≤15 tool calls; return partial findings rather than no report; no rereads; use Glob/Grep for paths; one pass on diffs over ~1,500 lines. `review-changes/SKILL.md` and `implement-feature/SKILL.md` Phase 4: split large diffs by subsystem, one reviewer per slice; a lens requires an independent report — if two attempts stall, split or use a general-purpose reviewer with Bash and record the fallback. `orchestrator.md`: no silent self-audit. Evidence: reviewer kill/read counts above. Full text in run #8, P14.
+
+**P15 — QUEUED 2026-10-28 (MEDIUM): wait for task notifications, do not poll.**
+`orchestrator.md` new "Waiting for subagents" section and `implement-feature/SKILL.md` Phase 4: after spawning background agents, end the turn; rely on task notifications; no `sleep`/`true`/`ListAgents` loops; inspect the output file once after a notification; allow ≥~6 min for lens reviewers; stop only after 3+ min with no new tool activity, one nudge first, never before one full review pass. Evidence: 116 sleeps / 7,170 s, 101 `true`, 85 `ListAgents`, 11 `TaskStop`; successes 4m36s–5m44s. Full text in run #8, P15.
+
+**P16 — QUEUED 2026-10-28 (MEDIUM): forked-skill API-422 recovery.**
+`implement-feature/SKILL.md` (optionally `fix-bug` / `evolve-harness`): on `API Error: 422 … unknown variant tool_definition`, resume the same task-id via `SendMessage` or adopt its live child agents; do not re-spawn the whole loop; keep fork context lean. Evidence: four failures / two sessions on `deepseek-flash`, bodies 292–456 KB; PR #29 recovered by adopting `aceb750…`. Full text in run #8, P16.
+
+**P17 — QUEUED 2026-10-28 (MEDIUM): UI state matrix in the spec template.**
+`templates/spec-template.md` new `## UI States` (or table under Visual / Geometry Theme): each state × visible named groups/controls × transition trigger × single source of truth for duplicated facts; explicit "drawn geometry, not text glyph" wording. Evidence: five playtest rounds, 22 spec edits, 15 holdout edits. Full text in run #8, P17.
+
+**H6 — QUEUED 2026-10-28 (HIGH — human only): deterministic guard against holdout IDs in orchestrator→implementer prompts.**
+Extend the PreToolUse hook to inspect `Agent` / `SendMessage` inputs addressed to the implementer and deny holdout paths or `H<n>_` tokens. False-positive caveat: legitimate "do NOT read `.claude/holdouts/`" prohibitions must remain allowed. Logged only; not implemented.
 
 ## Harness Change Log
 
