@@ -12,7 +12,17 @@ active right now (and is deleted at merge, which means "idle"). This file record
 shipped, its gates, and open follow-ups. Do not track phase here — it goes stale the moment a PR
 merges.
 
-**Last feature:** level-5-progenitor — three-route Level 5 + The Progenitor boss
+**Current feature:** tower-upgrades — in-level ranks, hidden XP gates, archetype specialization
+**Branch:** `feature/tower-upgrades`
+**Spec:** `.claude/specs/tower-upgrades.md` (approved 2026-10-27)
+
+Three coin-priced ranks per placed tower (5 / 15 / 25) with +3% damage, +0.5 cell range and
++3% fire rate per rank. Each rank is gated by hidden kill XP, split across every tower that
+damaged the enemy in proportion to effective damage. Rank 3 is an archetype choice between the
+tower's two skill-tree seed nodes: the chosen seed applies at minimum rank 1, the unchosen seed
+contributes nothing. Rank, XP and archetype live on the tower instance and never persist.
+
+**Previous feature:** level-5-progenitor — three-route Level 5 + The Progenitor boss
 **Branch:** `feature/level-5-progenitor`
 **Spec:** `.claude/specs/level-5-progenitor.md` (approved 2026-10-25)
 
@@ -51,7 +61,7 @@ its phases (thresholds now 166 / 83 HP); tests re-pinned.
 Playtest 3 (2026-10-25): boss still read slightly large; diameter 72 → 64 px (collision radius
 32). No other tuning changed.
 
-**Previous feature:** layout-verifier — headless pre-playtest layout verification
+**Earlier feature:** layout-verifier — headless pre-playtest layout verification
 **Branch:** `feature/layout-verifier`
 **Spec:** `.claude/specs/layout-verifier.md` (approved 2026-10-19, AC-11 amended 2026-10-19)
 
