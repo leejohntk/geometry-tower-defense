@@ -33,6 +33,12 @@ skill tree. They are now inert until rank 3: pierce/crit, cluster/stun, and chai
 read zero on ranks 0–2 even with maxed seed nodes; the chosen seed applies only after
 the archetype choice. Trunk nodes are unchanged. Spec and holdout H12 updated.
 
+**Playtest fix 2 (2026-10-27):** rank icons now use one fixed-size 16x30 box with a
+vertically centred stack of drawn V chevrons (no text glyphs). A tiny current-rank
+badge sits at the tower cell's top-right once rank ≥ 1 (chevrons at rank 1/2,
+archetype emblem at rank 3); it appears on purchase, not when the next XP gate opens,
+and is visible without selecting the tower. Spec and holdouts H13/H17 updated.
+
 **Open follow-ups:** the spec's double-click edge case is worded as "second click is a no-op",
 but each valid click buys one rank — a second click can legitimately buy the next rank when its
 gate is already open (a challenge at 15 XP bought rank 2). The layout verifier has no assertions
