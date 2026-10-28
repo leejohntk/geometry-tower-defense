@@ -39,6 +39,12 @@ badge sits at the tower cell's top-right once rank ≥ 1 (chevrons at rank 1/2,
 archetype emblem at rank 3); it appears on purchase, not when the next XP gate opens,
 and is visible without selecting the tower. Spec and holdouts H13/H17 updated.
 
+**Playtest fix 3 (2026-10-27):** removed the generic rank-3 base ring/emblem accent.
+The tower body silhouette now changes per archetype: Arrow forked spearhead (Pierce)
+or star inset (Crit), Cannon lobed cluster (Cluster) or shockwave rings (Stun), Laser
+linked rim nodes (Chain) or rising wedge core (Ramp-Up). The tiny badge remains. Spec
+and holdout H18 updated.
+
 **Open follow-ups:** the spec's double-click edge case is worded as "second click is a no-op",
 but each valid click buys one rank — a second click can legitimately buy the next rank when its
 gate is already open (a challenge at 15 XP bought rank 2). The layout verifier has no assertions
