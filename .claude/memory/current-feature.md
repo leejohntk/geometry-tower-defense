@@ -50,6 +50,12 @@ removed because the tower badge already shows rank. Only the next-rank preview k
 the fixed-size vertical chevron stack. Costs lowered to 5 / 10 / 15. Spec and holdouts
 H1/H10/H13 updated.
 
+**Playtest fix 5 (2026-10-28):** panel is now a single action with no header. Generic
+upgrade = one full-width `Upgrade {cost}` button; rank 2 = two archetype cards; no
+panel at all when no upgrade is available (closed XP gate or rank 3). Selection still
+shows range; panel appears live if the gate opens. Spec and holdouts H4/H10/H13/H14
+updated.
+
 **Open follow-ups:** the spec's double-click edge case is worded as "second click is a no-op",
 but each valid click buys one rank — a second click can legitimately buy the next rank when its
 gate is already open (a challenge at 15 XP bought rank 2). The layout verifier has no assertions
