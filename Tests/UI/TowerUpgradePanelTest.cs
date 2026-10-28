@@ -97,7 +97,8 @@ public class TowerUpgradePanelTest
             AssertThat(upgradeBlock!.MouseFilter).IsEqual(Control.MouseFilterEnum.Ignore);
             AssertThat(archetypeBlock!.MouseFilter).IsEqual(Control.MouseFilterEnum.Ignore);
 
-            AssertThat(panel.GetNodeOrNull<Control>("Block_Rank/Rank")).IsNotNull();
+            AssertThat(panel.GetNodeOrNull<Control>("Block_Rank/Rank")).IsNull();
+            AssertThat(panel.GetNodeOrNull<Control>("Block_Rank/Icon")).IsNull();
             AssertThat(panel.GetNodeOrNull<Label>("Block_Rank/Name")).IsNotNull();
             AssertThat(panel.GetNodeOrNull<Button>("Block_Upgrade/Buy")).IsNotNull();
         }
@@ -117,7 +118,7 @@ public class TowerUpgradePanelTest
         {
             AssertThat(panel.GetNode<Control>("Block_Upgrade").Visible).IsFalse();
             AssertThat(panel.GetNode<Control>("Block_ArchetypeChoice").Visible).IsFalse();
-            AssertThat(VisibleChildren(panel.GetNode("Block_Rank/Rank"))).IsEqual(0);
+            AssertThat(panel.GetNodeOrNull<Control>("Block_Rank/Rank")).IsNull();
 
             AssertNoXpHintText(panel);
         }
@@ -179,17 +180,26 @@ public class TowerUpgradePanelTest
     }
 
     [TestCase]
-    public void RankChevrons_ShowExactlyTheCurrentRank()
+    public void Panel_HasNoCurrentRankDisplay_TheTowerBadgeOwnsIt()
     {
         var tower = MakeTower(TowerType.Arrow, 5, 10);
         var panel = CreatePanel(tower, 100);
         try
         {
-            AssertThat(VisibleChildren(panel.GetNode("Block_Rank/Rank"))).IsEqual(0);
+            // Block_Rank is the tower name only: no chevrons and no emblem in the panel.
+            AssertThat(panel.GetNodeOrNull<Control>("Block_Rank/Rank")).IsNull();
+            AssertThat(panel.GetNodeOrNull<Control>("Block_Rank/Icon")).IsNull();
+            AssertThat(panel.GetNode<Label>("Block_Rank/Name").Text).IsEqual("Arrow");
 
             RaiseToRank2(tower);
             panel.Refresh();
-            AssertThat(VisibleChildren(panel.GetNode("Block_Rank/Rank"))).IsEqual(2);
+
+            AssertThat(panel.GetNodeOrNull<Control>("Block_Rank/Rank")).IsNull();
+            AssertThat(panel.GetNodeOrNull<Control>("Block_Rank/Icon")).IsNull();
+            AssertThat(panel.GetNode<Label>("Block_Rank/Name").Text).IsEqual("Arrow");
+
+            // The placed tower's own badge is the single current-rank display.
+            AssertThat(tower.GetNodeOrNull<Control>("RankBadge")).IsNotNull();
         }
         finally
         {
@@ -198,50 +208,35 @@ public class TowerUpgradePanelTest
     }
 
     [TestCase]
-    public void RankIcon_IsAFixedSizeVerticalStack_CentredInTheSameBoxForAnyRank()
+    public void UpgradePreview_IsAFixedSizeVerticalChevronStack()
     {
         var tower = MakeTower(TowerType.Arrow, 5, 10);
+        tower.AddXp(5f); // rank 0 -> 1 preview (one chevron)
         var panel = CreatePanel(tower, 100);
         try
         {
-            var rankStack = panel.GetNode<Control>("Block_Rank/Rank");
             var buyStack = panel.GetNode<Control>("Block_Upgrade/Chevrons");
             var box = new Vector2(GameConstants.RankIconWidth, GameConstants.RankIconHeight);
-
-            // One shared fixed-size box for the rank display and the upgrade preview.
-            AssertThat(rankStack.Size).IsEqual(box);
             AssertThat(buyStack.Size).IsEqual(box);
-            AssertThat(VisibleChildren(rankStack)).IsEqual(0);
 
-            // Rank 1: one chevron, centred vertically inside the same box.
-            tower.ApplyRankUpgrade();
-            panel.Refresh();
-            var one = VisibleControls(rankStack);
+            // Target rank 1: one chevron, centred vertically inside the same box.
+            var one = VisibleControls(buyStack);
             AssertThat(one.Count).IsEqual(1);
-            AssertThat(rankStack.Size).IsEqual(box);
             AssertThat(one[0].Position.X).IsEqual(0f);
             AssertThat(one[0].Position.Y + one[0].Size.Y / 2f)
                 .IsEqual(GameConstants.RankIconHeight / 2f);
 
-            // Upgrade preview at rank 1 (target rank 2): two chevrons in the fixed box,
-            // sharing x and increasing in y.
-            tower.AddXp(15f);
-            panel.Refresh();
-            var buy = VisibleControls(buyStack);
-            AssertThat(buy.Count).IsEqual(2);
-            AssertThat(buyStack.Size).IsEqual(box);
-            AssertThat(buy[0].Position.X).IsEqual(buy[1].Position.X);
-            AssertThat(buy[1].Position.Y).IsGreater(buy[0].Position.Y);
-            AssertThat(buy[0].Size).IsEqual(buy[1].Size);
-
-            // Rank 2: two chevrons, same icon box, stack still centred as a column.
+            // Target rank 2 preview: two chevrons sharing x, increasing y, same box.
             tower.ApplyRankUpgrade();
+            tower.AddXp(10f); // 15 total opens the rank-2 gate
             panel.Refresh();
-            var two = VisibleControls(rankStack);
+
+            var two = VisibleControls(buyStack);
             AssertThat(two.Count).IsEqual(2);
-            AssertThat(rankStack.Size).IsEqual(box);
+            AssertThat(buyStack.Size).IsEqual(box);
             AssertThat(two[0].Position.X).IsEqual(two[1].Position.X);
             AssertThat(two[1].Position.Y).IsGreater(two[0].Position.Y);
+            AssertThat(two[0].Size).IsEqual(two[1].Size);
             float stackCenter = (two[0].Position.Y + two[^1].Position.Y + two[^1].Size.Y) / 2f;
             AssertThat(stackCenter).IsEqual(GameConstants.RankIconHeight / 2f);
         }
@@ -271,7 +266,7 @@ public class TowerUpgradePanelTest
             AssertThat(right.Text).IsEqual("Crit");
             AssertThat(left.GetNode<Label>("Name").Text).IsEqual("Pierce");
             AssertThat(right.GetNode<Label>("Name").Text).IsEqual("Crit");
-            AssertThat(left.GetNode<Label>("Cost").Text).IsEqual("25$");
+            AssertThat(left.GetNode<Label>("Cost").Text).IsEqual("15$");
             AssertThat(left.GetNodeOrNull<Control>("Icon")).IsNotNull();
             AssertThat(right.GetNodeOrNull<Control>("Icon")).IsNotNull();
 
@@ -285,7 +280,7 @@ public class TowerUpgradePanelTest
     }
 
     [TestCase]
-    public void Rank3_ShowsChosenArchetypeEmblemAndName_WithNoUpgradeControls()
+    public void Rank3_ShowsArchetypeNameOnly_WithNoUpgradeControls()
     {
         var tower = MakeTower(TowerType.Arrow, 5, 10);
         tower.AddXp(30f);
@@ -294,9 +289,10 @@ public class TowerUpgradePanelTest
         var panel = CreatePanel(tower, 100);
         try
         {
-            AssertThat(panel.GetNode<Control>("Block_Rank/Icon").Visible).IsTrue();
             AssertThat(panel.GetNode<Label>("Block_Rank/Name").Text).IsEqual("Pierce");
-            AssertThat(panel.GetNode<Control>("Block_Rank/Rank").Visible).IsFalse();
+            // Name only: the panel draws no emblem and no current-rank chevrons.
+            AssertThat(panel.GetNodeOrNull<Control>("Block_Rank/Icon")).IsNull();
+            AssertThat(panel.GetNodeOrNull<Control>("Block_Rank/Rank")).IsNull();
             AssertThat(panel.GetNode<Control>("Block_Upgrade").Visible).IsFalse();
             AssertThat(panel.GetNode<Control>("Block_ArchetypeChoice").Visible).IsFalse();
         }
@@ -470,7 +466,7 @@ public class TowerUpgradePanelTest
         {
             AssertThat(panel.GetNode<Control>("Block_Upgrade").Visible).IsFalse();
             AssertThat(panel.GetNode<Control>("Block_ArchetypeChoice").Visible).IsFalse();
-            AssertThat(VisibleChildren(panel.GetNode("Block_Rank/Rank"))).IsEqual(2);
+            AssertThat(panel.GetNodeOrNull<Control>("Block_Rank/Rank")).IsNull();
             AssertNoXpHintText(panel);
         }
         finally
@@ -892,14 +888,14 @@ public class TowerUpgradePanelTest
         var main = CreateStartedGame();
         try
         {
-            // 30 XP passes both rank gates; 100 extra coins cover 5 + 15 + 25.
+            // 30 XP passes both rank gates; 100 extra coins cover 5 + 10 + 15.
             var tower = PlaceTower(main, TowerType.Arrow, row: 5, col: 10);
             tower.AddXp(30f);
             var manager = GetManager(main);
             AssertThat(manager.TryUpgradeTower(tower)).IsTrue();
             AssertThat(manager.TryUpgradeTower(tower)).IsTrue();
             AssertThat(tower.Rank).IsEqual(2);
-            AssertThat(manager.Coins).IsEqual(80);
+            AssertThat(manager.Coins).IsEqual(85);
 
             PushLeftClick(main, CellCenter(5, 10));
             var panel = GetPanel(main);
@@ -911,7 +907,7 @@ public class TowerUpgradePanelTest
 
             AssertThat(tower.Rank).IsEqual(3);
             AssertThat(tower.Archetype).IsEqual(TowerArchetype.Crit);
-            AssertThat(manager.Coins).IsEqual(55);
+            AssertThat(manager.Coins).IsEqual(70);
             AssertThat(panel.IsOpen).IsTrue();
             AssertThat(HasRangeIndicator(tower)).IsTrue();
             AssertThat(panel.GetNode<Control>("Block_ArchetypeChoice").Visible).IsFalse();
@@ -922,7 +918,7 @@ public class TowerUpgradePanelTest
             panel.GetNode<Button>("Block_ArchetypeChoice/Card_Pierce")
                 .EmitSignal(Button.SignalName.Pressed);
             AssertThat(tower.Archetype).IsEqual(TowerArchetype.Crit);
-            AssertThat(manager.Coins).IsEqual(55);
+            AssertThat(manager.Coins).IsEqual(70);
         }
         finally
         {

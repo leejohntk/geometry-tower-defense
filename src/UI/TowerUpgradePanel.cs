@@ -34,8 +34,6 @@ public partial class TowerUpgradePanel : Control
     private ColorRect? _background;
     private Control? _rankBlock;
     private Label? _nameLabel;
-    private Control? _rankIcon;
-    private Control? _rankChevronsRoot;
     private Control? _upgradeBlock;
     private Button? _buyButton;
     private Control? _buyChevronsRoot;
@@ -53,10 +51,8 @@ public partial class TowerUpgradePanel : Control
     private TowerArchetype _leftArchetype = TowerArchetype.None;
     private TowerArchetype _rightArchetype = TowerArchetype.None;
 
-    private Color _rankChevronColor = Colors.White;
     private Color _buyChevronColor = Colors.White;
 
-    private readonly List<Control> _rankChevrons = new();
     private readonly List<Control> _buyChevrons = new();
 
     /// <summary>
@@ -131,13 +127,12 @@ public partial class TowerUpgradePanel : Control
         }
 
         Color color = tower.TowerColor;
-        bool maxRank = TowerUpgrades.IsMaxRank(tower.Rank);
 
         // One state read drives every block and the layout, so the gate can never be
         // evaluated differently between the blocks and the recorded signature.
         var state = ComputeState();
 
-        UpdateRankBlock(tower, color, maxRank);
+        UpdateRankBlock(tower, color);
         UpdateUpgradeBlock(tower, color, state.Upgrade);
         UpdateArchetypeBlock(tower, color, state.Choice);
         LayoutPanel(state.Upgrade, state.Choice);
@@ -280,31 +275,18 @@ public partial class TowerUpgradePanel : Control
         _rankBlock.Size = new Vector2(width, height);
         AddChild(_rankBlock);
 
-        float iconSize = GameConstants.TowerUpgradePanelIconSize;
-        _rankIcon = new Control();
-        _rankIcon.Name = "Icon";
-        _rankIcon.Size = new Vector2(iconSize, iconSize);
-        _rankIcon.Position = new Vector2(0f, (height - iconSize) / 2f);
-        _rankIcon.MouseFilter = MouseFilterEnum.Ignore;
-        _rankIcon.Visible = false;
-        _rankIcon.Draw += DrawRankIcon;
-        _rankBlock.AddChild(_rankIcon);
-
+        // The header is the tower (or archetype) name only. The placed tower's
+        // top-right RankBadge is the single current-rank display; the panel never
+        // duplicates it with its own chevrons or emblem.
         _nameLabel = new Label();
         _nameLabel.Name = "Name";
-        _nameLabel.Position = new Vector2(iconSize + 4f, 2f);
-        _nameLabel.Size = new Vector2(width - iconSize - 4f - 52f, height - 4f);
+        _nameLabel.Position = Vector2.Zero;
+        _nameLabel.Size = new Vector2(width, height);
         _nameLabel.VerticalAlignment = VerticalAlignment.Center;
         _nameLabel.AddThemeFontSizeOverride("font_size", 14);
         _nameLabel.AddThemeColorOverride("font_color", new Color(0.9f, 0.9f, 1f));
         _nameLabel.MouseFilter = MouseFilterEnum.Ignore;
         _rankBlock.AddChild(_nameLabel);
-
-        _rankChevronsRoot = CreateChevronStack("Rank", _rankChevrons, DrawRankChevron);
-        _rankChevronsRoot.Position = new Vector2(
-            width - GameConstants.RankIconWidth,
-            (height - GameConstants.RankIconHeight) / 2f);
-        _rankBlock.AddChild(_rankChevronsRoot);
     }
 
     private void BuildUpgradeBlock()
@@ -432,31 +414,16 @@ public partial class TowerUpgradePanel : Control
 
     // === Refresh ===
 
-    private void UpdateRankBlock(Tower tower, Color color, bool maxRank)
+    private void UpdateRankBlock(Tower tower, Color color)
     {
-        if (_rankBlock == null || _nameLabel == null || _rankIcon == null || _rankChevronsRoot == null)
+        if (_nameLabel == null)
             return;
 
+        bool maxRank = TowerUpgrades.IsMaxRank(tower.Rank);
         _nameLabel.Text = maxRank
             ? TowerArchetypes.DisplayName(tower.Archetype)
             : tower.Type.ToString();
         _nameLabel.AddThemeColorOverride("font_color", maxRank ? color : new Color(0.9f, 0.9f, 1f));
-
-        _rankIcon.Visible = maxRank;
-        if (maxRank)
-            _rankIcon.QueueRedraw();
-
-        _rankChevronsRoot.Visible = !maxRank;
-        _rankChevronColor = color;
-
-        // The icon box never changes size; only the number of visible chevrons in the
-        // centred vertical column changes with rank.
-        RankIcon.LayoutStack(
-            _rankChevrons,
-            maxRank ? 0 : tower.Rank,
-            GameConstants.RankIconHeight,
-            GameConstants.RankChevronHeight,
-            GameConstants.RankChevronVerticalGap);
     }
 
     private void UpdateUpgradeBlock(Tower tower, Color color, bool upgradeVisible)
@@ -582,17 +549,6 @@ public partial class TowerUpgradePanel : Control
 
     // === Drawing ===
 
-    private void DrawRankChevron(Control chevron)
-    {
-        if (!IsInstanceValid(chevron))
-            return;
-        RankChevron.Draw(
-            chevron,
-            new Rect2(Vector2.Zero, chevron.Size),
-            _rankChevronColor,
-            GameConstants.RankChevronStroke);
-    }
-
     private void DrawBuyChevron(Control chevron)
     {
         if (!IsInstanceValid(chevron))
@@ -602,14 +558,6 @@ public partial class TowerUpgradePanel : Control
             new Rect2(Vector2.Zero, chevron.Size),
             _buyChevronColor,
             GameConstants.RankChevronStroke);
-    }
-
-    private void DrawRankIcon()
-    {
-        if (_rankIcon == null || !IsInstanceValid(_rankIcon) || _tower == null)
-            return;
-
-        DrawEmblem(_rankIcon, _tower.Archetype);
     }
 
     private void DrawLeftIcon()

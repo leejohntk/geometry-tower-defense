@@ -171,8 +171,8 @@ public static class GameConstants
     // Ranks, XP, and archetype are per tower instance and are discarded with the level.
     public const int TowerMaxRank = 3;
     public const int TowerUpgradeCostRank1 = 5;
-    public const int TowerUpgradeCostRank2 = 15;
-    public const int TowerUpgradeCostRank3 = 25;
+    public const int TowerUpgradeCostRank2 = 10;
+    public const int TowerUpgradeCostRank3 = 15;
     public const float TowerRankDamageBonusPerRank = 0.03f;   // multiplier = 1 + 0.03 x rank
     public const float TowerRankRangeBonusPerRank = 0.5f;     // cells, additive
     public const float TowerRankFireRateBonusPerRank = 0.03f; // interval / (1 + 0.03 x rank)
@@ -195,12 +195,11 @@ public static class GameConstants
     // selected tower's cell. Dark translucent fill matching the HUD sidebar.
     public const float TowerUpgradePanelWidth = 180f;
     public const float TowerUpgradePanelPadding = 8f;
-    public const float TowerUpgradePanelRankHeight = 34f;     // tall enough for the 30 px rank icon box
+    public const float TowerUpgradePanelRankHeight = 24f;     // name-only row; the badge shows the rank
     public const float TowerUpgradePanelUpgradeHeight = 40f;
     public const float TowerUpgradePanelArchetypeHeight = 84f;
     public const float TowerUpgradePanelBlockGap = 6f;
     public const float TowerUpgradePanelCellGap = 8f;         // px between cell edge and panel
-    public const float TowerUpgradePanelIconSize = 22f;
     public const float TowerUpgradePanelCardIconSize = 26f;
 
     // Rank icon: one fixed-size box for 1, 2, or 3 chevrons, with the stack centred

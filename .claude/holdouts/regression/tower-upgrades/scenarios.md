@@ -3,7 +3,7 @@
 Implementer must NOT see this file. Orchestrator runs these during verification.
 
 ## H1 — Upgrade costs and transaction safety
-- Rank 0 → 1 deducts exactly 5 coins. Rank 1 → 2 deducts exactly 15. Rank 2 → 3 (archetype pick) deducts exactly 25.
+- Rank 0 → 1 deducts exactly 5 coins. Rank 1 → 2 deducts exactly 10. Rank 2 → 3 (archetype pick) deducts exactly 15.
 - Clicking an upgrade twice in one frame / repeated calls: only one coin deduction, one rank increase.
 - With 4 coins and 5 XP, the rank-1 upgrade option is present but disabled and leaves rank 0 and coins 4.
 - Upgrade attempts during `GameOver` or `Victory` do nothing.
@@ -64,9 +64,9 @@ Set every node to rank 5.
 ## H10 — Archetype purchase flow
 - At rank 2 with 30 XP, the panel shows exactly two archetype cards and no third-chevron upgrade icon.
 - Arrow cards are Pierce and Crit; Cannon cards are Cluster and Stun; Laser cards are Chain and Ramp-Up.
-- Clicking a card deducts 25 coins, sets rank 3, records the archetype, and continues to show only the chosen emblem — no further upgrade or card controls.
+- Clicking a card deducts 15 coins, sets rank 3, records the archetype, and continues to show the chosen archetype name in the panel with no further upgrade or card controls. The top-right tower badge shows the chosen emblem.
 - Clicking one card twice / both cards in one frame results in exactly one purchase and one archetype.
-- With 24 coins the cards are visible but not purchasable.
+- With 14 coins the cards are visible but not purchasable.
 
 ## H11 — Chosen seed only, minimum rank 1
 Fresh skill tree (all seed ranks 0):
@@ -88,14 +88,13 @@ Maxed skill tree (all ranks 5):
 - Seed ranks are not deleted or consumed; once the tower reaches rank 3 and chooses a branch, the chosen seed applies at `max(1, skill-tree rank)`.
 - The archetype gate only opens the chosen seed; the unchosen seed remains zero at rank 3.
 
-## H13 — Archetype emblems and vertical rank icons
-- Rank 0 panel: zero filled chevrons.
-- Rank 1 panel: one chevron. Rank 2 panel: two chevrons.
-- All rank chevrons are stacked vertically: every visible chevron shares the same x, and later chevrons have greater y.
-- The rank icon container has the same fixed size at rank 1, rank 2, and target-rank 1/2; the chevron stack is centred inside it. One chevron does not render a smaller/larger box than two.
+## H13 — Upgrade preview icons; no current-rank duplication
+- The panel never shows the tower's current rank as chevrons or an emblem; `Block_Rank` contains only the tower/archetype name. The top-right tower badge is the current-rank display.
+- When a rank-1/2 upgrade is available, `Block_Upgrade/Chevrons` shows exactly the target rank: one chevron for target rank 1, two for target rank 2.
+- The target-rank icon container has the same fixed size for 1 and 2 chevrons; the stack is centred vertically, every visible chevron shares x, and later chevrons have greater y.
 - Chevrons are drawn V strokes, not text caret characters.
 - Rank 2 with 30 XP: two archetype emblems/cards, never a three-chevron upgrade icon.
-- Rank 3 panel: exactly one archetype emblem + name, zero chevrons, zero upgrade buttons.
+- Rank 3 panel: chosen archetype name only, zero chevrons, zero emblem, zero upgrade buttons; the badge shows the emblem.
 - Chevron and emblem nodes are named groups (`Block_Rank`, `Block_Upgrade`, `Block_ArchetypeChoice`) with stable child names; no generated `@Label@…` names appear in findings.
 - All icons are drawn procedurally; no new external or AI-generated asset files exist in the repo.
 

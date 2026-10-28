@@ -6,14 +6,14 @@
 
 ## Description
 
-Adds in-level per-tower upgrades. Each placed tower starts at rank 0 and can be upgraded three times with coins (5 / 15 / 25). Every rank adds a small stat boost (+3% damage, +0.5 cell range, +3% fire rate). Upgrades are gated by hidden combat experience: a tower must earn enough kill XP before each rank's upgrade option appears. Kill XP is awarded per enemy kind and split between every tower that damaged the enemy, in proportion to effective damage dealt. At rank 2 → 3, instead of a third chevron, the upgrade panel offers the tower's two archetype branches (matching the skill-tree seed nodes). Choosing one spends the 25 coins, sets rank 3 permanently for that tower, and specializes the tower into that seed. Seed mechanics are inert until specialization: a rank 0–2 tower applies no seed effect even if the skill tree has ranks in it. At rank 3 only the chosen seed mechanic applies; the unchosen seed has no effect on that tower. Trunk nodes (damage, attack speed, range, laser ignite) still apply normally.
+Adds in-level per-tower upgrades. Each placed tower starts at rank 0 and can be upgraded three times with coins (5 / 10 / 15). Every rank adds a small stat boost (+3% damage, +0.5 cell range, +3% fire rate). Upgrades are gated by hidden combat experience: a tower must earn enough kill XP before each rank's upgrade option appears. Kill XP is awarded per enemy kind and split between every tower that damaged the enemy, in proportion to effective damage dealt. At rank 2 → 3, instead of a third chevron, the upgrade panel offers the tower's two archetype branches (matching the skill-tree seed nodes). Choosing one spends the 15 coins, sets rank 3 permanently for that tower, and specializes the tower into that seed. Seed mechanics are inert until specialization: a rank 0–2 tower applies no seed effect even if the skill tree has ranks in it. At rank 3 only the chosen seed mechanic applies; the unchosen seed has no effect on that tower. Trunk nodes (damage, attack speed, range, laser ignite) still apply normally.
 
 ## Acceptance Criteria
 
 ### Ranks and costs
 
 - [ ] A placed tower starts at rank 0 with 0 XP and no archetype.
-- [ ] Rank 1 costs 5 coins, rank 2 costs 15 coins, rank 3 costs 25 coins. Coins are deducted exactly once per successful upgrade.
+- [ ] Rank 1 costs 5 coins, rank 2 costs 10 coins, rank 3 costs 15 coins. Coins are deducted exactly once per successful upgrade.
 - [ ] Upgrades only happen during `GameState.Playing`. Game over / victory / level reset leaves towers at their rank, but towers do not persist across levels.
 - [ ] At rank 0–2, clicking a selected tower's upgrade option raises its rank by exactly 1 when the XP gate and coin cost are satisfied.
 - [ ] The upgrade is rejected with no state change when coins are insufficient, XP is below the next threshold, rank is already 3, or the tower is not part of the active game.
@@ -47,11 +47,11 @@ Adds in-level per-tower upgrades. Each placed tower starts at rank 0 and can be 
 
 - [ ] Clicking a placed tower selects it (existing behaviour) and opens `Panel_TowerUpgrade`.
 - [ ] The panel is positioned above the selected tower's cell, kept inside the battlefield bounds. For row-0 towers it opens below the cell so it never sits under the top bar.
-- [ ] `Block_Rank` shows the current rank as a vertical stack of filled chevrons. Rank 0 shows no filled chevrons. The icon box is the same fixed size for 1, 2, or 3 chevrons, and the stack is centred in that box.
-- [ ] When an upgrade is available, `Block_Upgrade` shows the target rank as the same fixed-size vertical chevron stack plus the coin cost (rank 1 = one chevron, rank 2 = two chevrons). The button is disabled while coins are below the cost.
+- [ ] `Block_Rank` shows only the tower's name (its archetype name at rank 3). It does **not** repeat the current rank as chevrons or an emblem: the tiny tower badge already shows the current rank on the battlefield. No duplicate rank display exists inside the panel.
+- [ ] When an upgrade is available, `Block_Upgrade` shows the target rank as a fixed-size vertical chevron stack plus the coin cost (rank 1 = one chevron, rank 2 = two chevrons). The button is disabled while coins are below the cost. This target-rank icon is the only chevron display in the panel.
 - [ ] At rank 2, when 30 XP is reached, `Block_Upgrade` is replaced by `Block_ArchetypeChoice` with exactly two labelled cards. No three-chevron upgrade icon is ever shown.
-- [ ] Selecting an archetype card spends 25 coins, sets rank 3, records the archetype, and permanently removes all further upgrade actions for that tower.
-- [ ] At rank 3 the panel shows the chosen archetype's emblem and name in place of chevrons, and no upgrade/archetype controls.
+- [ ] Selecting an archetype card spends 15 coins, sets rank 3, records the archetype, and permanently removes all further upgrade actions for that tower.
+- [ ] At rank 3 the panel shows the chosen archetype's name and no upgrade/archetype controls. It does not repeat the archetype emblem; the top-right tower badge shows it.
 - [ ] The panel closes on: clicking empty battlefield space, clicking another tower (the new tower's panel opens), entering placement mode, Escape, game over, victory, or level reset. It never lingers over a result screen.
 - [ ] The panel consumes mouse input (`MouseFilter = Stop`) so clicking an upgrade action never also deselects the tower, toggles its range, or places a tower.
 - [ ] The panel works for all three tower types and is rebuilt/refreshed when the selected tower's rank, XP gate, coins, or archetype changes.
@@ -78,7 +78,7 @@ Adds in-level per-tower upgrades. Each placed tower starts at rank 0 and can be 
 ### Visuals
 
 - [ ] Chevrons and archetype emblems are procedural `Control.Draw*` geometry. No AI-generated or external art assets.
-- [ ] Chevrons are drawn as thick V strokes, never as text caret characters. Rank icons stack the chevrons vertically and use one fixed icon box for 1, 2, or 3 chevrons; the stack is centred inside the box.
+- [ ] Chevrons are drawn as thick V strokes, never as text caret characters. Rank icons stack the chevrons vertically and use one fixed icon box for 1, 2, or 3 chevrons; the stack is centred inside the box. The panel only uses this icon for the next-rank upgrade preview; the current rank lives on the tower badge.
 - [ ] Rank chevrons use the tower's colour (arrow blue, cannon green, laser magenta); locked/disabled states are dimmed.
 - [ ] The tower badge is a scaled-down version of the current-rank icon: chevrons for rank 1/2, the chosen archetype emblem for rank 3. It sits inside the top-right of the tower cell and must not intercept clicks.
 - [ ] Archetype emblems are distinct geometric marks: Pierce = double chevron / arrow trail; Crit = four-point star; Cluster = three small circles; Stun = concentric ring; Chain = three linked nodes; Ramp-Up = rising wedge.
@@ -155,8 +155,8 @@ Adds in-level per-tower upgrades. Each placed tower starts at rank 0 and can be 
 |----------|-------|-------|
 | `TowerMaxRank` | 3 | |
 | `TowerUpgradeCostRank1` | 5 | coins |
-| `TowerUpgradeCostRank2` | 15 | coins |
-| `TowerUpgradeCostRank3` | 25 | coins |
+| `TowerUpgradeCostRank2` | 10 | coins |
+| `TowerUpgradeCostRank3` | 15 | coins |
 | `TowerRankDamageBonusPerRank` | 0.03 | multiplier = 1 + 0.03 × rank |
 | `TowerRankRangeBonusPerRank` | 0.5 | cells |
 | `TowerRankFireRateBonusPerRank` | 0.03 | interval ÷ (1 + 0.03 × rank); laser dps × same |

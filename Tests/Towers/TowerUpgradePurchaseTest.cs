@@ -92,17 +92,17 @@ public class TowerUpgradePurchaseTest
     }
 
     [TestCase]
-    public void Rank2Purchase_DeductsFifteen()
+    public void Rank2Purchase_DeductsTen()
     {
         var manager = CreateManager(40);
         var tower = PlaceArrow(manager); // 40 coins left
         tower.AddXp(15f);
 
         AssertThat(manager.TryUpgradeTower(tower)).IsTrue();  // rank 1, -5
-        AssertThat(manager.TryUpgradeTower(tower)).IsTrue();  // rank 2, -15
+        AssertThat(manager.TryUpgradeTower(tower)).IsTrue();  // rank 2, -10
 
         AssertThat(tower.Rank).IsEqual(2);
-        AssertThat(manager.Coins).IsEqual(20);
+        AssertThat(manager.Coins).IsEqual(25);
     }
 
     [TestCase]
@@ -111,34 +111,34 @@ public class TowerUpgradePurchaseTest
         var manager = CreateManager(100);
         var tower = PlaceArrow(manager);
         tower.AddXp(100f);
-        RaiseToRank2(manager, tower); // 100 - 5 - 15 = 80
+        RaiseToRank2(manager, tower); // 100 - 5 - 10 = 85
 
         AssertThat(manager.TryUpgradeTower(tower)).IsFalse();
         AssertThat(tower.Rank).IsEqual(2);
-        AssertThat(manager.Coins).IsEqual(80);
+        AssertThat(manager.Coins).IsEqual(85);
     }
 
     [TestCase]
-    public void ArchetypePurchase_DeductsTwentyFive_SetsRank3_AndIsFinal()
+    public void ArchetypePurchase_DeductsFifteen_SetsRank3_AndIsFinal()
     {
         var manager = CreateManager(100);
         var tower = PlaceArrow(manager);
         tower.AddXp(100f);
-        RaiseToRank2(manager, tower); // 80 coins
+        RaiseToRank2(manager, tower); // 85 coins
 
         AssertThat(manager.TryChooseArchetype(tower, TowerArchetype.Pierce)).IsTrue();
         AssertThat(tower.Rank).IsEqual(3);
         AssertThat(tower.Archetype).IsEqual(TowerArchetype.Pierce);
-        AssertThat(manager.Coins).IsEqual(55);
+        AssertThat(manager.Coins).IsEqual(70);
 
         // No respec: a second card, even a valid one, is a no-op.
         AssertThat(manager.TryChooseArchetype(tower, TowerArchetype.Crit)).IsFalse();
         AssertThat(tower.Archetype).IsEqual(TowerArchetype.Pierce);
-        AssertThat(manager.Coins).IsEqual(55);
+        AssertThat(manager.Coins).IsEqual(70);
 
         // And no further generic upgrades.
         AssertThat(manager.TryUpgradeTower(tower)).IsFalse();
-        AssertThat(manager.Coins).IsEqual(55);
+        AssertThat(manager.Coins).IsEqual(70);
     }
 
     [TestCase]
@@ -147,7 +147,7 @@ public class TowerUpgradePurchaseTest
         var manager = CreateManager(100);
         var tower = PlaceArrow(manager);
         tower.AddXp(29.9f);
-        RaiseToRank2(manager, tower); // 80 coins
+        RaiseToRank2(manager, tower); // 85 coins
         int coinsBefore = manager.Coins;
 
         AssertThat(manager.TryChooseArchetype(tower, TowerArchetype.Pierce)).IsFalse();
@@ -159,20 +159,21 @@ public class TowerUpgradePurchaseTest
     [TestCase]
     public void ArchetypePurchase_CoinsShort_IsRejectedThenSucceedsOnceCoinsArrive()
     {
-        // 44 extra: after the tower and both ranks, exactly 24 coins remain.
-        var manager = CreateManager(44);
+        // 29 extra: after the tower and both ranks, exactly 14 coins remain (one short
+        // of the 15-coin rank-3 cost).
+        var manager = CreateManager(29);
         var tower = PlaceArrow(manager);
         tower.AddXp(30f);
         RaiseToRank2(manager, tower);
-        AssertThat(manager.Coins).IsEqual(24);
+        AssertThat(manager.Coins).IsEqual(14);
 
         AssertThat(manager.TryChooseArchetype(tower, TowerArchetype.Pierce)).IsFalse();
         AssertThat(tower.Rank).IsEqual(2);
-        AssertThat(manager.Coins).IsEqual(24);
+        AssertThat(manager.Coins).IsEqual(14);
 
         // Coins arriving later must make the same already-visible option buyable.
         manager.AddCoinsForTesting(1);
-        AssertThat(manager.Coins).IsEqual(25);
+        AssertThat(manager.Coins).IsEqual(15);
         AssertThat(manager.TryChooseArchetype(tower, TowerArchetype.Pierce)).IsTrue();
         AssertThat(tower.Rank).IsEqual(3);
         AssertThat(manager.Coins).IsEqual(0);
@@ -255,13 +256,13 @@ public class TowerUpgradePurchaseTest
         var manager = CreateManager(100);
         var tower = PlaceArrow(manager);
         tower.AddXp(30f);
-        RaiseToRank2(manager, tower); // 80 coins
+        RaiseToRank2(manager, tower); // 85 coins
 
         AssertThat(manager.TryChooseArchetype(tower, TowerArchetype.Pierce)).IsTrue();
         AssertThat(manager.TryChooseArchetype(tower, TowerArchetype.Crit)).IsFalse();
 
         AssertThat(tower.Rank).IsEqual(3);
-        AssertThat(manager.Coins).IsEqual(55);
+        AssertThat(manager.Coins).IsEqual(70);
     }
 
     [TestCase]

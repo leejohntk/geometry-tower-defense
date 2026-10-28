@@ -183,8 +183,8 @@ public class TowerUpgradeTest
     public void UpgradeCostsAndThresholds_MatchTheSpecTable()
     {
         AssertThat(TowerUpgrades.CostToReachRank(1)).IsEqual(5);
-        AssertThat(TowerUpgrades.CostToReachRank(2)).IsEqual(15);
-        AssertThat(TowerUpgrades.CostToReachRank(3)).IsEqual(25);
+        AssertThat(TowerUpgrades.CostToReachRank(2)).IsEqual(10);
+        AssertThat(TowerUpgrades.CostToReachRank(3)).IsEqual(15);
 
         AssertThat(TowerUpgrades.XpThresholdToReachRank(1)).IsEqual(5f);
         AssertThat(TowerUpgrades.XpThresholdToReachRank(2)).IsEqual(15f);
@@ -210,7 +210,7 @@ public class TowerUpgradeTest
     {
         // Rank 2 -> 3 is the archetype choice, never a generic third chevron.
         AssertThat(TowerUpgrades.CanBuyNextRank(2, 1000f, 1000)).IsFalse();
-        AssertThat(TowerUpgrades.CanBuyArchetype(2, 30f, 25)).IsTrue();
+        AssertThat(TowerUpgrades.CanBuyArchetype(2, 30f, 15)).IsTrue();
         AssertThat(TowerUpgrades.CanBuyArchetype(1, 1000f, 1000)).IsFalse();
     }
 
