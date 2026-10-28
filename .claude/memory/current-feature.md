@@ -12,7 +12,56 @@ active right now (and is deleted at merge, which means "idle"). This file record
 shipped, its gates, and open follow-ups. Do not track phase here — it goes stale the moment a PR
 merges.
 
-**Last feature:** level-5-progenitor — three-route Level 5 + The Progenitor boss
+**Current feature:** tower-upgrades — in-level ranks, hidden XP gates, archetype specialization
+**Branch:** `feature/tower-upgrades`
+**Spec:** `.claude/specs/tower-upgrades.md` (approved 2026-10-27)
+
+Three coin-priced ranks per placed tower (5 / 10 / 15) with +3% damage, +0.5 cell range and
++3% fire rate per rank. Each rank is gated by hidden kill XP, split across every tower that
+damaged the enemy in proportion to effective damage. Rank 3 is an archetype choice between the
+tower's two skill-tree seed nodes: the chosen seed applies at minimum rank 1, the unchosen seed
+contributes nothing. Rank, XP and archetype live on the tower instance and never persist.
+
+**Gates (2026-10-27):** build 0 warnings; 373 tests pass; layout verifier PASS (142 assertions,
+0 findings); holdouts 16/16. Security lens 1 WARNING (pooled enemies retained tower refs) fixed
+via `Enemy.ClearAttribution` on every release path; 6 performance INFO items (credit lookup,
+panel style/icon allocations, polling) left as follow-ups; correctness reviewer agents stalled
+twice on harness/API errors, so the orchestrator completed the correctness audit.
+
+**Playtest fix (2026-10-27):** seed mechanics were still active at ranks 0–2 via the
+skill tree. They are now inert until rank 3: pierce/crit, cluster/stun, and chain/ramp
+read zero on ranks 0–2 even with maxed seed nodes; the chosen seed applies only after
+the archetype choice. Trunk nodes are unchanged. Spec and holdout H12 updated.
+
+**Playtest fix 2 (2026-10-27):** rank icons now use one fixed-size 16x30 box with a
+vertically centred stack of drawn V chevrons (no text glyphs). A tiny current-rank
+badge sits at the tower cell's top-right once rank ≥ 1 (chevrons at rank 1/2,
+archetype emblem at rank 3); it appears on purchase, not when the next XP gate opens,
+and is visible without selecting the tower. Spec and holdouts H13/H17 updated.
+
+**Playtest fix 3 (2026-10-27):** removed the generic rank-3 base ring/emblem accent.
+The tower body silhouette now changes per archetype: Arrow forked spearhead (Pierce)
+or star inset (Crit), Cannon lobed cluster (Cluster) or shockwave rings (Stun), Laser
+linked rim nodes (Chain) or rising wedge core (Ramp-Up). The tiny badge remains. Spec
+and holdout H18 updated.
+
+**Playtest fix 4 (2026-10-27):** panel header is name-only; current-rank chevrons/emblem
+removed because the tower badge already shows rank. Only the next-rank preview keeps
+the fixed-size vertical chevron stack. Costs lowered to 5 / 10 / 15. Spec and holdouts
+H1/H10/H13 updated.
+
+**Playtest fix 5 (2026-10-28):** panel is now a single action with no header. Generic
+upgrade = one full-width `Upgrade {cost}` button; rank 2 = two archetype cards; no
+panel at all when no upgrade is available (closed XP gate or rank 3). Selection still
+shows range; panel appears live if the gate opens. Spec and holdouts H4/H10/H13/H14
+updated.
+
+**Open follow-ups:** the spec's double-click edge case is worded as "second click is a no-op",
+but each valid click buys one rank — a second click can legitimately buy the next rank when its
+gate is already open (a challenge at 15 XP bought rank 2). The layout verifier has no assertions
+for the new `Panel_TowerUpgrade` groups yet (advisory gate only).
+
+**Previous feature:** level-5-progenitor — three-route Level 5 + The Progenitor boss
 **Branch:** `feature/level-5-progenitor`
 **Spec:** `.claude/specs/level-5-progenitor.md` (approved 2026-10-25)
 
@@ -51,7 +100,7 @@ its phases (thresholds now 166 / 83 HP); tests re-pinned.
 Playtest 3 (2026-10-25): boss still read slightly large; diameter 72 → 64 px (collision radius
 32). No other tuning changed.
 
-**Previous feature:** layout-verifier — headless pre-playtest layout verification
+**Earlier feature:** layout-verifier — headless pre-playtest layout verification
 **Branch:** `feature/layout-verifier`
 **Spec:** `.claude/specs/layout-verifier.md` (approved 2026-10-19, AC-11 amended 2026-10-19)
 

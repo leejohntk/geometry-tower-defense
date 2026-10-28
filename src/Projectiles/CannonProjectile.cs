@@ -25,9 +25,10 @@ public partial class CannonProjectile : Projectile
         : GameConstants.CannonTowerAoeRadius;
 
     /// <summary>
-    /// Damage applied to every enemy within the explosion radius.
+    /// Damage applied to every enemy within the explosion radius. Float, so a rank
+    /// damage multiplier reaches armor uncut.
     /// </summary>
-    public int ExplosionDamage => _damage;
+    public float ExplosionDamage => _damage;
 
     protected override void BuildVisual()
     {
@@ -82,7 +83,9 @@ public partial class CannonProjectile : Projectile
 
             // Armor still reduces the stunning hit's damage — stun is rolled after
             // the normal damaging hit, and only matters if the enemy survived it.
-            enemy.TakeDamage(damage);
+            // The source tower is passed through so every enemy in the blast credits
+            // the cannon; the direct target is in this list once, so it credits once.
+            enemy.TakeDamage(damage, source: SourceTower);
             if (enemy.IsDead)
                 continue;
 

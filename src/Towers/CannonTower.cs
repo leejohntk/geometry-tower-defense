@@ -11,15 +11,35 @@ namespace GeometryTowerDefense;
 public partial class CannonTower : Tower
 {
     public override TowerType Type => TowerType.Cannon;
-    public override int Damage => SkillStats.CannonDamage(SkillRank(SkillTreeCatalog.CannonPowderCharge));
-    public override float FireRate => SkillStats.CannonFireRate(SkillRank(SkillTreeCatalog.CannonAttackSpeed));
+    public override float Damage =>
+        SkillStats.CannonDamage(SkillRank(SkillTreeCatalog.CannonPowderCharge))
+        * TowerUpgrades.DamageMultiplier(Rank);
+    public override float FireRate =>
+        TowerUpgrades.FireInterval(
+            SkillStats.CannonFireRate(SkillRank(SkillTreeCatalog.CannonAttackSpeed)), Rank);
     public override int Cost => GameConstants.CannonTowerCost;
     public override float ProjectileSpeedMultiplier => SkillStats.CannonProjectileSpeedMultiplier(SkillRank(SkillTreeCatalog.CannonPowderCharge));
-    public override int ClusterCount => SkillMechanics.CannonClusterCount(SkillRank(SkillTreeCatalog.CannonCluster));
-    public override float StunChance => SkillMechanics.CannonStunChance(SkillRank(SkillTreeCatalog.CannonStunChance));
 
     /// <summary>
-    /// Final AoE radius (px) with the Splash Radius node applied.
+    /// Shells per volley. Seed mechanics are inert before rank 3 (always one shell).
+    /// After choosing Cluster it is 1 + max(1, skill rank); after choosing Stun,
+    /// cluster contributes nothing (one shell).
+    /// </summary>
+    public override int ClusterCount =>
+        SkillMechanics.CannonClusterCount(
+            SeedRankFor(TowerArchetype.Cluster, SkillTreeCatalog.CannonCluster));
+
+    /// <summary>
+    /// Per-hit stun chance. Inert (zero) before rank 3. After choosing Stun it is
+    /// max(1, skill rank) x 0.06; after choosing Cluster it contributes zero.
+    /// </summary>
+    public override float StunChance =>
+        SkillMechanics.CannonStunChance(
+            SeedRankFor(TowerArchetype.Stun, SkillTreeCatalog.CannonStunChance));
+
+    /// <summary>
+    /// Final AoE radius (px) with the Splash Radius trunk node applied. This is a
+    /// trunk-only stat: the per-rank range bonus never touches the splash radius.
     /// </summary>
     public override float SplashRadius => SkillStats.CannonSplashRadius(SkillRank(SkillTreeCatalog.CannonSplashRadius));
     protected override Color RangeColor => new Color(0.3f, 0.6f, 0.4f);
@@ -29,6 +49,10 @@ public partial class CannonTower : Tower
     private Control? _muzzleFlash;
     private float _muzzleFlashRemaining = 0f;
 
+    // The tower's own procedural body. Its silhouette branches on the chosen
+    // archetype (lobed cluster or shockwave rings); there is no separate overlay.
+    private Control? _body;
+
     /// <summary>
     /// True while the cluster volley's muzzle flash is playing.
     /// </summary>
@@ -37,27 +61,14 @@ public partial class CannonTower : Tower
     public override void _Ready()
     {
         float cell = GameConstants.CellSize;
-        float radius = cell / 2f - 4;
 
-        var body = new Control();
-        body.Name = "CannonBody";
-        body.Size = new Vector2(cell, cell);
-        body.Position = new Vector2(-cell / 2f, -cell / 2f);
-        body.MouseFilter = Control.MouseFilterEnum.Ignore;
-        body.Draw += () =>
-        {
-            if (!IsInstanceValid(body)) return;
-
-            Vector2 center = new Vector2(cell / 2f, cell / 2f);
-
-            // Filled circle (cannon barrel) with dark outline
-            body.DrawCircle(center, radius, new Color(0.3f, 0.6f, 0.4f));
-            body.DrawCircle(center, radius, new Color(0.1f, 0.25f, 0.15f), false, 2.0f);
-
-            // Small inner barrel circle
-            body.DrawCircle(center, radius * 0.4f, new Color(0.12f, 0.28f, 0.17f));
-        };
-        AddChild(body);
+        _body = new Control();
+        _body.Name = "CannonBody";
+        _body.Size = new Vector2(cell, cell);
+        _body.Position = new Vector2(-cell / 2f, -cell / 2f);
+        _body.MouseFilter = Control.MouseFilterEnum.Ignore;
+        _body.Draw += DrawBody;
+        AddChild(_body);
 
         // Muzzle flash overlay, centered on the tower and twice a cell wide so the
         // expanding ring and its spikes stay inside the control's bounds. Hidden while
@@ -71,6 +82,70 @@ public partial class CannonTower : Tower
         _muzzleFlash.Visible = false;
         _muzzleFlash.Draw += DrawMuzzleFlash;
         AddChild(_muzzleFlash);
+    }
+
+    protected override void OnArchetypeChanged()
+    {
+        _body?.QueueRedraw();
+    }
+
+    /// <summary>
+    /// Paints the cannon silhouette for the current archetype:
+    /// none = circle, outline, and inner barrel; Cluster = three overlapping lobe
+    /// circles; Stun = circle with concentric shockwave rings (no barrel).
+    /// </summary>
+    private void DrawBody()
+    {
+        if (_body == null || !IsInstanceValid(_body))
+            return;
+
+        float cell = GameConstants.CellSize;
+        float radius = cell / 2f - 4f;
+        Vector2 center = new(cell / 2f, cell / 2f);
+        var fill = new Color(0.3f, 0.6f, 0.4f);
+        var outline = new Color(0.1f, 0.25f, 0.15f);
+
+        switch (Archetype)
+        {
+            case TowerArchetype.Cluster:
+                DrawClusterBody(center, radius, fill, outline);
+                break;
+            case TowerArchetype.Stun:
+                _body.DrawCircle(center, radius, fill);
+                _body.DrawCircle(center, radius, outline, false, 2f);
+                _body.DrawCircle(center, radius * 0.68f, new Color(0.55f, 0.85f, 0.6f), false, 2f);
+                _body.DrawCircle(center, radius * 0.36f, new Color(0.55f, 0.85f, 0.6f), false, 2f);
+                break;
+            default:
+                _body.DrawCircle(center, radius, fill);
+                _body.DrawCircle(center, radius, outline, false, 2f);
+                _body.DrawCircle(center, radius * 0.4f, new Color(0.12f, 0.28f, 0.17f));
+                break;
+        }
+    }
+
+    /// <summary>
+    /// Cluster: three overlapping filled circles arranged in a triangle around the
+    /// centre, each with a dark outline — a lobed silhouette with no single barrel.
+    /// </summary>
+    private void DrawClusterBody(Vector2 center, float radius, Color fill, Color outline)
+    {
+        if (_body == null || !IsInstanceValid(_body))
+            return;
+
+        float lobeRadius = radius * 0.45f;
+        float spread = radius * 0.38f;
+        var lobes = new Vector2[3];
+        for (int i = 0; i < lobes.Length; i++)
+        {
+            float angle = Mathf.Tau * i / lobes.Length - Mathf.Pi / 2f;
+            lobes[i] = center + new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * spread;
+        }
+
+        foreach (var lobe in lobes)
+            _body.DrawCircle(lobe, lobeRadius, fill);
+        foreach (var lobe in lobes)
+            _body.DrawCircle(lobe, lobeRadius, outline, false, 2f);
     }
 
     /// <summary>

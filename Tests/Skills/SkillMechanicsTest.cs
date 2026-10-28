@@ -43,8 +43,15 @@ public class SkillMechanicsTest
         AssertThat(SkillMechanics.LaserRampMaxMultiplier(5)).IsEqualApprox(2.0f, 0.0001f);
     }
 
+    private static void Specialize(Tower tower, TowerArchetype archetype)
+    {
+        AssertThat(tower.ApplyRankUpgrade()).IsTrue();
+        AssertThat(tower.ApplyRankUpgrade()).IsTrue();
+        AssertThat(tower.ApplyArchetype(archetype)).IsTrue();
+    }
+
     [TestCase]
-    public void Towers_ExposeMechanicValues_AtRank5()
+    public void Towers_ExposeChosenSeedMechanics_AfterSpecialization()
     {
         var state = new SkillTreeState();
         state.SetRank(SkillTreeCatalog.ArrowPierce, 5);
@@ -55,21 +62,49 @@ public class SkillMechanicsTest
         state.SetRank(SkillTreeCatalog.LaserChain, 5);
         state.SetRank(SkillTreeCatalog.LaserRampUp, 5);
 
-        var arrow = new ArrowTower();
-        arrow.SetSkillTree(state);
-        AssertThat(arrow.PierceCount).IsEqual(5);
-        AssertThat(arrow.CritChance).IsEqualApprox(0.4f, 0.0001f);
+        // Before rank 3 every seed is inert even with maxed seed nodes.
+        var inertArrow = new ArrowTower();
+        inertArrow.SetSkillTree(state);
+        AssertThat(inertArrow.PierceCount).IsEqual(0);
+        AssertThat(inertArrow.CritChance).IsEqual(0f);
 
-        var cannon = new CannonTower();
-        cannon.SetSkillTree(state);
-        AssertThat(cannon.ClusterCount).IsEqual(6);
-        AssertThat(cannon.StunChance).IsEqualApprox(0.3f, 0.0001f);
+        var pierceArrow = new ArrowTower();
+        pierceArrow.SetSkillTree(state);
+        Specialize(pierceArrow, TowerArchetype.Pierce);
+        AssertThat(pierceArrow.PierceCount).IsEqual(5);
+        AssertThat(pierceArrow.CritChance).IsEqual(0f);
 
-        var laser = new LaserTower();
-        laser.SetSkillTree(state);
-        AssertThat(laser.ChainJumps).IsEqual(5);
-        AssertThat(laser.IgniteChancePerSecond).IsEqualApprox(0.25f, 0.0001f);
-        AssertThat(laser.RampMaxMultiplier).IsEqualApprox(2.0f, 0.0001f);
+        var critArrow = new ArrowTower();
+        critArrow.SetSkillTree(state);
+        Specialize(critArrow, TowerArchetype.Crit);
+        AssertThat(critArrow.CritChance).IsEqualApprox(0.4f, 0.0001f);
+        AssertThat(critArrow.PierceCount).IsEqual(0);
+
+        var clusterCannon = new CannonTower();
+        clusterCannon.SetSkillTree(state);
+        Specialize(clusterCannon, TowerArchetype.Cluster);
+        AssertThat(clusterCannon.ClusterCount).IsEqual(6);
+        AssertThat(clusterCannon.StunChance).IsEqual(0f);
+
+        var stunCannon = new CannonTower();
+        stunCannon.SetSkillTree(state);
+        Specialize(stunCannon, TowerArchetype.Stun);
+        AssertThat(stunCannon.ClusterCount).IsEqual(1);
+        AssertThat(stunCannon.StunChance).IsEqualApprox(0.3f, 0.0001f);
+
+        var chainLaser = new LaserTower();
+        chainLaser.SetSkillTree(state);
+        Specialize(chainLaser, TowerArchetype.Chain);
+        AssertThat(chainLaser.ChainJumps).IsEqual(5);
+        AssertThat(chainLaser.RampMaxMultiplier).IsEqual(1f);
+        AssertThat(chainLaser.IgniteChancePerSecond).IsEqualApprox(0.25f, 0.0001f);
+
+        var rampLaser = new LaserTower();
+        rampLaser.SetSkillTree(state);
+        Specialize(rampLaser, TowerArchetype.RampUp);
+        AssertThat(rampLaser.ChainJumps).IsEqual(0);
+        AssertThat(rampLaser.RampMaxMultiplier).IsEqualApprox(2.0f, 0.0001f);
+        AssertThat(rampLaser.IgniteChancePerSecond).IsEqualApprox(0.25f, 0.0001f);
     }
 
     [TestCase]
@@ -130,6 +165,7 @@ public class SkillMechanicsTest
         state.SetRank(SkillTreeCatalog.LaserRampUp, 5);
         var laser = new LaserTower();
         laser.SetSkillTree(state);
+        Specialize(laser, TowerArchetype.RampUp);
 
         var a = new Enemy();
         a.Configure(EnemyKind.Basic);
@@ -159,6 +195,7 @@ public class SkillMechanicsTest
         state.SetRank(SkillTreeCatalog.LaserRampUp, 5);
         var laser = new LaserTower();
         laser.SetSkillTree(state);
+        Specialize(laser, TowerArchetype.RampUp);
 
         var enemy = new Enemy();
         enemy.Configure(EnemyKind.Basic);

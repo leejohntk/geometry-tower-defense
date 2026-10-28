@@ -13,14 +13,34 @@ namespace GeometryTowerDefense.Tests;
 [TestSuite]
 public class ArrowMechanicsTest
 {
+    /// <summary>
+    /// Seed mechanics are inert until rank 3, so pierce/crit tests must specialize
+    /// the tower first (rank 3 + the matching archetype).
+    /// </summary>
+    private static ArrowTower Rank3Arrow(SkillTreeState state, TowerArchetype archetype)
+    {
+        var tower = new ArrowTower();
+        tower.Initialize(0, 0);
+        tower.SetSkillTree(state);
+        AssertThat(tower.ApplyRankUpgrade()).IsTrue();
+        AssertThat(tower.ApplyRankUpgrade()).IsTrue();
+        AssertThat(tower.ApplyArchetype(archetype)).IsTrue();
+        return tower;
+    }
+
+    private static void HitOnce(ArrowTower tower, Enemy enemy)
+    {
+        var projectile = new ArrowProjectile();
+        projectile.Initialize(tower, new Vector2(200, 0), enemy);
+        projectile.HitEnemy(enemy);
+    }
+
     [TestCase]
     public void Pierce_PassesThroughPierceCountEnemies_WithArmorPerHit()
     {
         var state = new SkillTreeState();
         state.SetRank(SkillTreeCatalog.ArrowPierce, 5); // pierce 5 → 6 total hits
-        var tower = new ArrowTower();
-        tower.Initialize(0, 0);
-        tower.SetSkillTree(state);
+        var tower = Rank3Arrow(state, TowerArchetype.Pierce);
 
         var first = new Enemy();
         first.Configure(EnemyKind.Basic);
@@ -36,13 +56,13 @@ public class ArrowMechanicsTest
             armored.Add(enemy);
         }
 
-        // Hit 6 distinct enemies; each takes (10 damage - 5 armor) = 5.
+        // Hit 6 distinct enemies; each takes rank-3 arrow 10.9 - 5 armor = 5.9.
         for (int i = 0; i < 6; i++)
             projectile.HitEnemy(armored[i]);
 
         AssertThat(projectile.IsDone).IsTrue();
         foreach (var enemy in armored.GetRange(0, 6))
-            AssertThat(enemy.CurrentHP).IsEqual(9f);
+            AssertThat(enemy.CurrentHP).IsEqualApprox(8.1f, 0.001f);
 
         // The 7th enemy is never touched because the arrow is spent.
         AssertThat(armored[6].CurrentHP).IsEqual(14f);
@@ -53,9 +73,7 @@ public class ArrowMechanicsTest
     {
         var state = new SkillTreeState();
         state.SetRank(SkillTreeCatalog.ArrowPierce, 3); // 4 total hits
-        var tower = new ArrowTower();
-        tower.Initialize(0, 0);
-        tower.SetSkillTree(state);
+        var tower = Rank3Arrow(state, TowerArchetype.Pierce);
 
         var target = new Enemy();
         target.Configure(EnemyKind.Armored);
@@ -63,30 +81,21 @@ public class ArrowMechanicsTest
         var projectile = new ArrowProjectile();
         projectile.Initialize(tower, new Vector2(200, 0), target);
 
-        // First hit deals 5 damage; a second HitEnemy on the same enemy is a no-op.
+        // First hit deals 5.9 damage; a second HitEnemy on the same enemy is a no-op.
         projectile.HitEnemy(target);
         projectile.HitEnemy(target);
 
-        AssertThat(target.CurrentHP).IsEqual(9f);
+        AssertThat(target.CurrentHP).IsEqualApprox(8.1f, 0.001f);
         AssertThat(projectile.IsDone).IsFalse(); // still has pierce remaining
     }
 
     [TestCase]
-    public void Crit_DealsDoubleDamage_AndRollsPerPiercedHit()
+    public void Crit_DealsDoubleDamage_AndRollsPerHit()
     {
         var state = new SkillTreeState();
-        state.SetRank(SkillTreeCatalog.ArrowPierce, 2);      // 3 total hits
-        state.SetRank(SkillTreeCatalog.ArrowCritChance, 5);  // 40%
-        var tower = new ArrowTower();
-        tower.Initialize(0, 0);
-        tower.SetSkillTree(state);
+        state.SetRank(SkillTreeCatalog.ArrowCritChance, 5);  // 40% after specialization
+        var tower = Rank3Arrow(state, TowerArchetype.Crit);
         tower.SetSkillRandom(new ScriptedRandom(1.0, 0.0, 1.0, 0.0)); // crit, no-crit, crit
-
-        var first = new Enemy();
-        first.Configure(EnemyKind.Basic);
-
-        var projectile = new ArrowProjectile();
-        projectile.Initialize(tower, new Vector2(200, 0), first);
 
         var e1 = new Enemy();
         e1.Configure(EnemyKind.Armored); // 14 HP, 5 armor
@@ -95,13 +104,13 @@ public class ArrowMechanicsTest
         var e3 = new Enemy();
         e3.Configure(EnemyKind.Armored);
 
-        projectile.HitEnemy(e1); // crit: 20 - 5 = 15 → dead
-        projectile.HitEnemy(e2); // no crit: 10 - 5 = 5 → HP 9
-        projectile.HitEnemy(e3); // crit: 15 → dead
+        HitOnce(tower, e1); // crit: 10.9 x 2 - 5 = 16.8 → dead
+        HitOnce(tower, e2); // no crit: 10.9 - 5 = 5.9 → HP 8.1
+        HitOnce(tower, e3); // crit → dead
 
         AssertThat(e1.IsDead).IsTrue();
         AssertThat(e2.IsDead).IsFalse();
-        AssertThat(e2.CurrentHP).IsEqual(9f);
+        AssertThat(e2.CurrentHP).IsEqualApprox(8.1f, 0.001f);
         AssertThat(e3.IsDead).IsTrue();
     }
 
@@ -135,9 +144,7 @@ public class ArrowMechanicsTest
         // damage/death feedback).
         var state = new SkillTreeState();
         state.SetRank(SkillTreeCatalog.ArrowPierce, 2); // 3 total hits
-        var tower = new ArrowTower();
-        tower.Initialize(0, 0);
-        tower.SetSkillTree(state);
+        var tower = Rank3Arrow(state, TowerArchetype.Pierce);
 
         var first = new Enemy();
         first.Configure(EnemyKind.Basic);
