@@ -16,7 +16,7 @@ merges.
 **Branch:** `feature/tower-upgrades`
 **Spec:** `.claude/specs/tower-upgrades.md` (approved 2026-10-27)
 
-Three coin-priced ranks per placed tower (5 / 15 / 25) with +3% damage, +0.5 cell range and
+Three coin-priced ranks per placed tower (5 / 10 / 15) with +3% damage, +0.5 cell range and
 +3% fire rate per rank. Each rank is gated by hidden kill XP, split across every tower that
 damaged the enemy in proportion to effective damage. Rank 3 is an archetype choice between the
 tower's two skill-tree seed nodes: the chosen seed applies at minimum rank 1, the unchosen seed
@@ -44,6 +44,11 @@ The tower body silhouette now changes per archetype: Arrow forked spearhead (Pie
 or star inset (Crit), Cannon lobed cluster (Cluster) or shockwave rings (Stun), Laser
 linked rim nodes (Chain) or rising wedge core (Ramp-Up). The tiny badge remains. Spec
 and holdout H18 updated.
+
+**Playtest fix 4 (2026-10-27):** panel header is name-only; current-rank chevrons/emblem
+removed because the tower badge already shows rank. Only the next-rank preview keeps
+the fixed-size vertical chevron stack. Costs lowered to 5 / 10 / 15. Spec and holdouts
+H1/H10/H13 updated.
 
 **Open follow-ups:** the spec's double-click edge case is worded as "second click is a no-op",
 but each valid click buys one rank — a second click can legitimately buy the next rank when its
