@@ -72,6 +72,7 @@ public static class ArchetypeEmblem
             points[i] = center + new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * length;
         }
         target.DrawPolygon(points, new[] { color });
+        OutlinePolygon(target, points, color);
     }
 
     /// <summary>Cluster: three small circles in a triangle.</summary>
@@ -83,6 +84,7 @@ public static class ArchetypeEmblem
             float angle = Mathf.Tau * i / 3f - Mathf.Pi / 2f;
             Vector2 offset = new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * radius * 0.5f;
             target.DrawCircle(center + offset, nodeRadius, color);
+            OutlineCircle(target, center + offset, nodeRadius, color);
         }
     }
 
@@ -90,8 +92,8 @@ public static class ArchetypeEmblem
     private static void DrawStun(CanvasItem target, Vector2 center, float radius, Color color)
     {
         float stroke = Mathf.Max(1f, radius * 0.18f);
-        target.DrawCircle(center, radius * 0.85f, color, false, stroke);
-        target.DrawCircle(center, radius * 0.45f, color, false, stroke);
+        target.DrawCircle(center, radius * 0.85f, color, false, stroke, antialiased: true);
+        target.DrawCircle(center, radius * 0.45f, color, false, stroke, antialiased: true);
     }
 
     /// <summary>Chain: three linked nodes.</summary>
@@ -106,12 +108,15 @@ public static class ArchetypeEmblem
         }
 
         float stroke = Mathf.Max(1f, radius * 0.14f);
-        target.DrawLine(points[0], points[1], color, stroke);
-        target.DrawLine(points[1], points[2], color, stroke);
-        target.DrawLine(points[2], points[0], color, stroke);
+        target.DrawLine(points[0], points[1], color, stroke, antialiased: true);
+        target.DrawLine(points[1], points[2], color, stroke, antialiased: true);
+        target.DrawLine(points[2], points[0], color, stroke, antialiased: true);
 
         foreach (var point in points)
+        {
             target.DrawCircle(point, nodeRadius, color);
+            OutlineCircle(target, point, nodeRadius, color);
+        }
     }
 
     /// <summary>Ramp-Up: a rising wedge.</summary>
@@ -124,6 +129,29 @@ public static class ArchetypeEmblem
             new Vector2(center.X + radius * 0.85f, center.Y - radius * 0.75f)
         };
         target.DrawPolygon(points, new[] { color });
+        OutlinePolygon(target, points, color);
+    }
+
+    /// <summary>
+    /// Feathers a filled polygon's edge with a thin same-color closed antialiased
+    /// outline; the fill itself is unchanged, so shapes and sizes stay identical.
+    /// </summary>
+    private static void OutlinePolygon(CanvasItem target, Vector2[] points, Color color)
+    {
+        if (points.Length == 0)
+            return;
+
+        var closed = new Vector2[points.Length + 1];
+        for (int i = 0; i < points.Length; i++)
+            closed[i] = points[i];
+        closed[points.Length] = points[0];
+        target.DrawPolyline(closed, color, 1f, antialiased: true);
+    }
+
+    /// <summary>Feathers a filled circle's edge with a 1px antialiased ring.</summary>
+    private static void OutlineCircle(CanvasItem target, Vector2 center, float radius, Color color)
+    {
+        target.DrawCircle(center, radius, color, false, 1f, antialiased: true);
     }
 }
 

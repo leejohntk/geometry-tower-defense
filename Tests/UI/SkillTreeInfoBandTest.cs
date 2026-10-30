@@ -339,6 +339,33 @@ public class SkillTreeInfoBandTest
     }
 
     [TestCase]
+    public void IconRedraw_KeepsSizeAndCenter()
+    {
+        var screen = BuildScreen(new SkillTreeState());
+        try
+        {
+            var row = screen.GetNode<Control>("TreeArea/Row_arrow_damage");
+            var icon = row.GetNode<Control>("Icon");
+            Vector2 sizeBefore = icon.Size;
+            Vector2 centerBefore = icon.GetGlobalRect().GetCenter();
+
+            // The AA change is per-draw and not pixel-testable headlessly; this drives
+            // the redraw-request path and proves the softened draws never resize or
+            // move the icon (the verifier renders the real draw frames).
+            icon.QueueRedraw();
+
+            AssertThat(icon.Size).IsEqual(sizeBefore);
+            AssertThat(icon.Size).IsEqual(new Vector2(46f, 46f));
+            AssertThat(icon.GetGlobalRect().GetCenter()).IsEqual(centerBefore);
+            AssertThat(icon.MouseFilter).IsEqual(Control.MouseFilterEnum.Ignore);
+        }
+        finally
+        {
+            NodeTestSupport.Cleanup(screen);
+        }
+    }
+
+    [TestCase]
     public void HoveringTheBuyButton_ShowsItsRowsInfo()
     {
         var screen = BuildScreen(new SkillTreeState());

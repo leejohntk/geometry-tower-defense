@@ -1009,7 +1009,8 @@ public partial class SkillTreeScreen : Control
                 GameConstants.SkillTreeHaloRadius,
                 halo with { A = locked ? 0.55f : 0.9f },
                 false,
-                GameConstants.SkillTreeHaloWidth);
+                GameConstants.SkillTreeHaloWidth,
+                antialiased: true);
 
             if (maxed)
             {
@@ -1018,7 +1019,8 @@ public partial class SkillTreeScreen : Control
                     GameConstants.SkillTreeHaloRadius + 1.5f,
                     GameConstants.SkillTreeMaxColor with { A = 0.45f },
                     false,
-                    1f);
+                    1f,
+                    antialiased: true);
             }
 
             Color glyphColor = locked ? GameConstants.SkillTreeLockedColor : color;
@@ -1036,7 +1038,8 @@ public partial class SkillTreeScreen : Control
                     center - new Vector2(slashExtent, slashExtent),
                     center + new Vector2(slashExtent, slashExtent),
                     slash,
-                    half * 0.14f);
+                    half * 0.14f,
+                    antialiased: true);
                 icon.DrawRect(
                     new Rect2(
                         center.X + half * 0.09f,
@@ -1051,14 +1054,16 @@ public partial class SkillTreeScreen : Control
                     Mathf.Tau,
                     8,
                     slash,
-                    half * 0.09f);
+                    half * 0.09f,
+                    antialiased: true);
             }
             else if (maxed)
             {
                 icon.DrawCircle(
                     center + new Vector2(half * 0.59f, -half * 0.59f),
                     half * 0.18f,
-                    GameConstants.SkillTreeMaxColor);
+                    GameConstants.SkillTreeMaxColor,
+                    antialiased: true);
             }
         };
         return icon;

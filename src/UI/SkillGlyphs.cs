@@ -78,9 +78,14 @@ public static class SkillGlyphs
             case SkillGlyphKind.Seed:
                 var archetype = SeedArchetype(nodeId);
                 if (archetype.HasValue)
+                {
                     ArchetypeEmblem.Draw(target, archetype.Value, center, radius, color);
+                }
                 else
+                {
                     target.DrawCircle(center, radius * 0.5f, color);
+                    OutlineCircle(target, center, radius * 0.5f, color);
+                }
                 break;
 
             case SkillGlyphKind.Blade:
@@ -127,6 +132,7 @@ public static class SkillGlyphs
             new Vector2(center.X + radius * 0.55f, center.Y + radius * 0.75f),
         };
         target.DrawColoredPolygon(points, color);
+        OutlinePolygon(target, points, color);
     }
 
     /// <summary>Attack Speed: three speed lines, unequal lengths.</summary>
@@ -136,23 +142,26 @@ public static class SkillGlyphs
             new Vector2(center.X - radius * 0.85f, center.Y - radius * 0.55f),
             new Vector2(center.X + radius * 0.55f, center.Y - radius * 0.55f),
             color,
-            1.5f);
+            1.5f,
+            antialiased: true);
         target.DrawLine(
             new Vector2(center.X - radius * 0.5f, center.Y),
             new Vector2(center.X + radius * 0.9f, center.Y),
             color,
-            1.5f);
+            1.5f,
+            antialiased: true);
         target.DrawLine(
             new Vector2(center.X - radius * 0.85f, center.Y + radius * 0.55f),
             new Vector2(center.X + radius * 0.55f, center.Y + radius * 0.55f),
             color,
-            1.5f);
+            1.5f,
+            antialiased: true);
     }
 
     /// <summary>Range: crosshair (ring plus four ticks).</summary>
     private static void DrawCrosshair(CanvasItem target, Vector2 center, float radius, Color color)
     {
-        target.DrawCircle(center, radius * 0.55f, color, false, 1.5f);
+        target.DrawCircle(center, radius * 0.55f, color, false, 1.5f, antialiased: true);
         DrawTick(target, center, radius, color, Vector2.Up);
         DrawTick(target, center, radius, color, Vector2.Down);
         DrawTick(target, center, radius, color, Vector2.Left);
@@ -170,7 +179,8 @@ public static class SkillGlyphs
             center + direction * (radius * 0.72f),
             center + direction * radius,
             color,
-            1.5f);
+            1.5f,
+            antialiased: true);
     }
 
     /// <summary>Powder Charge: a filled shell with a spark.</summary>
@@ -178,11 +188,28 @@ public static class SkillGlyphs
     {
         var shell = new Vector2(center.X - radius * 0.25f, center.Y + radius * 0.1f);
         target.DrawCircle(shell, radius * 0.52f, color);
-        target.DrawCircle(shell, radius * 0.52f, new Color(0.05f, 0.05f, 0.1f), false, 1f);
+        OutlineCircle(target, shell, radius * 0.52f, color);
+        target.DrawCircle(
+            shell,
+            radius * 0.52f,
+            new Color(0.05f, 0.05f, 0.1f),
+            false,
+            1f,
+            antialiased: true);
 
         var spark = new Vector2(center.X + radius * 0.45f, center.Y - radius * 0.5f);
-        target.DrawLine(spark, spark + new Vector2(radius * 0.45f, -radius * 0.35f), color, 1.5f);
-        target.DrawLine(spark, spark + new Vector2(radius * 0.35f, -radius * 0.05f), color, 1.5f);
+        target.DrawLine(
+            spark,
+            spark + new Vector2(radius * 0.45f, -radius * 0.35f),
+            color,
+            1.5f,
+            antialiased: true);
+        target.DrawLine(
+            spark,
+            spark + new Vector2(radius * 0.35f, -radius * 0.05f),
+            color,
+            1.5f,
+            antialiased: true);
     }
 
     /// <summary>
@@ -191,10 +218,11 @@ public static class SkillGlyphs
     /// </summary>
     private static void DrawConcentricRings(CanvasItem target, Vector2 center, float radius, Color color)
     {
-        target.DrawCircle(center, radius * 0.3f, color, false, 1.2f);
-        target.DrawCircle(center, radius * 0.6f, color, false, 1.2f);
-        target.DrawCircle(center, radius * 0.9f, color, false, 1.2f);
+        target.DrawCircle(center, radius * 0.3f, color, false, 1.2f, antialiased: true);
+        target.DrawCircle(center, radius * 0.6f, color, false, 1.2f, antialiased: true);
+        target.DrawCircle(center, radius * 0.9f, color, false, 1.2f, antialiased: true);
         target.DrawCircle(center, radius * 0.12f, color);
+        OutlineCircle(target, center, radius * 0.12f, color);
 
         // Four diagonal splash ticks outside the rings: the extra ring + ticks keep this
         // unmistakably different from the Stun emblem's two plain rings.
@@ -206,7 +234,8 @@ public static class SkillGlyphs
                 center + direction * (radius * 0.98f),
                 center + direction * (radius * 1.15f),
                 color,
-                1.2f);
+                1.2f,
+                antialiased: true);
         }
     }
 
@@ -218,7 +247,7 @@ public static class SkillGlyphs
     {
         Vector2 left = center + new Vector2(-radius * 0.85f, 0f);
         Vector2 right = center + new Vector2(radius * 0.85f, 0f);
-        target.DrawLine(left, right, color, 1.5f);
+        target.DrawLine(left, right, color, 1.5f, antialiased: true);
 
         if (capped)
         {
@@ -226,17 +255,21 @@ public static class SkillGlyphs
                 left + new Vector2(0f, -radius * 0.35f),
                 left + new Vector2(0f, radius * 0.35f),
                 color,
-                1.5f);
+                1.5f,
+                antialiased: true);
             target.DrawLine(
                 right + new Vector2(0f, -radius * 0.35f),
                 right + new Vector2(0f, radius * 0.35f),
                 color,
-                1.5f);
+                1.5f,
+                antialiased: true);
         }
         else
         {
             target.DrawCircle(left, radius * 0.2f, color);
+            OutlineCircle(target, left, radius * 0.2f, color);
             target.DrawCircle(right, radius * 0.2f, color);
+            OutlineCircle(target, right, radius * 0.2f, color);
         }
     }
 
@@ -251,5 +284,28 @@ public static class SkillGlyphs
             new Vector2(center.X - radius * 0.65f, center.Y + radius * 0.2f),
         };
         target.DrawColoredPolygon(points, color);
+        OutlinePolygon(target, points, color);
+    }
+
+    /// <summary>
+    /// Feathers a filled polygon's edge with a thin same-color closed antialiased
+    /// outline. The fill itself is untouched, so shapes and sizes are unchanged.
+    /// </summary>
+    private static void OutlinePolygon(CanvasItem target, Vector2[] points, Color color)
+    {
+        if (points.Length == 0)
+            return;
+
+        var closed = new Vector2[points.Length + 1];
+        for (int i = 0; i < points.Length; i++)
+            closed[i] = points[i];
+        closed[points.Length] = points[0];
+        target.DrawPolyline(closed, color, 1f, antialiased: true);
+    }
+
+    /// <summary>Feathers a filled circle's edge with a 1px antialiased ring.</summary>
+    private static void OutlineCircle(CanvasItem target, Vector2 center, float radius, Color color)
+    {
+        target.DrawCircle(center, radius, color, false, 1f, antialiased: true);
     }
 }
