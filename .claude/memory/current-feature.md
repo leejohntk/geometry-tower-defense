@@ -7,8 +7,7 @@ metadata:
 
 # Current Feature
 
-**Active:** visual-overhaul — full-game procedural visual pass (combat, spawn/base,
-placement cards, skill tree + hover band, title/result screens). Live phase in
+**Status:** awaiting playtest — visual-overhaul complete, PR open. Live phase in
 `.claude/state.json`; spec `.claude/specs/visual-overhaul.md` (approved 2026-10-30).
 Branch `feature/visual-overhaul`.
 
@@ -169,6 +168,17 @@ Holdouts moved to `.claude/holdouts/regression/tower-skill-tree-mechanics/`.
 
 ## Recent Features
 
+- **Visual overhaul** (PR pending, 2026-10-30) — full procedural visual pass with no
+  gameplay changes: per-kind enemy silhouettes + transform idle motion + hit feedback +
+  pooled death bursts; turret aim/recoil, arrow orientation fix and trails, richer
+  explosion, laser impact glow; spawn portals + base core replace debug markers/labels;
+  placement icon cards; skill-tree backdrop/glyphs/halos + bottom hover description band
+  with 15 tuning-accurate descriptions; animated title and distinct victory/defeat
+  backdrops with styled buttons. Build 0 warnings, 499 tests, layout verifier 214/0,
+  holdouts 23/23. Review found one CRITICAL (status tint repainted only the overlay
+  container, so body-layer flashes/boss phase border went stale) plus 4 WARNING and 5
+  INFO; all fixed in one batch. Simplify pass then removed dead code and consolidated
+  button/ornament/test-support duplication.
 - **Tower upgrades** (PR #29, merged 2026-10-28) — three coin-priced ranks per placed tower
   (5/10/15), each gated by hidden kill XP split by effective damage; rank 3 picks one of the
   tower's two skill-tree seed nodes, applied at minimum rank 1. Rank/XP/archetype live on the
