@@ -12,8 +12,8 @@ active right now (and is deleted at merge, which means "idle"). This file record
 shipped, its gates, and open follow-ups. Do not track phase here — it goes stale the moment a PR
 merges.
 
-**Current feature:** tower-upgrades — in-level ranks, hidden XP gates, archetype specialization
-**Branch:** `feature/tower-upgrades`
+**Last feature:** tower-upgrades — in-level ranks, hidden XP gates, archetype specialization (PR #29, merged 2026-10-28)
+**Branch:** `feature/tower-upgrades` (merged, deleted) — squash `5db78bb`
 **Spec:** `.claude/specs/tower-upgrades.md` (approved 2026-10-27)
 
 Three coin-priced ranks per placed tower (5 / 10 / 15) with +3% damage, +0.5 cell range and
@@ -55,6 +55,11 @@ upgrade = one full-width `Upgrade {cost}` button; rank 2 = two archetype cards; 
 panel at all when no upgrade is available (closed XP gate or rank 3). Selection still
 shows range; panel appears live if the gate opens. Spec and holdouts H4/H10/H13/H14
 updated.
+
+**Merged (2026-10-28):** PR #29 squash `5db78bb`; build 0 warnings / 0 errors, 384 tests pass,
+layout verifier PASS, holdouts 16/16. Local and remote feature branches deleted; `state.json`
+removed; post-merge `main` re-verified (build clean, 384 tests). Holdouts moved to
+`.claude/holdouts/regression/tower-upgrades/`.
 
 **Open follow-ups:** the spec's double-click edge case is worded as "second click is a no-op",
 but each valid click buys one rank — a second click can legitimately buy the next rank when its
@@ -159,6 +164,14 @@ Holdouts moved to `.claude/holdouts/regression/tower-skill-tree-mechanics/`.
 
 ## Recent Features
 
+- **Tower upgrades** (PR #29, merged 2026-10-28) — three coin-priced ranks per placed tower
+  (5/10/15), each gated by hidden kill XP split by effective damage; rank 3 picks one of the
+  tower's two skill-tree seed nodes, applied at minimum rank 1. Rank/XP/archetype live on the
+  tower instance, never persisted. Five playtest rounds produced the final form: seed mechanics
+  inert until rank 3, fixed-size drawn V-chevron stacks (no text glyphs), a tiny rank badge on
+  the tower at rank ≥ 1, per-archetype body silhouettes, and a single-action panel (one Upgrade
+  button, two archetype cards at rank 2, no panel when nothing is available). Build 0 warnings,
+  384 tests, holdouts 16/16. Correctness lens stalled twice and was self-audited — see run #8.
 - **Level 5 + The Progenitor** (PR #25, merged 2026-10-25) — three simultaneous lanes, waves 12/15/18/21/24,
   first boss mid-wave. Progenitor slows and summons ahead on-path with HP-phase escalation;
   zero-coin summons count toward wave completion. Review caught a critical post-base summon
