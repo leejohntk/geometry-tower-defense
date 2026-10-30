@@ -149,7 +149,7 @@ public class SkillTreeInfoBandTest
             var icon = row.GetNode<Control>("Icon");
 
             AssertThat(icon.MouseFilter).IsEqual(Control.MouseFilterEnum.Ignore);
-            AssertThat(icon.Size).IsEqual(new Vector2(40f, 40f));
+            AssertThat(icon.Size).IsEqual(new Vector2(46f, 46f));
             AssertThat(row.GetGlobalRect().HasPoint(icon.GetGlobalRect().GetCenter())).IsTrue();
             // The row is the hover surface and fully covers the enlarged icon.
             AssertThat(Contains(row.GetGlobalRect(), icon.GetGlobalRect())).IsTrue();
@@ -294,7 +294,7 @@ public class SkillTreeInfoBandTest
                     Rect2 iconRect = icon.GetGlobalRect();
                     Rect2 rowRect = row.GetGlobalRect();
 
-                    AssertThat(icon.Size).IsEqual(new Vector2(40f, 40f));
+                    AssertThat(icon.Size).IsEqual(new Vector2(46f, 46f));
                     AssertThat(Contains(rowRect, iconRect)).IsTrue();
                     AssertThat(rowRect.Size.Y).IsGreaterEqual(iconRect.Size.Y);
                     // No clipping at the tree-area edges.

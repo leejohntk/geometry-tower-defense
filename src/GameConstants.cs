@@ -409,9 +409,9 @@ public static class GameConstants
     public const float SkillTreeLineGlowWidth = 8f;
     public const float SkillTreeLineGlowAlpha = 0.18f;
     public const float SkillTreeLineCoreWidth = 2.5f;
-    public const float SkillTreeHaloRadius = 17f;           // inside the 40x40 icon box
-    public const float SkillTreeHaloWidth = 2.2f;
-    public const float SkillTreeGlyphRadius = 11.5f;
+    public const float SkillTreeHaloRadius = 19.5f;         // inside the 46x46 icon box
+    public const float SkillTreeHaloWidth = 2.5f;
+    public const float SkillTreeGlyphRadius = 13f;
     public const float SkillTreeHoverBrightness = 1.2f;
     public const float SkillTreeIdlePulseAmplitude = 0.05f;
     public const float SkillTreeIdlePulseSpeed = 1.6f;

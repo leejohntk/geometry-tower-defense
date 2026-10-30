@@ -27,9 +27,9 @@ public partial class SkillTreeScreen : Control
     // content is side-aware — mirrored left/right around the spine — so the whole
     // tree block is symmetric and centers with the spine. BranchOffset is sized so
     // mirrored seed content stays inside the tree area at the default viewport.
-    // Node icon box is 40x40 (IconHalf 20) centered exactly on the node anchor; the
+    // Node icon box is 46x46 (IconHalf 23) centered exactly on the node anchor; the
     // larger box keeps the same anchor positions and row content columns.
-    private const float IconHalf = 20f;
+    private const float IconHalf = 23f;
     private const float TrunkSpacing = 120f;
     private const float BranchSpacing = 120f;
     private const float BranchOffset = 180f;
@@ -38,14 +38,14 @@ public partial class SkillTreeScreen : Control
     // Node row metrics. Every row is a named Control wrapper whose rect spans the
     // full row (icon edge to buy-column edge), so the headless layout verifier can
     // resolve rows by identity instead of grouping them by y-coordinate. The row half
-    // height (44px tall rows) covers the enlarged icon for hover.
-    private const float NameOffset = 28f;
+    // height (50px tall rows) covers the enlarged icon for hover.
+    private const float NameOffset = 31f;
     private const float NameWidth = 150f;
     private const float RankOffset = 262f;
     private const float RankWidth = 44f;
     private const float BuyOffset = 310f;
     private const float BuyWidth = 124f;
-    private const float RowHalfHeight = 22f;
+    private const float RowHalfHeight = 25f;
 
     // Info band layout (inside Panel_Main, below the rows).
     private const float InfoNameX = 16f;
@@ -975,7 +975,7 @@ public partial class SkillTreeScreen : Control
     }
 
     /// <summary>
-    /// Node icon at the fixed 40x40 size: an outer halo ring (tower color unlocked, grey
+    /// Node icon at the fixed 46x46 size: an outer halo ring (tower color unlocked, grey
     /// locked, gold at rank 5), a distinct glyph (stat glyph for trunk nodes, the shared
     /// archetype emblem for seeds), a dim glyph plus slash/lock mark when locked, and a
     /// gold accent when maxed. The locked/maxed marks are sized as ratios of the icon
@@ -1025,7 +1025,7 @@ public partial class SkillTreeScreen : Control
             SkillGlyphs.Draw(icon, node.Id, center, GameConstants.SkillTreeGlyphRadius, glyphColor);
 
             // Marks are expressed as ratios of the icon half-extent, so the slash, lock,
-            // and max dot always scale with the 40x40 box (no old-pixel-size marks).
+            // and max dot always scale with the 46x46 box (no old-pixel-size marks).
             float half = IconHalf;
 
             if (locked)

@@ -76,9 +76,9 @@ const SKTREE_SIDEBAR_BUTTONS := 3
 const ROW_BUY_OFFSET := 310.0
 const ROW_BUY_WIDTH := 124.0
 
-## Enlarged tree node icon box (playtest fix: 22x22 -> 40x40). Icons stay centered on
+## Enlarged tree node icon box (playtest fix: 22x22 -> 46x46). Icons stay centered on
 ## their anchors; rows grow to cover them.
-const TREE_ICON_SIZE := 40.0
+const TREE_ICON_SIZE := 46.0
 
 ## Placement card geometry, stated independently of the HUD nodes it is measured
 ## against (spec: ~160x72 icon cards stacked with a visible gap, then StartWave).
@@ -1609,7 +1609,7 @@ func _evaluate_tower_tree(key: String, nodes: Array, tree_area: Control) -> void
                 "size=(%.1f, %.1f)" % [TREE_ICON_SIZE, TREE_ICON_SIZE],
                 _approx(icon_rect.size.x, TREE_ICON_SIZE)
                     and _approx(icon_rect.size.y, TREE_ICON_SIZE),
-                "Render each tree node icon at the enlarged 40x40 size.",
+                "Render each tree node icon at the enlarged 46x46 size.",
                 SKILL_TREE_SOURCE, "WARNING"
             )
             _check_inside(
