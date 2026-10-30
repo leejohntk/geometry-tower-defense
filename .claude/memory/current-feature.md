@@ -7,6 +7,11 @@ metadata:
 
 # Current Feature
 
+**Active:** visual-overhaul — full-game procedural visual pass (combat, spawn/base,
+placement cards, skill tree + hover band, title/result screens). Live phase in
+`.claude/state.json`; spec `.claude/specs/visual-overhaul.md` (approved 2026-10-30).
+Branch `feature/visual-overhaul`.
+
 **Live phase lives in `.claude/state.json`** — that file is the single source of truth for what is
 active right now (and is deleted at merge, which means "idle"). This file records *history*: what
 shipped, its gates, and open follow-ups. Do not track phase here — it goes stale the moment a PR
