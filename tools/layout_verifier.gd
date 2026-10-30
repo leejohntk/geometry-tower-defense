@@ -76,6 +76,10 @@ const SKTREE_SIDEBAR_BUTTONS := 3
 const ROW_BUY_OFFSET := 310.0
 const ROW_BUY_WIDTH := 124.0
 
+## Enlarged tree node icon box (playtest fix: 22x22 -> 40x40). Icons stay centered on
+## their anchors; rows grow to cover them.
+const TREE_ICON_SIZE := 40.0
+
 ## Placement card geometry, stated independently of the HUD nodes it is measured
 ## against (spec: ~160x72 icon cards stacked with a visible gap, then StartWave).
 const HUD_CARD_WIDTH := 160.0
@@ -1588,7 +1592,58 @@ func _evaluate_tower_tree(key: String, nodes: Array, tree_area: Control) -> void
 
         var icon := _require(row, "Icon", row_path, SKILL_TREE_SOURCE)
         var name_rect: Rect2 = name_label.get_global_rect() if name_label != null else Rect2()
+        var rank_rect: Rect2 = rank_label.get_global_rect() if rank_label != null else Rect2()
         var icon_rect: Rect2 = icon.get_global_rect() if icon != null else Rect2()
+        var row_rect: Rect2 = row.get_global_rect()
+
+        _check_inside(
+            "tree.%s.%s.row_inside_tree" % [key, node["id"]], row_path, row_rect, tree_rect,
+            "Keep each row inside the tree area (no clipping at the enlarged icon size).",
+            SKILL_TREE_SOURCE, "WARNING"
+        )
+
+        if icon != null:
+            _check(
+                "tree.%s.%s.icon_size" % [key, node["id"]], "%s/Icon" % row_path,
+                "size=(%.2f, %.2f)" % [icon_rect.size.x, icon_rect.size.y],
+                "size=(%.1f, %.1f)" % [TREE_ICON_SIZE, TREE_ICON_SIZE],
+                _approx(icon_rect.size.x, TREE_ICON_SIZE)
+                    and _approx(icon_rect.size.y, TREE_ICON_SIZE),
+                "Render each tree node icon at the enlarged 40x40 size.",
+                SKILL_TREE_SOURCE, "WARNING"
+            )
+            _check_inside(
+                "tree.%s.%s.icon_inside_row" % [key, node["id"]], "%s/Icon" % row_path,
+                icon_rect, row_rect,
+                "Keep the enlarged icon inside the row wrapper.",
+                SKILL_TREE_SOURCE, "WARNING"
+            )
+            _check(
+                "tree.%s.%s.icon_hover_coverage" % [key, node["id"]], row_path,
+                "row.height=%.2f icon.height=%.2f" % [row_rect.size.y, icon_rect.size.y],
+                "row.height >= icon.height (hover covers the whole icon)",
+                row_rect.size.y >= icon_rect.size.y - EPS,
+                "Grow the row wrapper with the icon so hover covers the larger icon.",
+                SKILL_TREE_SOURCE, "WARNING"
+            )
+
+            var icon_clear := not icon_rect.intersects(name_rect) \
+                and not icon_rect.intersects(rank_rect)
+            var icon_clear_detail := "icon=%s name=%s rank=%s" % [
+                str(icon_rect), str(name_rect), str(rank_rect),
+            ]
+            if buy_button != null:
+                var content_buy_rect: Rect2 = buy_button.get_global_rect()
+                icon_clear = icon_clear and not icon_rect.intersects(content_buy_rect)
+                icon_clear_detail += " buy=%s" % str(content_buy_rect)
+            _check(
+                "tree.%s.%s.icon_clear_of_content" % [key, node["id"]], row_path,
+                icon_clear_detail,
+                "icon does not intersect Name, Rank, or Buy",
+                icon_clear,
+                "Keep the content columns clear of the enlarged icon.",
+                SKILL_TREE_SOURCE, "WARNING"
+            )
 
         if buy_button != null and icon != null:
             # The Buy child is measured against its sibling Icon (also independently

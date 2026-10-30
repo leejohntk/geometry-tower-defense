@@ -27,7 +27,9 @@ public partial class SkillTreeScreen : Control
     // content is side-aware — mirrored left/right around the spine — so the whole
     // tree block is symmetric and centers with the spine. BranchOffset is sized so
     // mirrored seed content stays inside the tree area at the default viewport.
-    private const float IconHalf = 11f;
+    // Node icon box is 40x40 (IconHalf 20) centered exactly on the node anchor; the
+    // larger box keeps the same anchor positions and row content columns.
+    private const float IconHalf = 20f;
     private const float TrunkSpacing = 120f;
     private const float BranchSpacing = 120f;
     private const float BranchOffset = 180f;
@@ -35,14 +37,15 @@ public partial class SkillTreeScreen : Control
 
     // Node row metrics. Every row is a named Control wrapper whose rect spans the
     // full row (icon edge to buy-column edge), so the headless layout verifier can
-    // resolve rows by identity instead of grouping them by y-coordinate.
-    private const float NameOffset = 20f;
+    // resolve rows by identity instead of grouping them by y-coordinate. The row half
+    // height (44px tall rows) covers the enlarged icon for hover.
+    private const float NameOffset = 28f;
     private const float NameWidth = 150f;
     private const float RankOffset = 262f;
     private const float RankWidth = 44f;
     private const float BuyOffset = 310f;
     private const float BuyWidth = 124f;
-    private const float RowHalfHeight = 15f;
+    private const float RowHalfHeight = 22f;
 
     // Info band layout (inside Panel_Main, below the rows).
     private const float InfoNameX = 16f;
@@ -972,10 +975,11 @@ public partial class SkillTreeScreen : Control
     }
 
     /// <summary>
-    /// Node icon at the fixed 22x22 size: an outer halo ring (tower color unlocked, grey
+    /// Node icon at the fixed 40x40 size: an outer halo ring (tower color unlocked, grey
     /// locked, gold at rank 5), a distinct glyph (stat glyph for trunk nodes, the shared
     /// archetype emblem for seeds), a dim glyph plus slash/lock mark when locked, and a
-    /// gold accent when maxed.
+    /// gold accent when maxed. The locked/maxed marks are sized as ratios of the icon
+    /// half-extent so they scale with the box.
     /// </summary>
     private static Control CreateNodeIcon(
         SkillNodeDefinition node,
@@ -1020,29 +1024,40 @@ public partial class SkillTreeScreen : Control
             Color glyphColor = locked ? GameConstants.SkillTreeLockedColor : color;
             SkillGlyphs.Draw(icon, node.Id, center, GameConstants.SkillTreeGlyphRadius, glyphColor);
 
+            // Marks are expressed as ratios of the icon half-extent, so the slash, lock,
+            // and max dot always scale with the 40x40 box (no old-pixel-size marks).
+            float half = IconHalf;
+
             if (locked)
             {
                 var slash = new Color(0.12f, 0.12f, 0.16f, 0.9f);
+                float slashExtent = half * 0.55f;
                 icon.DrawLine(
-                    center + new Vector2(-6f, -6f),
-                    center + new Vector2(6f, 6f),
+                    center - new Vector2(slashExtent, slashExtent),
+                    center + new Vector2(slashExtent, slashExtent),
                     slash,
-                    1.5f);
-                icon.DrawRect(new Rect2(center.X + 1f, center.Y + 2f, 6f, 4f), slash);
+                    half * 0.14f);
+                icon.DrawRect(
+                    new Rect2(
+                        center.X + half * 0.09f,
+                        center.Y + half * 0.18f,
+                        half * 0.55f,
+                        half * 0.36f),
+                    slash);
                 icon.DrawArc(
-                    new Vector2(center.X + 4f, center.Y + 2f),
-                    2.2f,
+                    new Vector2(center.X + half * 0.36f, center.Y + half * 0.18f),
+                    half * 0.2f,
                     Mathf.Pi,
                     Mathf.Tau,
                     8,
                     slash,
-                    1f);
+                    half * 0.09f);
             }
             else if (maxed)
             {
                 icon.DrawCircle(
-                    center + new Vector2(6.5f, -6.5f),
-                    2f,
+                    center + new Vector2(half * 0.59f, -half * 0.59f),
+                    half * 0.18f,
                     GameConstants.SkillTreeMaxColor);
             }
         };

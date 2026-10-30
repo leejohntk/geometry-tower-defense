@@ -22,6 +22,19 @@ public class SkillTreeInfoBandTest
         return NodeTestSupport.Attach(new SkillTreeScreen(new SkillTree(state, _ => true)));
     }
 
+    private static bool Contains(Rect2 outer, Rect2 inner) =>
+        inner.Position.X >= outer.Position.X - 0.01f
+        && inner.Position.Y >= outer.Position.Y - 0.01f
+        && inner.End.X <= outer.End.X + 0.01f
+        && inner.End.Y <= outer.End.Y + 0.01f;
+
+    private static string SidebarKey(TowerType type) => type switch
+    {
+        TowerType.Cannon => "cannon",
+        TowerType.Laser => "laser",
+        _ => "arrow"
+    };
+
     [TestCase]
     public void InfoBand_HasTheNamedStructureInsidePanelMain()
     {
@@ -136,7 +149,11 @@ public class SkillTreeInfoBandTest
             var icon = row.GetNode<Control>("Icon");
 
             AssertThat(icon.MouseFilter).IsEqual(Control.MouseFilterEnum.Ignore);
+            AssertThat(icon.Size).IsEqual(new Vector2(40f, 40f));
             AssertThat(row.GetGlobalRect().HasPoint(icon.GetGlobalRect().GetCenter())).IsTrue();
+            // The row is the hover surface and fully covers the enlarged icon.
+            AssertThat(Contains(row.GetGlobalRect(), icon.GetGlobalRect())).IsTrue();
+            AssertThat(row.GetGlobalRect().Size.Y).IsGreaterEqual(icon.Size.Y);
             AssertThat(row.MouseFilter).IsEqual(Control.MouseFilterEnum.Pass);
 
             row.EmitSignal(Control.SignalName.MouseEntered);
@@ -236,6 +253,84 @@ public class SkillTreeInfoBandTest
 
             screen.Visible = true;
             AssertThat(screen.IsProcessing()).IsTrue();
+        }
+        finally
+        {
+            NodeTestSupport.Cleanup(screen);
+        }
+    }
+
+    [TestCase]
+    public void EnlargedIcons_FitEveryRowAcrossAllTowers()
+    {
+        // Every node unlocked (rank 1) renders a Buy button, so all 15 rows are measured
+        // in their full content form across the three towers.
+        var state = new SkillTreeState();
+        foreach (var def in SkillTreeCatalog.All)
+            state.SetRank(def.Id, 1);
+
+        var screen = BuildScreen(state);
+        try
+        {
+            var tree = screen.GetNode<Control>("TreeArea");
+            Rect2 treeRect = tree.GetGlobalRect();
+            float spineX = treeRect.GetCenter().X;
+            float bandTop = screen.GetNode<Control>("Panel_Main/Block_SkillInfo")
+                .GetGlobalRect().Position.Y;
+
+            foreach (var type in new[] { TowerType.Arrow, TowerType.Cannon, TowerType.Laser })
+            {
+                screen.GetNode<Button>($"Block_Sidebar/Sidebar_{SidebarKey(type)}")
+                    .EmitSignal(Button.SignalName.Pressed);
+
+                float? leftSeedCenter = null;
+                float? rightSeedCenter = null;
+
+                foreach (var def in SkillTreeCatalog.ForTower(type))
+                {
+                    string rowName = "Row_" + def.Id.Replace('.', '_');
+                    var row = tree.GetNode<Control>(rowName);
+                    var icon = row.GetNode<Control>("Icon");
+                    Rect2 iconRect = icon.GetGlobalRect();
+                    Rect2 rowRect = row.GetGlobalRect();
+
+                    AssertThat(icon.Size).IsEqual(new Vector2(40f, 40f));
+                    AssertThat(Contains(rowRect, iconRect)).IsTrue();
+                    AssertThat(rowRect.Size.Y).IsGreaterEqual(iconRect.Size.Y);
+                    // No clipping at the tree-area edges.
+                    AssertThat(Contains(treeRect, rowRect)).IsTrue();
+                    // Icons never overlap the name, rank, or Buy content columns.
+                    AssertThat(iconRect.Intersects(row.GetNode<Label>("Name").GetGlobalRect())).IsFalse();
+                    AssertThat(iconRect.Intersects(row.GetNode<Label>("Rank").GetGlobalRect())).IsFalse();
+                    var buy = row.GetNodeOrNull<Button>("Buy");
+                    AssertThat(buy).IsNotNull();
+                    AssertThat(iconRect.Intersects(buy!.GetGlobalRect())).IsFalse();
+                    // The info band still sits below every row.
+                    AssertThat(rowRect.End.Y).IsLessEqual(bandTop);
+
+                    if (def.Kind == SkillNodeKind.Trunk)
+                    {
+                        // Icon centers stay on the trunk spine.
+                        AssertThat(iconRect.GetCenter().X).IsEqualApprox(spineX, 0.5f);
+                    }
+                    else if (leftSeedCenter == null)
+                    {
+                        leftSeedCenter = iconRect.GetCenter().X;
+                    }
+                    else
+                    {
+                        rightSeedCenter = iconRect.GetCenter().X;
+                    }
+                }
+
+                // Seed branches stay mirrored about the trunk spine.
+                AssertThat(leftSeedCenter.HasValue).IsTrue();
+                AssertThat(rightSeedCenter.HasValue).IsTrue();
+                float leftCenter = leftSeedCenter ?? 0f;
+                float rightCenter = rightSeedCenter ?? 0f;
+                AssertThat(spineX - leftCenter)
+                    .IsEqualApprox(rightCenter - spineX, 0.5f);
+            }
         }
         finally
         {
