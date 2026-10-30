@@ -23,18 +23,27 @@ public sealed class SkillNodeDefinition
     public SkillNodeKind Kind { get; }
     public bool Enabled { get; }
 
+    /// <summary>
+    /// Player-facing description of the node's real per-rank effect, with concrete
+    /// numbers. Seed nodes begin with "Archetype: ..." and explain the tower rank-3
+    /// specialization relationship.
+    /// </summary>
+    public string Description { get; }
+
     public SkillNodeDefinition(
         string id,
         TowerType towerType,
         string displayName,
         SkillNodeKind kind,
-        bool enabled)
+        bool enabled,
+        string description)
     {
         Id = id;
         TowerType = towerType;
         DisplayName = displayName;
         Kind = kind;
         Enabled = enabled;
+        Description = description;
     }
 }
 
@@ -74,26 +83,64 @@ public static class SkillTreeCatalog
     public static readonly IReadOnlyList<SkillNodeDefinition> All = new SkillNodeDefinition[]
     {
         // Arrow Tower — Sharpshooter | Barrage
-        new(ArrowDamage, TowerType.Arrow, "Damage", SkillNodeKind.Trunk, enabled: true),
-        new(ArrowAttackSpeed, TowerType.Arrow, "Attack Speed", SkillNodeKind.Trunk, enabled: true),
-        new(ArrowRange, TowerType.Arrow, "Range", SkillNodeKind.Trunk, enabled: true),
-        new(ArrowPierce, TowerType.Arrow, "Pierce", SkillNodeKind.Seed, enabled: true),
-        new(ArrowCritChance, TowerType.Arrow, "Crit Chance", SkillNodeKind.Seed, enabled: true),
+        new(ArrowDamage, TowerType.Arrow, "Damage", SkillNodeKind.Trunk, enabled: true,
+            "+2 damage per rank (rank 5: 20 damage)."),
+        new(ArrowAttackSpeed, TowerType.Arrow, "Attack Speed", SkillNodeKind.Trunk, enabled: true,
+            "+10% attack speed per rank (fire interval 1.5s to 1.0s at rank 5)."),
+        new(ArrowRange, TowerType.Arrow, "Range", SkillNodeKind.Trunk, enabled: true,
+            "+0.5 range per rank (4 to 6.5 cells at rank 5)."),
+        new(ArrowPierce, TowerType.Arrow, "Pierce", SkillNodeKind.Seed, enabled: true,
+            "Archetype: Pierce. At tower rank 3 choose Pierce to pass through 1 enemy per rank (at least 1) before the arrow is consumed."),
+        new(ArrowCritChance, TowerType.Arrow, "Crit Chance", SkillNodeKind.Seed, enabled: true,
+            "Archetype: Crit. 8% crit chance per rank (at least 8% once specialized at tower rank 3); crits deal double damage."),
 
         // Cannon Tower — Bombardier | Concussive
-        new(CannonPowderCharge, TowerType.Cannon, "Powder Charge", SkillNodeKind.Trunk, enabled: true),
-        new(CannonAttackSpeed, TowerType.Cannon, "Attack Speed", SkillNodeKind.Trunk, enabled: true),
-        new(CannonSplashRadius, TowerType.Cannon, "Splash Radius", SkillNodeKind.Trunk, enabled: true),
-        new(CannonCluster, TowerType.Cannon, "Cluster", SkillNodeKind.Seed, enabled: true),
-        new(CannonStunChance, TowerType.Cannon, "Stun Chance", SkillNodeKind.Seed, enabled: true),
+        new(CannonPowderCharge, TowerType.Cannon, "Powder Charge", SkillNodeKind.Trunk, enabled: true,
+            "+1 damage and +10% projectile speed per rank (15 to 20 damage at rank 5)."),
+        new(CannonAttackSpeed, TowerType.Cannon, "Attack Speed", SkillNodeKind.Trunk, enabled: true,
+            "+10% attack speed per rank (fire interval 2.5s to 1.67s at rank 5)."),
+        new(CannonSplashRadius, TowerType.Cannon, "Splash Radius", SkillNodeKind.Trunk, enabled: true,
+            "+8 splash radius per rank (64 to 104 px at rank 5)."),
+        new(CannonCluster, TowerType.Cannon, "Cluster", SkillNodeKind.Seed, enabled: true,
+            "Archetype: Cluster. At tower rank 3 choose Cluster to fire 1 + rank shells (at least 2) in a small fan."),
+        new(CannonStunChance, TowerType.Cannon, "Stun Chance", SkillNodeKind.Seed, enabled: true,
+            "Archetype: Stun. 6% stun chance per rank (at least 6% once specialized at tower rank 3) for 1s."),
 
         // Laser Tower — Arc/Chain | Melter
-        new(LaserDps, TowerType.Laser, "DPS", SkillNodeKind.Trunk, enabled: true),
-        new(LaserRange, TowerType.Laser, "Range", SkillNodeKind.Trunk, enabled: true),
-        new(LaserIgnite, TowerType.Laser, "Ignite", SkillNodeKind.Trunk, enabled: true),
-        new(LaserChain, TowerType.Laser, "Chain", SkillNodeKind.Seed, enabled: true),
-        new(LaserRampUp, TowerType.Laser, "Ramp-Up", SkillNodeKind.Seed, enabled: true),
+        new(LaserDps, TowerType.Laser, "DPS", SkillNodeKind.Trunk, enabled: true,
+            "+0.8 damage per second per rank (4 to 8 dps at rank 5)."),
+        new(LaserRange, TowerType.Laser, "Range", SkillNodeKind.Trunk, enabled: true,
+            "+0.5 range per rank (3 to 5.5 cells at rank 5)."),
+        new(LaserIgnite, TowerType.Laser, "Ignite", SkillNodeKind.Trunk, enabled: true,
+            "5% ignite chance per second per rank: 2 damage per second for 2s, ignoring armor."),
+        new(LaserChain, TowerType.Laser, "Chain", SkillNodeKind.Seed, enabled: true,
+            "Archetype: Chain. At tower rank 3 choose Chain to jump to 1 extra enemy per rank (at least 1) within 1.5 cells at 60% damage."),
+        new(LaserRampUp, TowerType.Laser, "Ramp-Up", SkillNodeKind.Seed, enabled: true,
+            "Archetype: Ramp-Up. At tower rank 3 choose Ramp-Up for +20% max damage per rank while holding a target for 2s (rank 5: +100%)."),
     };
+
+    /// <summary>
+    /// Player-facing description for a node id, or an empty string for an unknown id.
+    /// </summary>
+    public static string Description(string nodeId) => Find(nodeId)?.Description ?? string.Empty;
+
+    /// <summary>
+    /// Human-readable prerequisite hint for a still-locked node, e.g.
+    /// "Unlocks after Damage reaches rank 1." Returns null when the node has no
+    /// prerequisite (the first trunk node) or the id is unknown.
+    /// </summary>
+    public static string? UnlockHint(string nodeId)
+    {
+        var prerequisite = GetPrerequisite(nodeId);
+        if (prerequisite == null)
+            return null;
+
+        var def = Find(prerequisite);
+        if (def == null)
+            return null;
+
+        return $"Unlocks after {def.DisplayName} reaches rank {GameConstants.SkillUnlockRank}.";
+    }
 
     /// <summary>
     /// Finds a node definition by id, or null if the id is unknown.
