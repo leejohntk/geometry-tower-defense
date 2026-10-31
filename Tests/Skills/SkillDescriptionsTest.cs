@@ -14,17 +14,13 @@ namespace GeometryTowerDefense.Tests;
 public class SkillDescriptionsTest
 {
     [TestCase]
-    public void EveryNode_HasANonEmptyUniqueDescription()
+    public void EveryNode_HasANonEmptyDescription()
     {
-        var seen = new HashSet<string>();
-
+        // Player-facing text describes each node's own effect; identical wording (e.g.
+        // "+10% attack speed per rank.") is fine across different towers.
+        AssertThat(SkillTreeCatalog.All.Count).IsEqual(15);
         foreach (var node in SkillTreeCatalog.All)
-        {
             AssertThat(node.Description.Length).IsGreater(0);
-            AssertThat(seen.Add(node.Description)).IsTrue();
-        }
-
-        AssertThat(seen.Count).IsEqual(SkillTreeCatalog.All.Count);
     }
 
     [TestCase]
@@ -33,6 +29,18 @@ public class SkillDescriptionsTest
         foreach (var node in SkillTreeCatalog.All)
         {
             AssertThat(node.Description.ToLower().Contains("rank")).IsTrue();
+        }
+    }
+
+    [TestCase]
+    public void NoDescription_ContainsParentheticalInternals()
+    {
+        // Player-facing text never exposes internal calculation/window values.
+        AssertThat(SkillTreeCatalog.All.Count).IsEqual(15);
+        foreach (var node in SkillTreeCatalog.All)
+        {
+            AssertThat(node.Description.Contains('(')).IsFalse();
+            AssertThat(node.Description.Contains(')')).IsFalse();
         }
     }
 
@@ -49,6 +57,8 @@ public class SkillDescriptionsTest
             SkillTreeCatalog.LaserRampUp,
         };
 
+        // Every seed explains the rank-3 specialization relationship in
+        // non-parenthetical player-facing text.
         foreach (var id in seedIds)
         {
             string description = SkillTreeCatalog.Description(id);
@@ -64,16 +74,14 @@ public class SkillDescriptionsTest
         AssertThat(SkillTreeCatalog.Description(SkillTreeCatalog.ArrowPierce).Contains("1 enemy per rank")).IsTrue();
         // Crit: rank x 8% (at least 8% once specialized).
         AssertThat(SkillTreeCatalog.Description(SkillTreeCatalog.ArrowCritChance).Contains("8%")).IsTrue();
-        // Cluster: 1 + rank shells (at least 2 once specialized).
+        // Cluster: 1 + rank shells.
         AssertThat(SkillTreeCatalog.Description(SkillTreeCatalog.CannonCluster).Contains("1 + rank")).IsTrue();
-        AssertThat(SkillTreeCatalog.Description(SkillTreeCatalog.CannonCluster).Contains("at least 2")).IsTrue();
         // Stun: rank x 6%.
         AssertThat(SkillTreeCatalog.Description(SkillTreeCatalog.CannonStunChance).Contains("6%")).IsTrue();
         // Chain: one jump per effective rank (max(1, rank)).
         AssertThat(SkillTreeCatalog.Description(SkillTreeCatalog.LaserChain).Contains("1 extra enemy per rank")).IsTrue();
-        // Ramp: +20% max damage per rank (rank 5 = +100%).
+        // Ramp: +20% max damage per rank.
         AssertThat(SkillTreeCatalog.Description(SkillTreeCatalog.LaserRampUp).Contains("20%")).IsTrue();
-        AssertThat(SkillTreeCatalog.Description(SkillTreeCatalog.LaserRampUp).Contains("+100%")).IsTrue();
     }
 
     [TestCase]
@@ -81,17 +89,12 @@ public class SkillDescriptionsTest
     {
         string damage = SkillTreeCatalog.Description(SkillTreeCatalog.ArrowDamage);
         AssertThat(damage.Contains("+2")).IsTrue();
-        AssertThat(damage.Contains((GameConstants.ArrowTowerDamage + GameConstants.SkillMaxRanks * GameConstants.SkillArrowDamagePerRank).ToString())).IsTrue();
 
         string range = SkillTreeCatalog.Description(SkillTreeCatalog.ArrowRange);
         AssertThat(range.Contains("0.5")).IsTrue();
-        AssertThat(range.Contains((GameConstants.ArrowTowerRange + GameConstants.SkillMaxRanks * GameConstants.SkillArrowRangePerRank).ToString("0.0"))).IsTrue();
 
         string speed = SkillTreeCatalog.Description(SkillTreeCatalog.ArrowAttackSpeed);
         AssertThat(speed.Contains("10%")).IsTrue();
-        float rankFiveInterval = GameConstants.ArrowTowerFireRate
-            / (1f + GameConstants.SkillMaxRanks * GameConstants.SkillArrowAttackSpeedPerRank);
-        AssertThat(speed.Contains(rankFiveInterval.ToString("0.0"))).IsTrue();
     }
 
     [TestCase]
@@ -100,11 +103,9 @@ public class SkillDescriptionsTest
         string powder = SkillTreeCatalog.Description(SkillTreeCatalog.CannonPowderCharge);
         AssertThat(powder.Contains("+1 damage")).IsTrue();
         AssertThat(powder.Contains("10%")).IsTrue();
-        AssertThat(powder.Contains((GameConstants.CannonTowerDamage + GameConstants.SkillMaxRanks * GameConstants.SkillCannonPowderDamagePerRank).ToString())).IsTrue();
 
         string splash = SkillTreeCatalog.Description(SkillTreeCatalog.CannonSplashRadius);
         AssertThat(splash.Contains(GameConstants.SkillCannonSplashRadiusPerRank.ToString())).IsTrue();
-        AssertThat(splash.Contains((GameConstants.CannonTowerAoeRadius + GameConstants.SkillMaxRanks * GameConstants.SkillCannonSplashRadiusPerRank).ToString())).IsTrue();
     }
 
     [TestCase]
@@ -112,7 +113,6 @@ public class SkillDescriptionsTest
     {
         string dps = SkillTreeCatalog.Description(SkillTreeCatalog.LaserDps);
         AssertThat(dps.Contains("0.8")).IsTrue();
-        AssertThat(dps.Contains((GameConstants.LaserTowerDps + GameConstants.SkillMaxRanks * GameConstants.SkillLaserDpsPerRank).ToString("0.#"))).IsTrue();
 
         string ignite = SkillTreeCatalog.Description(SkillTreeCatalog.LaserIgnite);
         AssertThat(ignite.Contains("5%")).IsTrue();
@@ -125,7 +125,6 @@ public class SkillDescriptionsTest
 
         string ramp = SkillTreeCatalog.Description(SkillTreeCatalog.LaserRampUp);
         AssertThat(ramp.Contains("20%")).IsTrue();
-        AssertThat(ramp.Contains("+100%")).IsTrue();
     }
 
     [TestCase]

@@ -84,39 +84,39 @@ public static class SkillTreeCatalog
     {
         // Arrow Tower — Sharpshooter | Barrage
         new(ArrowDamage, TowerType.Arrow, "Damage", SkillNodeKind.Trunk, enabled: true,
-            "+2 damage per rank (rank 5: 20 damage)."),
+            "+2 damage per rank."),
         new(ArrowAttackSpeed, TowerType.Arrow, "Attack Speed", SkillNodeKind.Trunk, enabled: true,
-            "+10% attack speed per rank (fire interval 1.5s to 1.0s at rank 5)."),
+            "+10% attack speed per rank."),
         new(ArrowRange, TowerType.Arrow, "Range", SkillNodeKind.Trunk, enabled: true,
-            "+0.5 range per rank (4 to 6.5 cells at rank 5)."),
+            "+0.5 range per rank."),
         new(ArrowPierce, TowerType.Arrow, "Pierce", SkillNodeKind.Seed, enabled: true,
-            "Archetype: Pierce. At tower rank 3 choose Pierce to pass through 1 enemy per rank (at least 1) before the arrow is consumed."),
+            "Archetype: Pierce. At tower rank 3 choose Pierce to pass through 1 enemy per rank before the arrow is consumed."),
         new(ArrowCritChance, TowerType.Arrow, "Crit Chance", SkillNodeKind.Seed, enabled: true,
-            "Archetype: Crit. 8% crit chance per rank (at least 8% once specialized at tower rank 3); crits deal double damage."),
+            "Archetype: Crit. At tower rank 3 choose Crit for 8% crit chance per rank; crits deal double damage."),
 
         // Cannon Tower — Bombardier | Concussive
         new(CannonPowderCharge, TowerType.Cannon, "Powder Charge", SkillNodeKind.Trunk, enabled: true,
-            "+1 damage and +10% projectile speed per rank (15 to 20 damage at rank 5)."),
+            "+1 damage and +10% projectile speed per rank."),
         new(CannonAttackSpeed, TowerType.Cannon, "Attack Speed", SkillNodeKind.Trunk, enabled: true,
-            "+10% attack speed per rank (fire interval 2.5s to 1.67s at rank 5)."),
+            "+10% attack speed per rank."),
         new(CannonSplashRadius, TowerType.Cannon, "Splash Radius", SkillNodeKind.Trunk, enabled: true,
-            "+8 splash radius per rank (64 to 104 px at rank 5)."),
+            "+8 splash radius per rank."),
         new(CannonCluster, TowerType.Cannon, "Cluster", SkillNodeKind.Seed, enabled: true,
-            "Archetype: Cluster. At tower rank 3 choose Cluster to fire 1 + rank shells (at least 2) in a small fan."),
+            "Archetype: Cluster. At tower rank 3 choose Cluster to fire 1 + rank shells in a small fan."),
         new(CannonStunChance, TowerType.Cannon, "Stun Chance", SkillNodeKind.Seed, enabled: true,
-            "Archetype: Stun. 6% stun chance per rank (at least 6% once specialized at tower rank 3) for 1s."),
+            "Archetype: Stun. At tower rank 3 choose Stun for 6% stun chance per rank for 1s."),
 
         // Laser Tower — Arc/Chain | Melter
         new(LaserDps, TowerType.Laser, "DPS", SkillNodeKind.Trunk, enabled: true,
-            "+0.8 damage per second per rank (4 to 8 dps at rank 5)."),
+            "+0.8 damage per second per rank."),
         new(LaserRange, TowerType.Laser, "Range", SkillNodeKind.Trunk, enabled: true,
-            "+0.5 range per rank (3 to 5.5 cells at rank 5)."),
+            "+0.5 range per rank."),
         new(LaserIgnite, TowerType.Laser, "Ignite", SkillNodeKind.Trunk, enabled: true,
             "5% ignite chance per second per rank: 2 damage per second for 2s, ignoring armor."),
         new(LaserChain, TowerType.Laser, "Chain", SkillNodeKind.Seed, enabled: true,
-            "Archetype: Chain. At tower rank 3 choose Chain to jump to 1 extra enemy per rank (at least 1) within 1.5 cells at 60% damage."),
+            "Archetype: Chain. At tower rank 3 choose Chain to jump to 1 extra enemy per rank within 1.5 cells at 60% damage."),
         new(LaserRampUp, TowerType.Laser, "Ramp-Up", SkillNodeKind.Seed, enabled: true,
-            "Archetype: Ramp-Up. At tower rank 3 choose Ramp-Up for +20% max damage per rank while holding a target for 2s (rank 5: +100%)."),
+            "Archetype: Ramp-Up. At tower rank 3 choose Ramp-Up for +20% max damage per rank while holding a target for 2s."),
     };
 
     /// <summary>
