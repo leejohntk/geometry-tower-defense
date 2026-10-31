@@ -278,6 +278,183 @@ public static class GameConstants
     public static readonly Color CannonExplosionFillColor = new Color(0.3f, 0.6f, 0.4f);    // matches cannon range color
     public static readonly Color CannonExplosionOutlineColor = new Color(0.1f, 0.25f, 0.15f); // matches cannon tower outline
 
+    // === Visual overhaul (presentation only) =====================================
+
+    // Enemy silhouettes. Sides = 0 means a circle; any other value is a regular
+    // polygon with that many sides. Spin and pulse are applied as node transforms
+    // (Rotation / Scale), never as per-frame redraws.
+    public const int EnemySwarmSides = 3;
+    public const int EnemyArmoredSides = 4;
+    public const int EnemyProgenitorSides = 8;
+    public const float EnemySwarmSpinSpeed = 1.4f;          // radians/sec
+    public const float EnemyBasicPulseAmplitude = 0.045f;   // scale delta around 1
+    public const float EnemyBasicPulseSpeed = 3.2f;         // radians/sec
+    public const float EnemyBasicInnerRingRatio = 0.52f;    // x outer radius
+    public const float EnemySilhouetteStrokeWidth = 2f;
+    public const float EnemyArmoredInsetRatio = 0.62f;      // inner border, x radius
+    public const float EnemyArmoredRivetRadius = 2.5f;
+    public const float EnemyProgenitorOuterRingScale = 1.16f; // x octagon radius
+    public const float EnemyProgenitorOuterRingWidth = 1.5f;
+    public const float EnemyProgenitorOuterRingSpinSpeed = -0.8f; // rad/sec, counter-rotating
+
+    // Normal (non-crit) hit feedback. Deliberately weaker and shorter than the white
+    // crit flash (HitFlashDuration 0.1s at strength 0.6), and distinct from the hot
+    // yellow burn-proc flash: a normal hit is a short, faint brighten plus a scale pop.
+    public const float EnemyHitPulseDuration = 0.07f;       // seconds
+    public const float EnemyHitPulseStrength = 0.25f;       // lerp toward white
+    public const float EnemyHitPulseScale = 0.08f;          // extra scale at the pop peak
+
+    // Death burst: pooled expanding shards at a kill position, colored with the
+    // enemy's fill. Shard counts scale with kind; the boss radius is > 2x basic.
+    public const float DeathBurstDuration = 0.38f;          // seconds
+    public const float DeathBurstBasicRadius = 26f;
+    public const float DeathBurstSwarmRadius = 18f;
+    public const float DeathBurstArmoredRadius = 30f;
+    public const float DeathBurstProgenitorRadius = 60f;
+    public const int DeathBurstBasicShards = 6;
+    public const int DeathBurstSwarmShards = 4;
+    public const int DeathBurstArmoredShards = 8;
+    public const int DeathBurstProgenitorShards = 16;
+    public const float DeathBurstShardWidth = 3f;
+    public const float DeathBurstInnerRadiusRatio = 0.25f;
+    public const int DeathBurstPoolSize = 16;
+
+    // Per-type tower palette: the arrow blue, cannon green, and laser magenta used by
+    // the world bodies, range rings, and UI tower glyphs. One source of truth so the
+    // field and its icons never drift apart.
+    public static readonly Color ArrowTowerFillColor = new Color(0.2f, 0.5f, 1f);
+    public static readonly Color ArrowTowerOutlineColor = new Color(0.05f, 0.1f, 0.4f);
+    public static readonly Color CannonTowerFillColor = new Color(0.3f, 0.6f, 0.4f);
+    public static readonly Color CannonTowerOutlineColor = new Color(0.1f, 0.25f, 0.15f);
+    public static readonly Color LaserTowerFillColor = new Color(0.8f, 0.3f, 1f);
+    public static readonly Color LaserTowerOutlineColor = new Color(0.4f, 0.1f, 0.6f);
+
+    // Tower aim and fire feedback. Aim rotates toward the target at a capped angular
+    // speed instead of snapping; every successful shot kicks a short recoil.
+    public const float TowerAimAngularSpeed = 8f;           // radians/sec cap
+    public const float TowerShotRecoilDuration = 0.12f;     // seconds
+    public const float TowerRecoilDistance = 6f;            // px along the aim axis
+    public const float TowerBowFlashRadius = 30f;           // arrow bow arc radius (just past the tip)
+    public const float TowerBowFlashWidth = 2f;
+    public static readonly Color TowerBowFlashColor = new Color(0.88f, 0.94f, 1f);
+
+    // Laser emitter firing pulse while the beam is active (transform only).
+    public const float LaserEmitterPulseAmplitude = 0.05f;
+    public const float LaserEmitterPulseSpeed = 7f;
+
+    // Laser impact glow: a small ring at the beam endpoint (and smaller rings at chain
+    // endpoints) that follows the target and fades with the ramp. Never drawn idle.
+    public const float LaserImpactGlowRadius = 9f;
+    public const float LaserImpactGlowStroke = 2f;
+    public const float LaserChainImpactGlowScale = 0.6f;
+    public const float LaserImpactGlowAlphaMin = 0.45f;
+    public const float LaserImpactGlowAlphaMax = 0.95f;
+    public static readonly Color LaserImpactGlowColor = new Color(1f, 0.65f, 1f);
+
+    // Projectile trails. Visual only: they never collide or feed back into movement.
+    public const int ArrowTrailSegments = 3;                // 3 segments = 4 samples
+    public const float ArrowTrailLifetime = 0.12f;          // seconds
+    public const float ArrowTrailWidth = 3f;
+    public static readonly Color ArrowTrailColor = new Color(1f, 0.9f, 0.2f);
+    public const int CannonTrailPuffs = 4;
+    public const float CannonTrailLifetime = 0.2f;          // seconds
+    public const float CannonTrailPuffRadius = 4.5f;
+    public static readonly Color CannonTrailColor = new Color(0.24f, 0.32f, 0.26f);
+
+    // Cannon explosion extra detail: an inner shockwave ring and radial debris spokes,
+    // drawn inside the unchanged RadiusAt / AlphaAt envelope.
+    public const float CannonExplosionInnerRingScale = 0.62f;
+    public const float CannonExplosionInnerRingWidth = 1.5f;
+    public const int CannonExplosionSpokes = 6;
+    public const float CannonExplosionSpokeInnerRatio = 0.35f;
+    public const float CannonExplosionSpokeWidth = 1.5f;
+    public const float CannonExplosionSpokeLengthRatio = 1.14f; // x radius at full expansion
+
+    // Spawn portals and base core: background markers that render below gameplay and
+    // never intercept input. Low fill alpha keeps them clearly behind the action.
+    public static readonly Color SpawnPortalFillColor = new Color(0.5f, 0.05f, 0.02f, 0.22f);
+    public static readonly Color SpawnPortalRingColor = new Color(0.8f, 0.18f, 0.08f, 0.85f);
+    public static readonly Color SpawnPortalArcColor = new Color(1f, 0.42f, 0.12f, 0.9f);
+    public static readonly Color SpawnPortalCoreColor = new Color(1f, 0.55f, 0.2f, 0.9f);
+    public const float SpawnPortalOuterRadiusRatio = 0.4f;   // x cell size
+    public const float SpawnPortalInnerRadiusRatio = 0.24f;
+    public const float SpawnPortalCoreRadiusRatio = 0.1f;
+    public const float SpawnPortalRotationSpeed = 0.7f;     // radians/sec
+    public const float SpawnPortalPulseAmplitude = 0.04f;
+    public const float SpawnPortalPulseSpeed = 2.4f;
+    public const int SpawnPortalArcSegments = 24;
+    public static readonly Color BaseCoreFillColor = new Color(1f, 0.88f, 0.4f, 0.28f);
+    public static readonly Color BaseCoreStrokeColor = new Color(1f, 0.9f, 0.5f, 0.9f);
+    public static readonly Color BaseCoreShieldColor = new Color(1f, 0.98f, 0.85f, 0.75f);
+    public const float BaseCoreHexRadiusRatio = 0.28f;       // x cell size
+    public const float BaseCoreShieldRadiusRatio = 0.4f;
+    public const float BaseCorePulseAmplitude = 0.05f;
+    public const float BaseCorePulseSpeed = 1.8f;
+
+    // HUD tower placement cards. Buttons keep their node names/paths and signals;
+    // only their content and size change.
+    public const float SidebarCardWidth = 160f;
+    public const float SidebarCardHeight = 72f;
+    public const float SidebarCardGap = 8f;
+    // Start below the HUD top bar so no card overlaps it.
+    public const float SidebarCardTop = TopBarHeight + 8f;
+    public const float SidebarCardIconSize = 36f;
+    public const float SidebarCardIconInset = 10f;
+    public const float SidebarCardTextX = 54f;
+    public const float SidebarStartWaveGap = 12f;
+    public static readonly Color SidebarCardCostColor = new Color(1f, 0.9f, 0.2f);
+    public static readonly Color SidebarCardDisabledModulate = new Color(0.42f, 0.42f, 0.48f, 0.85f);
+
+    // Skill tree decoration.
+    public const float SkillTreeLineGlowWidth = 8f;
+    public const float SkillTreeLineGlowAlpha = 0.18f;
+    public const float SkillTreeLineCoreWidth = 2.5f;
+    public const float SkillTreeHaloRadius = 19.5f;         // inside the 46x46 icon box
+    public const float SkillTreeHaloWidth = 2.5f;
+    public const float SkillTreeGlyphRadius = 13f;
+    public const float SkillTreeHoverBrightness = 1.2f;
+    public const float SkillTreeIdlePulseAmplitude = 0.05f;
+    public const float SkillTreeIdlePulseSpeed = 1.6f;
+    public const float SkillTreeBackdropDotSpacing = 40f;
+    public const float SkillTreeBackdropSpineGlowWidth = 60f;
+    public const float SkillTreeHoverBandAlpha = 0.14f;
+    public static readonly Color SkillTreeLockedColor = new Color(0.3f, 0.3f, 0.35f);
+    public static readonly Color SkillTreeMaxColor = new Color(1f, 0.82f, 0.2f);
+    public static readonly Color SkillTreeBackdropDotColor = new Color(0.45f, 0.55f, 0.9f, 0.07f);
+
+    // Skill info band (bottom of the skill-tree screen). The idle hint is shown until
+    // a row is hovered.
+    public const string SkillInfoIdleHint = "Hover a skill to see its description.";
+    public const float SkillInfoBandHeight = 104f;
+    public const float SkillInfoBandBottomMargin = 12f;
+    public static readonly Color SkillInfoPanelColor = new Color(0.06f, 0.06f, 0.14f, 0.95f);
+    public static readonly Color SkillInfoPanelBorderColor = new Color(0.3f, 0.35f, 0.6f, 0.9f);
+    public static readonly Color SkillInfoNameColor = new Color(0.95f, 0.97f, 1f);
+    public static readonly Color SkillInfoRankColor = new Color(1f, 0.85f, 0.3f);
+    public static readonly Color SkillInfoDescriptionColor = new Color(0.72f, 0.75f, 0.88f);
+    public static readonly Color SkillInfoLockedHintColor = new Color(1f, 0.62f, 0.45f);
+
+    // Title screen backdrop and menu decorations.
+    public const float TitleBackdropRotationSpeed = 0.06f;  // radians/sec
+    public const float TitleBackdropPulseSpeed = 0.8f;
+    public const float TitleBackdropDriftAmplitude = 18f;
+    public const float TitleBackdropDriftSpeed = 0.25f;
+    public const float TitleBackdropRingRadiusRatio = 0.42f;
+    public static readonly Color TitleBackdropLineColor = new Color(0.35f, 0.45f, 0.8f, 0.12f);
+    public static readonly Color TitleBackdropGlowColor = new Color(0.25f, 0.4f, 0.9f, 0.10f);
+    public static readonly Color TitleBackdropDotColor = new Color(0.5f, 0.6f, 0.95f, 0.2f);
+    public static readonly Color TitleOrnamentColor = new Color(0.5f, 0.65f, 1f, 0.65f);
+
+    // Result backdrops. The intro animation runs once and settles (no endless loop).
+    public const float ResultBackdropDuration = 1.4f;       // seconds
+    public const int ResultBackdropRings = 3;
+    public const int ResultBackdropShardCount = 14;
+    public static readonly Color VictoryBackdropGold = new Color(1f, 0.82f, 0.25f, 0.9f);
+    public static readonly Color VictoryBackdropWhite = new Color(1f, 0.98f, 0.85f, 0.85f);
+    public static readonly Color DefeatBackdropRed = new Color(0.95f, 0.25f, 0.15f, 0.9f);
+    public static readonly Color DefeatBackdropOrange = new Color(1f, 0.5f, 0.1f, 0.8f);
+    public static readonly Color ResultVignetteColor = new Color(0f, 0f, 0f, 0.5f);
+
     // World pixel dimensions
     public static int PlayAreaWidth => GridCols * CellSize;
     public static int PlayAreaHeight => GridRows * CellSize;

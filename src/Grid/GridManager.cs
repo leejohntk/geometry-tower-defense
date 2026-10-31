@@ -19,6 +19,13 @@ public partial class GridManager : Node2D
 
     private LevelDefinition? _level;
 
+    // Procedural spawn portals (one per level spawn cell) and the base core marker.
+    // These live in presentation-only Controls with MouseFilter = Ignore; they never
+    // block placement, pathing, clicks, or targeting.
+    private readonly List<Control> _spawnPortals = new();
+    private Control? _baseCore;
+    private float _markerPhase = 0f;
+
     // Placement preview nodes
     private ColorRect? _previewHighlight;
     private Polygon2D? _previewTower;
@@ -183,64 +190,179 @@ public partial class GridManager : Node2D
         // Configure(level) runs before _Ready, so _level is always set here.
         var level = _level!;
 
-        // One spawn indicator per route spawn cell.
+        _spawnPortals.Clear();
+
+        // One procedural portal per route spawn cell.
         foreach (var spawnCell in level.SpawnCells)
-            CreateSpawnIndicator(spawnCell);
+            CreateSpawnPortal(spawnCell);
 
-        Vector2I baseCell = level.BaseCell;
-
-        // House/base indicator on the base cell
-        float houseX = GameConstants.CellCenterX(baseCell.X);
-        float houseY = GameConstants.CellCenterY(baseCell.Y);
-
-        // House body
-        var houseBody = new ColorRect();
-        houseBody.Size = new Vector2(GameConstants.CellSize, GameConstants.CellSize);
-        houseBody.Position = new Vector2(houseX - GameConstants.CellSize / 2f, houseY - GameConstants.CellSize / 2f);
-        houseBody.Color = new Color(0.9f, 0.4f, 0.2f, 0.6f);
-        AddChild(houseBody);
-
-        // House roof (triangle)
-        var roofPoints = new Vector2[]
-        {
-            new Vector2(houseX, houseY - GameConstants.CellSize / 2f - 16),      // Peak
-            new Vector2(houseX - GameConstants.CellSize / 2f, houseY - GameConstants.CellSize / 2f), // Bottom left
-            new Vector2(houseX + GameConstants.CellSize / 2f, houseY - GameConstants.CellSize / 2f)  // Bottom right
-        };
-        var roof = new Polygon2D();
-        roof.Polygon = roofPoints;
-        roof.Color = new Color(0.8f, 0.2f, 0.1f, 0.8f);
-        AddChild(roof);
-
-        // Base label
-        var baseLabel = new Label();
-        baseLabel.Text = "BASE";
-        baseLabel.Position = new Vector2(houseX - 20, houseY - 8);
-        baseLabel.AddThemeColorOverride("font_color", new Color(1f, 0.8f, 0.5f, 0.8f));
-        baseLabel.Scale = new Vector2(0.7f, 0.7f);
-        AddChild(baseLabel);
+        CreateBaseCore(level.BaseCell);
     }
 
-    private void CreateSpawnIndicator(Vector2I spawnCell)
+    /// <summary>
+    /// Builds the rotating spawn portal for one spawn cell: a low-alpha fill, two
+    /// concentric arcs in a dark red/orange palette, and a small core. The whole
+    /// control is rotated/pulsed by <see cref="_Process"/> (transform only), and it is
+    /// click-through and background-layered.
+    /// </summary>
+    private void CreateSpawnPortal(Vector2I spawnCell)
     {
-        // Spawn zone indicator on the spawn cell
-        var spawnZone = new ColorRect();
-        spawnZone.Size = new Vector2(GameConstants.CellSize, GameConstants.CellSize);
-        spawnZone.Position = new Vector2(spawnCell.X * GameConstants.CellSize, spawnCell.Y * GameConstants.CellSize);
-        spawnZone.Color = new Color(1f, 0.2f, 0.2f, 0.15f);
-        AddChild(spawnZone);
+        const float cell = GameConstants.CellSize;
+        float radius = cell / 2f;
 
-        // Spawn label
-        var spawnLabel = new Label();
-        spawnLabel.Text = "SPAWN";
-        spawnLabel.Position = new Vector2(
-            GameConstants.CellCenterX(spawnCell.X) - 25,
-            GameConstants.CellCenterY(spawnCell.Y) - 8
-        );
-        spawnLabel.AddThemeColorOverride("font_color", new Color(1f, 0.5f, 0.5f, 0.6f));
-        spawnLabel.Scale = new Vector2(0.7f, 0.7f);
-        AddChild(spawnLabel);
+        var portal = new Control();
+        portal.Name = $"SpawnPortal_{spawnCell.X}_{spawnCell.Y}";
+        portal.Position = new Vector2(
+            spawnCell.X * GameConstants.CellSize,
+            spawnCell.Y * GameConstants.CellSize);
+        portal.Size = new Vector2(cell, cell);
+        portal.PivotOffset = new Vector2(radius, radius);
+        portal.MouseFilter = Control.MouseFilterEnum.Ignore;
+        // A negative z-index keeps the marker below enemies and towers.
+        portal.ZIndex = -1;
+        portal.Draw += () =>
+        {
+            if (!IsInstanceValid(portal)) return;
+
+            var center = new Vector2(radius, radius);
+            float outer = cell * GameConstants.SpawnPortalOuterRadiusRatio;
+            float inner = cell * GameConstants.SpawnPortalInnerRadiusRatio;
+            float core = cell * GameConstants.SpawnPortalCoreRadiusRatio;
+
+            portal.DrawCircle(center, outer, GameConstants.SpawnPortalFillColor);
+            portal.DrawCircle(
+                center,
+                outer,
+                GameConstants.SpawnPortalRingColor,
+                false,
+                2f);
+
+            // Two concentric arcs: rotation makes them sweep, so the marker reads as
+            // alive without a per-frame repaint.
+            portal.DrawArc(
+                center,
+                outer * 0.82f,
+                -Mathf.Pi / 2f,
+                Mathf.Pi / 2f,
+                GameConstants.SpawnPortalArcSegments,
+                GameConstants.SpawnPortalArcColor,
+                2f,
+                antialiased: true);
+            portal.DrawArc(
+                center,
+                inner,
+                Mathf.Pi / 2f,
+                Mathf.Tau,
+                GameConstants.SpawnPortalArcSegments,
+                GameConstants.SpawnPortalRingColor,
+                1.5f,
+                antialiased: true);
+
+            portal.DrawCircle(center, core, GameConstants.SpawnPortalCoreColor);
+        };
+
+        AddChild(portal);
+        _spawnPortals.Add(portal);
     }
+
+    /// <summary>
+    /// Builds the base marker: a gold/white hexagonal core inside one shield ring.
+    /// Pulsing is a scale transform driven by <see cref="_Process"/>; it is
+    /// click-through and background-layered.
+    /// </summary>
+    private void CreateBaseCore(Vector2I baseCell)
+    {
+        const float cell = GameConstants.CellSize;
+        float radius = cell / 2f;
+
+        // Precompute the hexagon and its closed outline once; the draw closure only
+        // consumes them, so a repaint never allocates.
+        var center = new Vector2(radius, radius);
+        float hexRadius = cell * GameConstants.BaseCoreHexRadiusRatio;
+        float shieldRadius = cell * GameConstants.BaseCoreShieldRadiusRatio;
+        var hex = new Vector2[6];
+        var hexOutline = new Vector2[7];
+        for (int i = 0; i < hex.Length; i++)
+        {
+            float angle = Mathf.Tau * i / hex.Length;
+            hex[i] = center + new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * hexRadius;
+            hexOutline[i] = hex[i];
+        }
+        hexOutline[hex.Length] = hex[0];
+
+        _baseCore = new Control();
+        _baseCore.Name = "BaseCore";
+        _baseCore.Position = new Vector2(
+            baseCell.X * GameConstants.CellSize,
+            baseCell.Y * GameConstants.CellSize);
+        _baseCore.Size = new Vector2(cell, cell);
+        _baseCore.PivotOffset = new Vector2(radius, radius);
+        _baseCore.MouseFilter = Control.MouseFilterEnum.Ignore;
+        _baseCore.ZIndex = -1;
+        _baseCore.Draw += () =>
+        {
+            if (_baseCore == null || !IsInstanceValid(_baseCore)) return;
+
+            _baseCore.DrawColoredPolygon(hex, GameConstants.BaseCoreFillColor);
+            _baseCore.DrawPolyline(
+                hexOutline,
+                GameConstants.BaseCoreStrokeColor,
+                2f,
+                antialiased: true);
+
+            // One shield ring.
+            _baseCore.DrawCircle(
+                center,
+                shieldRadius,
+                GameConstants.BaseCoreShieldColor,
+                false,
+                1.5f);
+            _baseCore.DrawCircle(center, hexRadius * 0.35f, GameConstants.BaseCoreShieldColor);
+        };
+
+        AddChild(_baseCore);
+    }
+
+    /// <summary>
+    /// Idle marker animation: portal spin and gentle scale pulses, all as transforms.
+    /// No marker repaints per frame.
+    /// </summary>
+    public override void _Process(double delta)
+    {
+        if (!(delta > 0f))
+            return;
+
+        _markerPhase += (float)delta;
+
+        if (_spawnPortals.Count > 0)
+        {
+            float rotation = _markerPhase * GameConstants.SpawnPortalRotationSpeed;
+            float scale = 1f + GameConstants.SpawnPortalPulseAmplitude
+                * Mathf.Sin(_markerPhase * GameConstants.SpawnPortalPulseSpeed);
+            var pulse = new Vector2(scale, scale);
+            for (int i = 0; i < _spawnPortals.Count; i++)
+            {
+                var portal = _spawnPortals[i];
+                if (portal == null || !IsInstanceValid(portal))
+                    continue;
+                portal.Rotation = rotation;
+                portal.Scale = pulse;
+            }
+        }
+
+        if (_baseCore != null && IsInstanceValid(_baseCore))
+        {
+            float scale = 1f + GameConstants.BaseCorePulseAmplitude
+                * Mathf.Sin(_markerPhase * GameConstants.BaseCorePulseSpeed);
+            _baseCore.Scale = new Vector2(scale, scale);
+        }
+    }
+
+    /// <summary>Read-only view of the spawn portals for tests (one per spawn cell).</summary>
+    public IReadOnlyList<Control> SpawnPortals => _spawnPortals;
+
+    /// <summary>The base core marker, or null before _Ready.</summary>
+    public Control? BaseCore => _baseCore;
 
     // === Placement Preview ===
 

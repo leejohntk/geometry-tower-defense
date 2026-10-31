@@ -12,6 +12,14 @@ public abstract partial class Tower : Node2D
     private Control? _rangeIndicator;
     private Control? _rankBadge;
 
+    // Aim/recoil presentation. The aim angle is purely visual: it is derived from the
+    // live target and never feeds back into targeting, range checks, or damage. It is
+    // animated toward the desired angle at a capped angular speed (no snapping) and
+    // eases back to DefaultAimAngle when there is no valid target.
+    private float _aimAngle = 0f;
+    private bool _aimSeeded = false;
+    private float _recoilRemaining = 0f;
+
     /// <summary>
     /// Grid row position of this tower.
     /// </summary>
@@ -81,6 +89,69 @@ public abstract partial class Tower : Node2D
     /// </summary>
     public float RangeCells =>
         TowerUpgrades.RangeCells(SkillStats.RangeCells(Type, _skillState), Rank);
+
+    /// <summary>
+    /// Current visual aim angle in radians. Read-only so aim behavior is testable
+    /// without reading pixels. Before the first placement it reports the tower's
+    /// default orientation.
+    /// </summary>
+    public float AimAngle => _aimSeeded ? _aimAngle : DefaultAimAngle;
+
+    /// <summary>
+    /// The angle the aim is easing toward this frame: the current target's direction
+    /// when one is alive and in range, otherwise the tower's default orientation.
+    /// </summary>
+    public float DesiredAimAngle
+    {
+        get
+        {
+            var target = CurrentTarget;
+            if (target == null || target.IsDead || !IsTargetInRange(target))
+                return DefaultAimAngle;
+
+            Vector2 toTarget = target.Position - Position;
+            if (toTarget.LengthSquared() < 0.0001f)
+                return DefaultAimAngle;
+
+            return Mathf.Atan2(toTarget.Y, toTarget.X);
+        }
+    }
+
+    /// <summary>
+    /// The orientation this tower rests at when it has no target. Arrow points up
+    /// (its triangle is drawn tip-up); cannon and laser point right (+X).
+    /// </summary>
+    public virtual float DefaultAimAngle => 0f;
+
+    /// <summary>True while the short per-shot recoil cue is playing.</summary>
+    public bool IsRecoiling => _recoilRemaining > 0f;
+
+    /// <summary>
+    /// Recoil cue progress (1 at the shot, decaying to 0). Transform-only: variants
+    /// offset their body, never this tower's Position.
+    /// </summary>
+    public float RecoilProgress => GameConstants.TowerShotRecoilDuration > 0f
+        ? Mathf.Clamp(_recoilRemaining / GameConstants.TowerShotRecoilDuration, 0f, 1f)
+        : 0f;
+
+    /// <summary>
+    /// Moves <paramref name="current"/> toward <paramref name="target"/> by at most
+    /// <paramref name="maxStep"/> radians, taking the shortest way around the circle.
+    /// Pure, so the capped-approach contract is testable without a tower.
+    /// </summary>
+    public static float ApproachAngle(float current, float target, float maxStep)
+    {
+        if (!float.IsFinite(current))
+            return float.IsFinite(target) ? target : 0f;
+        if (!float.IsFinite(target) || !(maxStep > 0f))
+            return current;
+
+        float delta = Mathf.Wrap(target - current, -Mathf.Pi, Mathf.Pi);
+        if (Mathf.Abs(delta) <= maxStep)
+            return target;
+
+        return current + Mathf.Sign(delta) * maxStep;
+    }
 
     /// <summary>
     /// Multiplier applied to projectile speed at launch. Base is 1.0; the cannon's
@@ -243,6 +314,12 @@ public abstract partial class Tower : Node2D
             GameConstants.CellCenterX(gridCol),
             GameConstants.CellCenterY(gridRow)
         );
+
+        // A freshly placed tower starts at its resting orientation with no recoil.
+        _aimAngle = DefaultAimAngle;
+        _aimSeeded = true;
+        _recoilRemaining = 0f;
+        OnAimUpdated();
     }
 
     /// <summary>
@@ -276,6 +353,11 @@ public abstract partial class Tower : Node2D
         _fireCooldownTimer = FireRate;
         targetPos = target.Position;
 
+        // Every successful shot kicks a short recoil cue. It is separate from the
+        // cannon's cluster-only MuzzleFlash, so a single shell still fires visually
+        // without ever setting IsMuzzleFlashing.
+        _recoilRemaining = GameConstants.TowerShotRecoilDuration;
+
         // Let variants layer fire-time presentation on a successful shot (the shot
         // itself is spawned by GameManager from the returned target position).
         OnFired(targetPos);
@@ -288,6 +370,14 @@ public abstract partial class Tower : Node2D
     /// Default is a no-op; variants override it for fire-time feedback.
     /// </summary>
     protected virtual void OnFired(Vector2 targetPos)
+    {
+    }
+
+    /// <summary>
+    /// Called after the aim angle advances (and from Initialize). Variants sync their
+    /// body transforms here; the default is a no-op.
+    /// </summary>
+    protected virtual void OnAimUpdated()
     {
     }
 
@@ -434,11 +524,37 @@ public abstract partial class Tower : Node2D
 
     public override void _Process(double delta)
     {
+        // Cooldown behavior is untouched: this is the only place it is advanced.
         if (_fireCooldownTimer > 0f)
         {
             _fireCooldownTimer -= (float)delta;
             if (_fireCooldownTimer < 0f)
                 _fireCooldownTimer = 0f;
         }
+
+        UpdateAim((float)delta);
+    }
+
+    /// <summary>
+    /// Eases the visual aim toward <see cref="DesiredAimAngle"/> at the capped angular
+    /// speed and decays the recoil cue. Never writes Position or any stat.
+    /// </summary>
+    private void UpdateAim(float delta)
+    {
+        if (!_aimSeeded)
+        {
+            _aimAngle = DefaultAimAngle;
+            _aimSeeded = true;
+        }
+
+        if (delta > 0f && _recoilRemaining > 0f)
+            _recoilRemaining = Mathf.Max(0f, _recoilRemaining - delta);
+
+        _aimAngle = ApproachAngle(
+            _aimAngle,
+            DesiredAimAngle,
+            GameConstants.TowerAimAngularSpeed * Mathf.Max(0f, delta));
+
+        OnAimUpdated();
     }
 }

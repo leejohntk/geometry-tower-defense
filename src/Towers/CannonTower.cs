@@ -42,7 +42,12 @@ public partial class CannonTower : Tower
     /// trunk-only stat: the per-rank range bonus never touches the splash radius.
     /// </summary>
     public override float SplashRadius => SkillStats.CannonSplashRadius(SkillRank(SkillTreeCatalog.CannonSplashRadius));
-    protected override Color RangeColor => new Color(0.3f, 0.6f, 0.4f);
+    protected override Color RangeColor => GameConstants.CannonTowerFillColor;
+
+    /// <summary>
+    /// The cannon's barrel is drawn along +X, so its resting aim points right.
+    /// </summary>
+    public override float DefaultAimAngle => 0f;
 
     // Cluster muzzle-flash state (presentation only). The flash lives on this node:
     // a Control that draws a ring + spikes, repainted only while the short timer runs.
@@ -52,6 +57,7 @@ public partial class CannonTower : Tower
     // The tower's own procedural body. Its silhouette branches on the chosen
     // archetype (lobed cluster or shockwave rings); there is no separate overlay.
     private Control? _body;
+    private Vector2 _bodyBasePosition;
 
     /// <summary>
     /// True while the cluster volley's muzzle flash is playing.
@@ -62,10 +68,14 @@ public partial class CannonTower : Tower
     {
         float cell = GameConstants.CellSize;
 
+        _bodyBasePosition = new Vector2(-cell / 2f, -cell / 2f);
         _body = new Control();
         _body.Name = "CannonBody";
         _body.Size = new Vector2(cell, cell);
-        _body.Position = new Vector2(-cell / 2f, -cell / 2f);
+        _body.Position = _bodyBasePosition;
+        // Rotate around the cell centre so the barrel reflects the aim direction
+        // without moving the tower's simulation position.
+        _body.PivotOffset = new Vector2(cell / 2f, cell / 2f);
         _body.MouseFilter = Control.MouseFilterEnum.Ignore;
         _body.Draw += DrawBody;
         AddChild(_body);
@@ -82,11 +92,30 @@ public partial class CannonTower : Tower
         _muzzleFlash.Visible = false;
         _muzzleFlash.Draw += DrawMuzzleFlash;
         AddChild(_muzzleFlash);
+
+        OnAimUpdated();
     }
 
     protected override void OnArchetypeChanged()
     {
         _body?.QueueRedraw();
+    }
+
+    /// <summary>
+    /// Applies the aim/recoil transforms: the whole body rotates to the aim angle and
+    /// kicks back along the aim axis while the recoil cue runs. Every shot recoils,
+    /// independent of the cluster-only MuzzleFlash. Never writes Position.
+    /// </summary>
+    protected override void OnAimUpdated()
+    {
+        if (_body == null || !IsInstanceValid(_body))
+            return;
+
+        _body.Rotation = AimAngle - DefaultAimAngle;
+
+        float recoil = GameConstants.TowerRecoilDistance * RecoilProgress;
+        var aim = new Vector2(Mathf.Cos(AimAngle), Mathf.Sin(AimAngle));
+        _body.Position = _bodyBasePosition - aim * recoil;
     }
 
     /// <summary>
@@ -102,8 +131,8 @@ public partial class CannonTower : Tower
         float cell = GameConstants.CellSize;
         float radius = cell / 2f - 4f;
         Vector2 center = new(cell / 2f, cell / 2f);
-        var fill = new Color(0.3f, 0.6f, 0.4f);
-        var outline = new Color(0.1f, 0.25f, 0.15f);
+        Color fill = GameConstants.CannonTowerFillColor;
+        Color outline = GameConstants.CannonTowerOutlineColor;
 
         switch (Archetype)
         {
@@ -119,7 +148,20 @@ public partial class CannonTower : Tower
             default:
                 _body.DrawCircle(center, radius, fill);
                 _body.DrawCircle(center, radius, outline, false, 2f);
-                _body.DrawCircle(center, radius * 0.4f, new Color(0.12f, 0.28f, 0.17f));
+                // Directional barrel along +X: body rotation turns it toward the aim.
+                float barrelLength = radius * 0.95f;
+                float barrelHalfHeight = radius * 0.24f;
+                var barrel = new Rect2(
+                    center.X,
+                    center.Y - barrelHalfHeight,
+                    barrelLength,
+                    barrelHalfHeight * 2f);
+                _body.DrawRect(barrel, new Color(0.12f, 0.28f, 0.17f));
+                _body.DrawRect(barrel, outline, filled: false, width: 2f);
+                _body.DrawCircle(
+                    new Vector2(center.X + barrelLength, center.Y),
+                    barrelHalfHeight * 0.85f,
+                    new Color(0.08f, 0.2f, 0.12f));
                 break;
         }
     }

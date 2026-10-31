@@ -30,6 +30,80 @@ public partial class CannonProjectile : Projectile
     /// </summary>
     public float ExplosionDamage => _damage;
 
+    // Smoke puffs behind the cannonball. Pre-created once per pooled shell; each frame
+    // only transform/modulate is written, never a redraw and never an allocation.
+    private readonly Polygon2D[] _smokePuffs = new Polygon2D[GameConstants.CannonTrailPuffs];
+    private int _lastSmokeVersion = -1;
+
+    protected override void BuildTrailVisual()
+    {
+        var puffPolygon = BuildCirclePolygon(GameConstants.CannonTrailPuffRadius, 12);
+        for (int i = 0; i < _smokePuffs.Length; i++)
+        {
+            var puff = new Polygon2D();
+            puff.Name = $"SmokePuff_{i}";
+            puff.Polygon = puffPolygon;
+            puff.Color = GameConstants.CannonTrailColor;
+            // World-space samples, like the arrow trail.
+            puff.TopLevel = true;
+            puff.ZIndex = -1;
+            puff.Visible = false;
+            AddChild(puff);
+            _smokePuffs[i] = puff;
+        }
+    }
+
+    protected override void UpdateTrailVisual()
+    {
+        if (_trail == null)
+            return;
+
+        int count = _trail.Count;
+        bool positionsChanged = _trail.Version != _lastSmokeVersion;
+
+        for (int i = 0; i < _smokePuffs.Length; i++)
+        {
+            var puff = _smokePuffs[i];
+            if (puff == null || !IsInstanceValid(puff))
+                continue;
+
+            bool used = i < count;
+            puff.Visible = used;
+            if (!used)
+                continue;
+
+            // Sample positions only move when the history changes; the fade/growth
+            // curve is a per-frame transform because sample ages advance every frame.
+            if (positionsChanged)
+                puff.Position = _trail.PositionAt(i);
+
+            float fade = _trail.FadeAt(i);
+            float age = 1f - fade;
+            puff.Modulate = new Color(1f, 1f, 1f, fade * 0.8f);
+            float scale = 0.7f + 0.8f * age;
+            puff.Scale = new Vector2(scale, scale);
+        }
+
+        _lastSmokeVersion = _trail.Version;
+    }
+
+    protected override ProjectileTrail? CreateTrail() => ProjectileTrail.CreateCannonTrail();
+
+    /// <summary>
+    /// Builds a regular polygon approximating a circle. Allocated once per pooled
+    /// projectile (never per frame) and shared by every smoke puff.
+    /// </summary>
+    private static Vector2[] BuildCirclePolygon(float radius, int sides)
+    {
+        var points = new Vector2[sides];
+        for (int i = 0; i < sides; i++)
+        {
+            float angle = Mathf.Tau * i / sides;
+            points[i] = new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * radius;
+        }
+        return points;
+    }
+
     protected override void BuildVisual()
     {
         float size = GameConstants.ProjectileSize;

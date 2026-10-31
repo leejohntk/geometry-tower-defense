@@ -39,6 +39,10 @@ public abstract partial class Projectile : Node2D
     private int _hitsRemaining = 1;
     private readonly List<Enemy> _hitEnemies = new();
 
+    // Visual-only fading trail. Created lazily (pooled projectiles build it once) and
+    // reset on every Initialize; it never collides and never feeds back into movement.
+    protected ProjectileTrail? _trail;
+
     /// <summary>
     /// The tower that fired this projectile.
     /// </summary>
@@ -54,9 +58,16 @@ public abstract partial class Projectile : Node2D
     /// </summary>
     public bool IsDone => _hasHit;
 
+    /// <summary>
+    /// Number of live trail samples. Zero after a hit, a dissipation, or a pool reuse,
+    /// so tests and callers can observe that no trail state leaks across shots.
+    /// </summary>
+    public int TrailSampleCount => _trail?.Count ?? 0;
+
     public override void _Ready()
     {
         BuildVisual();
+        EnsureTrail();
     }
 
     /// <summary>
@@ -65,13 +76,40 @@ public abstract partial class Projectile : Node2D
     protected abstract void BuildVisual();
 
     /// <summary>
+    /// Creates this projectile's trail history (null = no trail). Called once, lazily,
+    /// so tests that drive a projectile outside the scene tree still get a trail.
+    /// </summary>
+    protected virtual ProjectileTrail? CreateTrail() => null;
+
+    /// <summary>Builds the trail's render nodes. Called once, after CreateTrail.</summary>
+    protected virtual void BuildTrailVisual()
+    {
+    }
+
+    /// <summary>Repaints/positions the trail nodes from the current trail samples.</summary>
+    protected virtual void UpdateTrailVisual()
+    {
+    }
+
+    private void EnsureTrail()
+    {
+        if (_trail != null)
+            return;
+
+        _trail = CreateTrail();
+        if (_trail != null)
+            BuildTrailVisual();
+    }
+
+    /// <summary>
     /// Apply damage/side-effects on first contact with a live enemy.
     /// </summary>
     protected abstract void OnHit(Enemy enemy);
 
     /// <summary>
     /// Initialize the projectile with source, direction, and intended target.
-    /// Safe to call multiple times (for pool reuse) — resets all per-shot state.
+    /// Safe to call multiple times (for pool reuse) — resets all per-shot state,
+    /// including the visual trail.
     /// </summary>
     public void Initialize(Tower tower, Vector2 targetPosition, Enemy target)
     {
@@ -94,6 +132,11 @@ public abstract partial class Projectile : Node2D
         // Rotate to face direction
         float angle = Mathf.Atan2(_direction.Y, _direction.X);
         Rotation = angle;
+
+        // A pooled projectile must never reuse the previous shot's trail.
+        EnsureTrail();
+        _trail?.Reset(Position);
+        UpdateTrailVisual();
     }
 
     public override void _Process(double delta)
@@ -105,12 +148,25 @@ public abstract partial class Projectile : Node2D
         Position += _direction * moveDistance;
         _distanceTraveled += moveDistance;
 
+        _trail?.Advance(Position, (float)delta);
+        UpdateTrailVisual();
+
         if (_distanceTraveled >= _maxRangePixels)
         {
             _hasHit = true;
+            ClearTrail();
             EmitSignal(SignalName.Dissipated, this);
             // GameManager.OnProjectileDissipated handles pool release
         }
+    }
+
+    /// <summary>
+    /// Drops the visual trail (on impact, dissipation, or pool reuse).
+    /// </summary>
+    protected void ClearTrail()
+    {
+        _trail?.Clear();
+        UpdateTrailVisual();
     }
 
     /// <summary>
@@ -143,6 +199,9 @@ public abstract partial class Projectile : Node2D
         if (_hitsRemaining <= 0)
         {
             _hasHit = true;
+            // The trail ends where the shot ended; a pierce hit keeps flying, so its
+            // trail is deliberately left intact instead of restarting.
+            ClearTrail();
             // Signal for lifecycle management (pool release, list cleanup).
             EmitSignal(SignalName.EnemyHit, this, enemy);
         }
@@ -179,31 +238,111 @@ public abstract partial class Projectile : Node2D
 /// </summary>
 public partial class ArrowProjectile : Projectile
 {
+    private Line2D? _trailLine;
+    private readonly Vector2[] _trailBuffer = new Vector2[GameConstants.ArrowTrailSegments + 1];
+    private int _lastTrailVersion = -1;
+
+    /// <summary>
+    /// Triangle vertices in local space with the tip on +X, so setting
+    /// <see cref="Node2D.Rotation"/> to the travel angle makes the tip the
+    /// forward-most vertex. Pure and static so the orientation is testable.
+    /// </summary>
+    public static Vector2[] ArrowPolygon(float size)
+    {
+        float half = size / 2f;
+        return new Vector2[]
+        {
+            new Vector2(half, 0f),       // tip, forward along +X
+            new Vector2(-half, -half),   // rear top
+            new Vector2(-half, half),    // rear bottom
+        };
+    }
+
+    /// <summary>
+    /// Outer outline triangle: the same shape grown by <paramref name="grow"/> pixels.
+    /// </summary>
+    public static Vector2[] OutlinePolygon(float size, float grow)
+    {
+        float half = size / 2f;
+        return new Vector2[]
+        {
+            new Vector2(half + grow, 0f),
+            new Vector2(-half - grow, -half - grow),
+            new Vector2(-half - grow, half + grow),
+        };
+    }
+
     protected override void BuildVisual()
     {
-        // Draw the projectile as a small yellow triangle
-        var arrowPoints = new Vector2[]
-        {
-            new Vector2(0, -(GameConstants.ProjectileSize / 2f)),               // Tip (points upward, centered)
-            new Vector2(-(GameConstants.ProjectileSize / 2f), GameConstants.ProjectileSize / 2f), // Bottom left
-            new Vector2(GameConstants.ProjectileSize / 2f, GameConstants.ProjectileSize / 2f)     // Bottom right
-        };
+        // Dark outline first, bright fill on top: two siblings so the fill is not
+        // covered by the larger outline polygon.
+        var outline = new Polygon2D();
+        outline.Name = "ArrowOutline";
+        outline.Polygon = OutlinePolygon(GameConstants.ProjectileSize, 1f);
+        outline.Color = new Color(0.8f, 0.5f, 0.05f);
+        AddChild(outline);
 
         var arrow = new Polygon2D();
-        arrow.Polygon = arrowPoints;
+        arrow.Name = "ArrowShape";
+        arrow.Polygon = ArrowPolygon(GameConstants.ProjectileSize);
         arrow.Color = new Color(1f, 0.9f, 0.2f); // Yellow fill
         AddChild(arrow);
+    }
 
-        // Small outline
-        var outline = new Polygon2D();
-        outline.Polygon = new Vector2[]
+    protected override ProjectileTrail? CreateTrail() => ProjectileTrail.CreateArrowTrail();
+
+    protected override void BuildTrailVisual()
+    {
+        _trailLine = new Line2D();
+        _trailLine.Name = "Trail";
+        // TopLevel keeps the world-space samples independent of this projectile's
+        // position and rotation, so the trail stays behind instead of following.
+        _trailLine.TopLevel = true;
+        _trailLine.ZIndex = -1;
+        _trailLine.Width = GameConstants.ArrowTrailWidth;
+        _trailLine.Antialiased = true;
+        _trailLine.Visible = false;
+
+        var gradient = new Gradient();
+        gradient.SetColor(0, GameConstants.ArrowTrailColor with { A = 0f });
+        gradient.SetColor(1, GameConstants.ArrowTrailColor with { A = 0.85f });
+        _trailLine.Gradient = gradient;
+        _trailLine.DefaultColor = GameConstants.ArrowTrailColor;
+
+        AddChild(_trailLine);
+    }
+
+    protected override void UpdateTrailVisual()
+    {
+        if (_trailLine == null || !IsInstanceValid(_trailLine))
+            return;
+
+        int count = _trail?.Count ?? 0;
+        if (count < 2)
         {
-            new Vector2(0, -(GameConstants.ProjectileSize / 2f + 1)),               // Tip
-            new Vector2(-(GameConstants.ProjectileSize / 2f + 1), GameConstants.ProjectileSize / 2f), // Bottom left
-            new Vector2(GameConstants.ProjectileSize / 2f + 1, GameConstants.ProjectileSize / 2f)     // Bottom right
-        };
-        outline.Color = new Color(0.8f, 0.5f, 0.05f);
-        arrow.AddChild(outline);
+            _trailLine.Visible = false;
+            _lastTrailVersion = -1;
+            return;
+        }
+
+        // Only rebuild/assign the Line2D points when the sample history actually changed;
+        // a frame where the trail did not push or drop a sample skips the copy entirely.
+        if (_trail!.Version != _lastTrailVersion)
+        {
+            // Line2D draws the points in order; oldest first so the gradient fades the tail.
+            for (int i = 0; i < _trailBuffer.Length; i++)
+            {
+                int source = count - 1 - i;
+                _trailBuffer[i] = source >= 0
+                    ? _trail.PositionAt(source)
+                    : _trail.PositionAt(0);
+            }
+
+            _trailLine.Points = _trailBuffer;
+            _lastTrailVersion = _trail.Version;
+        }
+
+        _trailLine.Visible = true;
     }
 
     protected override void OnHit(Enemy enemy)

@@ -76,6 +76,21 @@ const SKTREE_SIDEBAR_BUTTONS := 3
 const ROW_BUY_OFFSET := 310.0
 const ROW_BUY_WIDTH := 124.0
 
+## Enlarged tree node icon box (playtest fix: 22x22 -> 46x46). Icons stay centered on
+## their anchors; rows grow to cover them.
+const TREE_ICON_SIZE := 46.0
+
+## Placement card geometry, stated independently of the HUD nodes it is measured
+## against (spec: ~160x72 icon cards stacked with a visible gap, then StartWave).
+const HUD_CARD_WIDTH := 160.0
+const HUD_CARD_HEIGHT := 72.0
+const HUD_CARD_GAP := 8.0
+const HUD_TOP_BAR_HEIGHT := 40.0
+
+## Skill-tree info band: idle hint text and the labels every band must carry.
+const SKILL_INFO_HINT := "Hover a skill to see its description."
+const SKILL_INFO_CHILDREN := ["Panel", "Name", "Rank", "Description"]
+
 ## Zero-state gating: with every rank at 0, only the first trunk node of each
 ## tower has no prerequisite. Every other node is locked behind rank 1 of its
 ## predecessor (later trunks) or of the tower's last trunk (seeds).
@@ -342,7 +357,63 @@ func _evaluate_title_screen(title_screen: Node) -> void:
     var title_block := _require(title_screen, "Block_Title", "TitleScreen", TITLE_SOURCE)
     var menu_block := _require(title_screen, "Block_LevelMenu", "TitleScreen", TITLE_SOURCE)
     var instructions_block := _require(title_screen, "Block_Instructions", "TitleScreen", TITLE_SOURCE)
+    var backdrop := _require(title_screen, "Block_Backdrop", "TitleScreen", TITLE_SOURCE)
     var viewport_rect := _viewport_rect()
+
+    # Title labels must keep their paths and text; the decoration group frames them
+    # without moving or resizing them.
+    if title_block != null:
+        var title_label := _require_label(title_block, "Title", "TitleScreen/Block_Title", TITLE_SOURCE)
+        var subtitle_label := _require_label(title_block, "Subtitle", "TitleScreen/Block_Title", TITLE_SOURCE)
+        var ornament := _require(title_block, "Ornament", "TitleScreen/Block_Title", TITLE_SOURCE)
+        if title_label != null:
+            _check(
+                "title.title_text", "TitleScreen/Block_Title/Title",
+                "text=%s" % String(title_label.text),
+                "text=GEOMETRY\\nTOWER DEFENSE",
+                String(title_label.text) == "GEOMETRY\nTOWER DEFENSE",
+                "Keep the title text unchanged.",
+                TITLE_SOURCE, "WARNING"
+            )
+        if subtitle_label != null:
+            _check(
+                "title.subtitle_text", "TitleScreen/Block_Title/Subtitle",
+                "text=%s" % String(subtitle_label.text),
+                "text=A Geometric Tower Defense Game",
+                String(subtitle_label.text) == "A Geometric Tower Defense Game",
+                "Keep the subtitle text unchanged.",
+                TITLE_SOURCE, "WARNING"
+            )
+        if ornament != null:
+            _check(
+                "title.ornament_click_through", "TitleScreen/Block_Title/Ornament",
+                "mouse_filter=%d" % ornament.mouse_filter,
+                "mouse_filter=%d (ignore)" % Control.MOUSE_FILTER_IGNORE,
+                ornament.mouse_filter == Control.MOUSE_FILTER_IGNORE,
+                "Make the title decoration click-through.",
+                TITLE_SOURCE, "WARNING"
+            )
+
+    if backdrop != null:
+        var rect: Rect2 = backdrop.get_global_rect()
+        _check(
+            "title.backdrop_spans_viewport", "TitleScreen/Block_Backdrop",
+            str(rect),
+            "position=(0, 0) size=%s" % str(viewport_rect.size),
+            _approx(rect.position.x, 0.0) and _approx(rect.position.y, 0.0)
+                and _approx(rect.size.x, viewport_rect.size.x)
+                and _approx(rect.size.y, viewport_rect.size.y),
+            "Span the full viewport with the backdrop group.",
+            TITLE_SOURCE, "WARNING"
+        )
+        _check(
+            "title.backdrop_click_through", "TitleScreen/Block_Backdrop",
+            "mouse_filter=%d" % backdrop.mouse_filter,
+            "mouse_filter=%d (ignore)" % Control.MOUSE_FILTER_IGNORE,
+            backdrop.mouse_filter == Control.MOUSE_FILTER_IGNORE,
+            "Make the backdrop group click-through so menu buttons remain the only mouse targets.",
+            TITLE_SOURCE, "WARNING"
+        )
 
     if title_block != null:
         var rect: Rect2 = title_block.get_global_rect()
@@ -421,6 +492,24 @@ func _evaluate_title_screen(title_screen: Node) -> void:
             "Lay the menu buttons out inside their named menu group.",
             TITLE_SOURCE, "WARNING", 1.0
         )
+        _check(
+            "title.menu.%s.styled" % button_name, group,
+            "hover_override=%s" % str(button.has_theme_stylebox_override("hover")),
+            "hover_override=true (geometric hover style)",
+            button.has_theme_stylebox_override("hover"),
+            "Apply the shared geometric button style to every menu button.",
+            TITLE_SOURCE, "WARNING"
+        )
+        var accent := _require(button, "Accent", group, TITLE_SOURCE)
+        if accent != null:
+            _check(
+                "title.menu.%s.accent_click_through" % button_name, "%s/Accent" % group,
+                "mouse_filter=%d" % accent.mouse_filter,
+                "mouse_filter=%d (ignore)" % Control.MOUSE_FILTER_IGNORE,
+                accent.mouse_filter == Control.MOUSE_FILTER_IGNORE,
+                "Make the accent bar click-through; the button is the only mouse target.",
+                TITLE_SOURCE, "WARNING"
+            )
 
         if has_previous:
             _check_stack_gap(
@@ -463,7 +552,42 @@ func _evaluate_result_screen(result_screen: Node) -> void:
     var screen_name := String(result_screen.name)
     var title_block := _require(result_screen, "Block_Title", screen_name, RESULT_SOURCE)
     var return_button := _require(result_screen, "ReturnToTitle", screen_name, RESULT_SOURCE)
+    var backdrop := _require(result_screen, "Block_Backdrop", screen_name, RESULT_SOURCE)
     var viewport_rect := _viewport_rect()
+
+    if backdrop != null:
+        var rect: Rect2 = backdrop.get_global_rect()
+        _check(
+            "result.%s.backdrop_spans_viewport" % screen_name, "%s/Block_Backdrop" % screen_name,
+            str(rect),
+            "position=(0, 0) size=%s" % str(viewport_rect.size),
+            _approx(rect.position.x, 0.0) and _approx(rect.position.y, 0.0)
+                and _approx(rect.size.x, viewport_rect.size.x)
+                and _approx(rect.size.y, viewport_rect.size.y),
+            "Span the full viewport with the result backdrop group.",
+            RESULT_SOURCE, "WARNING"
+        )
+        _check(
+            "result.%s.backdrop_click_through" % screen_name, "%s/Block_Backdrop" % screen_name,
+            "mouse_filter=%d" % backdrop.mouse_filter,
+            "mouse_filter=%d (ignore)" % Control.MOUSE_FILTER_IGNORE,
+            backdrop.mouse_filter == Control.MOUSE_FILTER_IGNORE,
+            "Make the result backdrop click-through so Return works on the first frame.",
+            RESULT_SOURCE, "WARNING"
+        )
+
+    if title_block != null:
+        var ornament := _require(title_block, "Ornament", "%s/Block_Title" % screen_name, RESULT_SOURCE)
+        if ornament != null:
+            _check(
+                "result.%s.title_ornament_click_through" % screen_name,
+                "%s/Block_Title/Ornament" % screen_name,
+                "mouse_filter=%d" % ornament.mouse_filter,
+                "mouse_filter=%d (ignore)" % Control.MOUSE_FILTER_IGNORE,
+                ornament.mouse_filter == Control.MOUSE_FILTER_IGNORE,
+                "Make the result title decoration click-through.",
+                RESULT_SOURCE, "WARNING"
+            )
 
     if title_block != null:
         var rect: Rect2 = title_block.get_global_rect()
@@ -484,6 +608,27 @@ func _evaluate_result_screen(result_screen: Node) -> void:
             rect, viewport_rect,
             "Keep the return button inside the viewport.", RESULT_SOURCE, "WARNING"
         )
+        _check(
+            "result.%s.return_styled" % screen_name, "%s/ReturnToTitle" % screen_name,
+            "hover_override=%s" % str(return_button.has_theme_stylebox_override("hover")),
+            "hover_override=true (geometric hover style)",
+            return_button.has_theme_stylebox_override("hover"),
+            "Apply the shared geometric button style to the return button.",
+            RESULT_SOURCE, "WARNING"
+        )
+        var return_accent := _require(
+            return_button, "Accent", "%s/ReturnToTitle" % screen_name, RESULT_SOURCE
+        )
+        if return_accent != null:
+            _check(
+                "result.%s.return_accent_click_through" % screen_name,
+                "%s/ReturnToTitle/Accent" % screen_name,
+                "mouse_filter=%d" % return_accent.mouse_filter,
+                "mouse_filter=%d (ignore)" % Control.MOUSE_FILTER_IGNORE,
+                return_accent.mouse_filter == Control.MOUSE_FILTER_IGNORE,
+                "Make the return button's accent bar click-through.",
+                RESULT_SOURCE, "WARNING"
+            )
 
 
 func _evaluate_game_hud(game_hud: Node) -> void:
@@ -540,6 +685,145 @@ func _evaluate_game_hud(game_hud: Node) -> void:
                 GAME_HUD_SOURCE, "WARNING"
             )
 
+        _evaluate_hud_cards(sidebar_block)
+
+
+## Placement cards: each Place* button is a 160x72 icon card with empty text and
+## Icon/Name/Cost children; the three cards stack with a positive gap and StartWave
+## sits below the stack. Expected labels/costs come from the spec, not the nodes.
+func _evaluate_hud_cards(sidebar_block: Control) -> void:
+    var expected_cards := [
+        {"name": "PlaceArrow", "label": "Arrow", "cost": "10$"},
+        {"name": "PlaceCannon", "label": "Cannon", "cost": "10$"},
+        {"name": "PlaceLaser", "label": "Laser", "cost": "10$"},
+    ]
+
+    var previous: Rect2 = Rect2()
+    var has_previous := false
+    var card_rects := {}
+    for card in expected_cards:
+        var card_name: String = card["name"]
+        var group := "GameHUD/Block_Sidebar/%s" % card_name
+        var button := _require_button(sidebar_block, card_name, "GameHUD/Block_Sidebar", GAME_HUD_SOURCE)
+        if button == null:
+            continue
+
+        var rect: Rect2 = button.get_global_rect()
+        card_rects[card_name] = rect
+
+        _check(
+            "hud.card.%s.size" % card_name.to_lower(), group,
+            "size=(%.2f, %.2f)" % [rect.size.x, rect.size.y],
+            "size=(%.1f, %.1f)" % [HUD_CARD_WIDTH, HUD_CARD_HEIGHT],
+            _approx(rect.size.x, HUD_CARD_WIDTH) and _approx(rect.size.y, HUD_CARD_HEIGHT),
+            "Size each placement card 160x72 so the icon, name, and cost fit.",
+            GAME_HUD_SOURCE, "WARNING"
+        )
+        _check(
+            "hud.card.%s.text_empty" % card_name.to_lower(), group,
+            "text='%s'" % String(button.text),
+            "text='' (the child labels carry the content)",
+            String(button.text) == "",
+            "Leave the Button text empty; Icon/Name/Cost children carry the card content.",
+            GAME_HUD_SOURCE, "WARNING"
+        )
+
+        var icon := _require(button, "Icon", group, GAME_HUD_SOURCE)
+        var name_label := _require_label(button, "Name", group, GAME_HUD_SOURCE)
+        var cost_label := _require_label(button, "Cost", group, GAME_HUD_SOURCE)
+
+        if icon != null:
+            _check_inside(
+                "hud.card.%s.icon_inside_card" % card_name.to_lower(), "%s/Icon" % group,
+                icon.get_global_rect(), rect,
+                "Keep the procedural icon inside the card.",
+                GAME_HUD_SOURCE, "WARNING"
+            )
+        if name_label != null:
+            _check_inside(
+                "hud.card.%s.name_inside_card" % card_name.to_lower(), "%s/Name" % group,
+                name_label.get_global_rect(), rect,
+                "Keep the tower name inside the card.",
+                GAME_HUD_SOURCE, "WARNING"
+            )
+        if cost_label != null:
+            _check_inside(
+                "hud.card.%s.cost_inside_card" % card_name.to_lower(), "%s/Cost" % group,
+                cost_label.get_global_rect(), rect,
+                "Keep the cost label inside the card.",
+                GAME_HUD_SOURCE, "WARNING"
+            )
+
+        if icon != null:
+            _check(
+                "hud.card.%s.icon_click_through" % card_name.to_lower(), "%s/Icon" % group,
+                "mouse_filter=%d" % icon.mouse_filter,
+                "mouse_filter=%d (ignore)" % Control.MOUSE_FILTER_IGNORE,
+                icon.mouse_filter == Control.MOUSE_FILTER_IGNORE,
+                "Make the procedural card icon click-through; the button is the only mouse target.",
+                GAME_HUD_SOURCE, "WARNING"
+            )
+        if name_label != null:
+            _check(
+                "hud.card.%s.name" % card_name.to_lower(), "%s/Name" % group,
+                "text=%s" % String(name_label.text),
+                "text=%s" % String(card["label"]),
+                String(name_label.text) == String(card["label"]),
+                "Label each placement card with the tower name.",
+                GAME_HUD_SOURCE, "WARNING"
+            )
+        if cost_label != null:
+            _check(
+                "hud.card.%s.cost" % card_name.to_lower(), "%s/Cost" % group,
+                "text=%s" % String(cost_label.text),
+                "text=%s" % String(card["cost"]),
+                String(cost_label.text) == String(card["cost"]),
+                "Show the tower's coin cost on the placement card.",
+                GAME_HUD_SOURCE, "WARNING"
+            )
+
+        if has_previous:
+            _check_stack_gap(
+                "hud.card.%s.stack" % card_name.to_lower(), group, rect, previous,
+                "Stack placement cards without overlap and with uniform height.",
+                GAME_HUD_SOURCE
+            )
+            var card_gap := rect.position.y - previous.end.y
+            _check(
+                "hud.card.%s.gap" % card_name.to_lower(), group,
+                "gap=%.2f" % card_gap,
+                "gap=%.1f (visible card gap)" % HUD_CARD_GAP,
+                _approx(card_gap, HUD_CARD_GAP),
+                "Stack placement cards with the shared visible gap.",
+                GAME_HUD_SOURCE, "WARNING"
+            )
+        previous = rect
+        has_previous = true
+
+    if card_rects.has("PlaceArrow"):
+        var first_card: Rect2 = card_rects["PlaceArrow"]
+        _check(
+            "hud.cards_below_top_bar", "GameHUD/Block_Sidebar/PlaceArrow",
+            "card.top=%.2f" % first_card.position.y,
+            "card.top >= %.1f (HUD top bar bottom)" % HUD_TOP_BAR_HEIGHT,
+            first_card.position.y >= HUD_TOP_BAR_HEIGHT - EPS,
+            "Start the card stack below the top bar so no card overlaps it.",
+            GAME_HUD_SOURCE, "WARNING"
+        )
+
+    var start_wave := _require_button(sidebar_block, "StartWave", "GameHUD/Block_Sidebar", GAME_HUD_SOURCE)
+    if start_wave != null and card_rects.has("PlaceLaser"):
+        var laser_rect: Rect2 = card_rects["PlaceLaser"]
+        var start_rect: Rect2 = start_wave.get_global_rect()
+        _check(
+            "hud.startwave_below_cards", "GameHUD/Block_Sidebar/StartWave",
+            "start.y=%.2f laser.end.y=%.2f" % [start_rect.position.y, laser_rect.end.y],
+            "start.y >= laser.end.y (no overlap)",
+            start_rect.position.y >= laser_rect.end.y - EPS,
+            "Place the StartWave button below the placement card stack.",
+            GAME_HUD_SOURCE, "WARNING"
+        )
+
 
 func _evaluate_skill_tree_screen(skill_screen: Node) -> void:
     var title_block := _require(skill_screen, "Block_Title", "SkillTreeScreen", SKILL_TREE_SOURCE)
@@ -590,6 +874,32 @@ func _evaluate_skill_tree_screen(skill_screen: Node) -> void:
             rect, viewport_rect,
             "Keep the main tree panel inside the viewport.", SKILL_TREE_SOURCE
         )
+
+        # The tree backdrop is a click-through decoration inside the panel, spanning it.
+        var tree_backdrop := _require(
+            main_panel, "Block_TreeBackdrop", "SkillTreeScreen/Panel_Main", SKILL_TREE_SOURCE
+        )
+        if tree_backdrop != null:
+            var backdrop_rect: Rect2 = tree_backdrop.get_global_rect()
+            _check(
+                "skilltree.tree_backdrop_spans_panel", "SkillTreeScreen/Panel_Main/Block_TreeBackdrop",
+                str(backdrop_rect),
+                "same rect as Panel_Main %s" % str(rect),
+                _approx(backdrop_rect.position.x, rect.position.x)
+                    and _approx(backdrop_rect.position.y, rect.position.y)
+                    and _approx(backdrop_rect.size.x, rect.size.x)
+                    and _approx(backdrop_rect.size.y, rect.size.y),
+                "Span Panel_Main with the tree backdrop group.",
+                SKILL_TREE_SOURCE, "WARNING"
+            )
+            _check(
+                "skilltree.tree_backdrop_click_through", "SkillTreeScreen/Panel_Main/Block_TreeBackdrop",
+                "mouse_filter=%d" % tree_backdrop.mouse_filter,
+                "mouse_filter=%d (ignore)" % Control.MOUSE_FILTER_IGNORE,
+                tree_backdrop.mouse_filter == Control.MOUSE_FILTER_IGNORE,
+                "Make the tree backdrop click-through.",
+                SKILL_TREE_SOURCE, "WARNING"
+            )
 
     if sidebar_block != null:
         var rect: Rect2 = sidebar_block.get_global_rect()
@@ -763,7 +1073,169 @@ func _evaluate_skill_tree_screen(skill_screen: Node) -> void:
     sidebar_buttons["arrow"].emit_signal("pressed")
     await process_frame
     await process_frame
+    await _evaluate_skill_info_band(skill_screen, tree_area)
     await _evaluate_purchase_rebuild(skill_screen, tree_area, sp_label)
+
+
+## The bottom info band: structure, click-through, idle hint, and the three hover
+## behaviours (unlocked row, locked row with prerequisite hint, and reset on exit).
+## Hover is driven through the rows' real MouseEntered/MouseExited signals.
+func _evaluate_skill_info_band(skill_screen: Node, tree_area: Control) -> void:
+    var main_panel := _require(skill_screen, "Panel_Main", "SkillTreeScreen", SKILL_TREE_SOURCE)
+    if main_panel == null:
+        return
+
+    var band := _require(
+        main_panel, "Block_SkillInfo", "SkillTreeScreen/Panel_Main", SKILL_TREE_SOURCE
+    )
+    if band == null:
+        return
+
+    var band_group := "SkillTreeScreen/Panel_Main/Block_SkillInfo"
+    var panel := _require(band, "Panel", band_group, SKILL_TREE_SOURCE)
+    var name_label := _require_label(band, "Name", band_group, SKILL_TREE_SOURCE)
+    var rank_label := _require_label(band, "Rank", band_group, SKILL_TREE_SOURCE)
+    var desc_label := _require_label(band, "Description", band_group, SKILL_TREE_SOURCE)
+
+    var main_rect: Rect2 = main_panel.get_global_rect()
+    var tree_rect: Rect2 = tree_area.get_global_rect()
+    var band_rect: Rect2 = band.get_global_rect()
+
+    _check_inside(
+        "skilltree.info_band_inside_panel", band_group, band_rect, main_rect,
+        "Keep the info band inside Panel_Main.", SKILL_TREE_SOURCE
+    )
+    _check(
+        "skilltree.info_band_spans_tree", band_group,
+        "band=[%.2f..%.2f]" % [band_rect.position.x, band_rect.end.x],
+        "tree=[%.2f..%.2f] (same left edge and width)" % [
+            tree_rect.position.x, tree_rect.end.x,
+        ],
+        _approx(band_rect.position.x, tree_rect.position.x)
+            and _approx(band_rect.size.x, tree_rect.size.x),
+        "Span the tree area's width with the info band.",
+        SKILL_TREE_SOURCE, "WARNING"
+    )
+
+    # Nothing in the band may overlap a node row: its top must be below every row.
+    var lowest_row_bottom := -1.0e20
+    for child in tree_area.get_children():
+        if String(child.name).begins_with("Row_"):
+            lowest_row_bottom = maxf(lowest_row_bottom, child.get_global_rect().end.y)
+    _check(
+        "skilltree.info_band_below_rows", band_group,
+        "band.top=%.2f rows.bottom=%.2f" % [band_rect.position.y, lowest_row_bottom],
+        "band.top >= rows.bottom (no overlap)",
+        lowest_row_bottom <= -1.0e19 or band_rect.position.y >= lowest_row_bottom - EPS,
+        "Place the info band below the tree rows.",
+        SKILL_TREE_SOURCE
+    )
+
+    # Every node in the band is click-through.
+    var ignore_ok: bool = band.mouse_filter == Control.MOUSE_FILTER_IGNORE
+    for node in [panel, name_label, rank_label, desc_label]:
+        if node != null:
+            ignore_ok = ignore_ok and node.mouse_filter == Control.MOUSE_FILTER_IGNORE
+    _check(
+        "skilltree.info_band_click_through", band_group,
+        "all_ignore=%s" % str(ignore_ok),
+        "band, Panel, Name, Rank, Description all use MOUSE_FILTER_IGNORE",
+        ignore_ok,
+        "Make the whole info band click-through; it must never intercept a Buy click.",
+        SKILL_TREE_SOURCE, "WARNING"
+    )
+
+    if name_label == null or rank_label == null or desc_label == null:
+        return
+
+    # Idle state shows the neutral hint and no name/rank.
+    _check(
+        "skilltree.info_band_idle", band_group,
+        "name='%s' rank='%s' desc='%s'" % [
+            String(name_label.text), String(rank_label.text), String(desc_label.text),
+        ],
+        "name='' rank='' desc='%s'" % SKILL_INFO_HINT,
+        String(name_label.text) == "" and String(rank_label.text) == ""
+            and String(desc_label.text) == SKILL_INFO_HINT,
+        "Show the neutral hint while nothing is hovered.",
+        SKILL_TREE_SOURCE, "WARNING"
+    )
+
+    var highlight := _require(
+        tree_area, "RowHighlight", "SkillTreeScreen/TreeArea", SKILL_TREE_SOURCE
+    )
+
+    # Hovering an unlocked row updates name, rank, and description, and highlights it.
+    var unlocked_row := _require(
+        tree_area, "Row_arrow_damage", "SkillTreeScreen/TreeArea", SKILL_TREE_SOURCE
+    )
+    if unlocked_row != null:
+        unlocked_row.emit_signal("mouse_entered")
+        await process_frame
+        _check(
+            "skilltree.info_band_hover_name", band_group,
+            "name='%s'" % String(name_label.text), "name='Damage'",
+            String(name_label.text) == "Damage",
+            "Show the hovered node's display name.",
+            SKILL_TREE_SOURCE, "WARNING"
+        )
+        _check(
+            "skilltree.info_band_hover_rank", band_group,
+            "rank='%s'" % String(rank_label.text), "rank='0/5'",
+            String(rank_label.text) == "0/5",
+            "Show the hovered node's current rank as r/5.",
+            SKILL_TREE_SOURCE, "WARNING"
+        )
+        _check(
+            "skilltree.info_band_hover_description", band_group,
+            "desc='%s'" % String(desc_label.text),
+            "desc contains '+2 damage' (from SkillTreeCatalog)",
+            String(desc_label.text).contains("+2 damage"),
+            "Show the hovered node's catalog description.",
+            SKILL_TREE_SOURCE, "WARNING"
+        )
+        if highlight != null:
+            _check(
+                "skilltree.info_band_hover_highlight", "SkillTreeScreen/TreeArea/RowHighlight",
+                "visible=%s" % str(highlight.visible), "visible=true",
+                highlight.visible,
+                "Highlight the hovered row with the decoration band.",
+                SKILL_TREE_SOURCE, "WARNING"
+            )
+
+    # Hovering a locked row appends the prerequisite hint; leaving clears the band.
+    var locked_row := _require(
+        tree_area, "Row_arrow_attack_speed", "SkillTreeScreen/TreeArea", SKILL_TREE_SOURCE
+    )
+    if locked_row != null:
+        locked_row.emit_signal("mouse_entered")
+        await process_frame
+        _check(
+            "skilltree.info_band_locked_hint", band_group,
+            "desc='%s'" % String(desc_label.text),
+            "desc contains 'Unlocks after Damage reaches rank 1.'",
+            String(desc_label.text).contains("Unlocks after Damage reaches rank 1."),
+            "Append the prerequisite hint when a locked row is hovered.",
+            SKILL_TREE_SOURCE, "WARNING"
+        )
+        locked_row.emit_signal("mouse_exited")
+        await process_frame
+        _check(
+            "skilltree.info_band_reset", band_group,
+            "name='%s' desc='%s'" % [String(name_label.text), String(desc_label.text)],
+            "name='' desc='%s'" % SKILL_INFO_HINT,
+            String(name_label.text) == "" and String(desc_label.text) == SKILL_INFO_HINT,
+            "Return the band to the idle hint when the pointer leaves every row.",
+            SKILL_TREE_SOURCE, "WARNING"
+        )
+        if highlight != null:
+            _check(
+                "skilltree.info_band_reset_highlight", "SkillTreeScreen/TreeArea/RowHighlight",
+                "visible=%s" % str(highlight.visible), "visible=false",
+                not highlight.visible,
+                "Hide the row highlight on mouse exit.",
+                SKILL_TREE_SOURCE, "WARNING"
+            )
 
 
 func _evaluate_purchase_rebuild(skill_screen: Node, tree_area: Control, sp_label: Label) -> void:
@@ -891,6 +1363,20 @@ func _evaluate_purchase_rebuild(skill_screen: Node, tree_area: Control, sp_label
         "Rebuild the tree after a purchase so newly unlocked nodes gain their buy button.",
         SKILL_TREE_SOURCE
     )
+
+    # A purchase rebuild discards the old rows and must return the info band to idle.
+    var info_desc := _require_label(
+        skill_screen, "Panel_Main/Block_SkillInfo/Description", "SkillTreeScreen", SKILL_TREE_SOURCE
+    )
+    if info_desc != null:
+        _check(
+            "skilltree.info_band_resets_on_purchase", "SkillTreeScreen/Panel_Main/Block_SkillInfo",
+            "desc='%s'" % String(info_desc.text),
+            "desc='%s'" % SKILL_INFO_HINT,
+            String(info_desc.text) == SKILL_INFO_HINT,
+            "Reset the info band to the idle hint after a purchase rebuild.",
+            SKILL_TREE_SOURCE, "WARNING"
+        )
     if trunk_icon != null:
         var tree_rect: Rect2 = tree_area.get_global_rect()
         var icon_center: float = trunk_icon.get_global_rect().get_center().x
@@ -1106,7 +1592,58 @@ func _evaluate_tower_tree(key: String, nodes: Array, tree_area: Control) -> void
 
         var icon := _require(row, "Icon", row_path, SKILL_TREE_SOURCE)
         var name_rect: Rect2 = name_label.get_global_rect() if name_label != null else Rect2()
+        var rank_rect: Rect2 = rank_label.get_global_rect() if rank_label != null else Rect2()
         var icon_rect: Rect2 = icon.get_global_rect() if icon != null else Rect2()
+        var row_rect: Rect2 = row.get_global_rect()
+
+        _check_inside(
+            "tree.%s.%s.row_inside_tree" % [key, node["id"]], row_path, row_rect, tree_rect,
+            "Keep each row inside the tree area (no clipping at the enlarged icon size).",
+            SKILL_TREE_SOURCE, "WARNING"
+        )
+
+        if icon != null:
+            _check(
+                "tree.%s.%s.icon_size" % [key, node["id"]], "%s/Icon" % row_path,
+                "size=(%.2f, %.2f)" % [icon_rect.size.x, icon_rect.size.y],
+                "size=(%.1f, %.1f)" % [TREE_ICON_SIZE, TREE_ICON_SIZE],
+                _approx(icon_rect.size.x, TREE_ICON_SIZE)
+                    and _approx(icon_rect.size.y, TREE_ICON_SIZE),
+                "Render each tree node icon at the enlarged 46x46 size.",
+                SKILL_TREE_SOURCE, "WARNING"
+            )
+            _check_inside(
+                "tree.%s.%s.icon_inside_row" % [key, node["id"]], "%s/Icon" % row_path,
+                icon_rect, row_rect,
+                "Keep the enlarged icon inside the row wrapper.",
+                SKILL_TREE_SOURCE, "WARNING"
+            )
+            _check(
+                "tree.%s.%s.icon_hover_coverage" % [key, node["id"]], row_path,
+                "row.height=%.2f icon.height=%.2f" % [row_rect.size.y, icon_rect.size.y],
+                "row.height >= icon.height (hover covers the whole icon)",
+                row_rect.size.y >= icon_rect.size.y - EPS,
+                "Grow the row wrapper with the icon so hover covers the larger icon.",
+                SKILL_TREE_SOURCE, "WARNING"
+            )
+
+            var icon_clear := not icon_rect.intersects(name_rect) \
+                and not icon_rect.intersects(rank_rect)
+            var icon_clear_detail := "icon=%s name=%s rank=%s" % [
+                str(icon_rect), str(name_rect), str(rank_rect),
+            ]
+            if buy_button != null:
+                var content_buy_rect: Rect2 = buy_button.get_global_rect()
+                icon_clear = icon_clear and not icon_rect.intersects(content_buy_rect)
+                icon_clear_detail += " buy=%s" % str(content_buy_rect)
+            _check(
+                "tree.%s.%s.icon_clear_of_content" % [key, node["id"]], row_path,
+                icon_clear_detail,
+                "icon does not intersect Name, Rank, or Buy",
+                icon_clear,
+                "Keep the content columns clear of the enlarged icon.",
+                SKILL_TREE_SOURCE, "WARNING"
+            )
 
         if buy_button != null and icon != null:
             # The Buy child is measured against its sibling Icon (also independently

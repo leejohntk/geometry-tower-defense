@@ -131,6 +131,21 @@ The output always prints:
 Zero findings with skips is distinguishable from zero findings with full coverage by
 design. A run with `L == 0` is fail-closed even when its own preconditions passed.
 
+### Visual-overhaul coverage
+
+The visual-overhaul assertions are structural, never pixel checks:
+
+- **Placement cards** — each `Place*` Button is 160x72 with empty text, click-through
+  `Icon`/`Name`/`Cost` children (expected labels/costs restated from the spec), positive
+  stack gaps, and `StartWave` below the stack.
+- **Skill info band** — `Panel_Main/Block_SkillInfo` is inside the panel, spans the tree
+  area's width, sits below every row, is click-through, shows the idle hint, and updates
+  name/rank/description through the rows' real `mouse_entered`/`mouse_exited` signals
+  (locked rows append the prerequisite hint; exit and purchases reset it).
+- **Backdrops and decorations** — full-viewport click-through `Block_Backdrop` groups on
+  the title and both result screens, a click-through tree backdrop spanning `Panel_Main`,
+  click-through title ornaments, and hover style overrides on menu/return buttons.
+
 ## Finding Format
 
 ```text
