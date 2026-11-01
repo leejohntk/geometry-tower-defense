@@ -119,6 +119,12 @@ public class GridMarkersTest
         }
     }
 
+    private static bool Contains(Rect2 outer, Rect2 inner) =>
+        inner.Position.X >= outer.Position.X - 0.01f
+        && inner.Position.Y >= outer.Position.Y - 0.01f
+        && inner.End.X <= outer.End.X + 0.01f
+        && inner.End.Y <= outer.End.Y + 0.01f;
+
     [TestCase]
     public void Markers_AnimateWithoutMovingTheBaseCore()
     {
@@ -127,12 +133,32 @@ public class GridMarkersTest
         {
             var portal = grid.SpawnPortals[0];
             var baseCore = grid.BaseCore!;
+            var arcA = baseCore.GetNodeOrNull<Control>("ShieldArcA");
+            var arcB = baseCore.GetNodeOrNull<Control>("ShieldArcB");
+            AssertThat(arcA).IsNotNull();
+            AssertThat(arcB).IsNotNull();
+            AssertThat(arcA!.MouseFilter).IsEqual(Control.MouseFilterEnum.Ignore);
+            AssertThat(arcB!.MouseFilter).IsEqual(Control.MouseFilterEnum.Ignore);
+            AssertThat(arcA.PivotOffset).IsEqual(new Vector2(
+                GameConstants.CellSize / 2f,
+                GameConstants.CellSize / 2f));
+            AssertThat(arcB.PivotOffset).IsEqual(new Vector2(
+                GameConstants.CellSize / 2f,
+                GameConstants.CellSize / 2f));
+            // Before animation the arcs share the core's rect (inside the marker).
+            AssertThat(Contains(baseCore.GetGlobalRect(), arcA.GetGlobalRect())).IsTrue();
+            AssertThat(Contains(baseCore.GetGlobalRect(), arcB.GetGlobalRect())).IsTrue();
+            AssertThat(baseCore.MouseFilter).IsEqual(Control.MouseFilterEnum.Ignore);
+            AssertThat(baseCore.ZIndex).IsLess(0);
+
             float rotationBefore = portal.Rotation;
             Vector2 portalScaleBefore = portal.Scale;
             Vector2 basePositionBefore = baseCore.Position;
             float baseAlphaBefore = baseCore.Modulate.A;
+            float arcABefore = arcA.Rotation;
+            float arcBBefore = arcB.Rotation;
 
-            grid._Process(0.4);
+            grid._Process(0.4f);
 
             // Spawn portals still rotate and pulse by transform.
             AssertThat(portal.Rotation).IsNotEqual(rotationBefore);
@@ -141,6 +167,11 @@ public class GridMarkersTest
             AssertThat(portal.PivotOffset).IsEqual(new Vector2(
                 GameConstants.CellSize / 2f,
                 GameConstants.CellSize / 2f));
+
+            // The arcs counter-rotate by transform only.
+            AssertThat(arcA.Rotation).IsGreater(arcABefore);
+            AssertThat(arcB.Rotation).IsLess(arcBBefore);
+            AssertThat(arcA.Rotation).IsEqualApprox(-arcB.Rotation, 0.0001f);
 
             // The base core keeps fixed, centred geometry; only its alpha pulses.
             AssertThat(baseCore.Scale).IsEqual(Vector2.One);
@@ -153,11 +184,18 @@ public class GridMarkersTest
                 GameConstants.CellCenterX(Levels.Level4.BaseCell.X),
                 GameConstants.CellCenterY(Levels.Level4.BaseCell.Y)));
 
-            // Several more frames must never write Scale or Position.
+            // Several more frames: arcs keep counter-rotating, core never scales/moves.
+            float arcAMid = arcA.Rotation;
+            float arcBMid = arcB.Rotation;
             for (int i = 0; i < 10; i++)
                 grid._Process(1f / 60f);
+            AssertThat(arcA.Rotation).IsGreater(arcAMid);
+            AssertThat(arcB.Rotation).IsLess(arcBMid);
             AssertThat(baseCore.Scale).IsEqual(Vector2.One);
             AssertThat(baseCore.Position).IsEqual(basePositionBefore);
+            AssertThat(baseCore.GetGlobalRect().GetCenter()).IsEqual(new Vector2(
+                GameConstants.CellCenterX(Levels.Level4.BaseCell.X),
+                GameConstants.CellCenterY(Levels.Level4.BaseCell.Y)));
             AssertThat(baseCore.Modulate.A)
                 .IsGreaterEqual(GameConstants.BaseCorePulseAlphaMin - 0.0001f);
             AssertThat(baseCore.Modulate.A).IsLessEqual(1f + 0.0001f);

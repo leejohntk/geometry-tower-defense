@@ -24,6 +24,8 @@ public partial class GridManager : Node2D
     // block placement, pathing, clicks, or targeting.
     private readonly List<Control> _spawnPortals = new();
     private Control? _baseCore;
+    private Control? _baseCoreArcA;
+    private Control? _baseCoreArcB;
     private float _markerPhase = 0f;
 
     // Placement preview nodes
@@ -312,29 +314,82 @@ public partial class GridManager : Node2D
                 2f,
                 antialiased: true);
 
-            // One shield ring.
-            _baseCore.DrawCircle(
-                center,
-                shieldRadius,
-                GameConstants.BaseCoreShieldColor,
-                false,
-                1.5f);
+            // Static inner dot; the surrounding ring is replaced by the two rotating
+            // shield arcs below so the marker reads as animated without scaling.
             _baseCore.DrawCircle(center, hexRadius * 0.35f, GameConstants.BaseCoreShieldColor);
         };
 
         AddChild(_baseCore);
+
+        _baseCoreArcA = CreateShieldArc(
+            "ShieldArcA",
+            shieldRadius,
+            Mathf.DegToRad(GameConstants.BaseCoreOuterArcDegrees),
+            GameConstants.BaseCoreShieldArcWidth,
+            GameConstants.BaseCoreShieldColor,
+            cell);
+        _baseCore.AddChild(_baseCoreArcA);
+
+        _baseCoreArcB = CreateShieldArc(
+            "ShieldArcB",
+            shieldRadius * GameConstants.BaseCoreInnerShieldRadiusRatio,
+            Mathf.DegToRad(GameConstants.BaseCoreInnerArcDegrees),
+            GameConstants.BaseCoreInnerShieldArcWidth,
+            GameConstants.BaseCoreShieldColor with { A = GameConstants.BaseCoreInnerShieldArcAlpha },
+            cell);
+        _baseCore.AddChild(_baseCoreArcB);
+    }
+
+    /// <summary>
+    /// Builds one shield arc around the base core. The arc is a rotation-only child —
+    /// no scale/position writes and no per-frame redraw — pivoted on the cell center so
+    /// it stays concentric with the static core.
+    /// </summary>
+    private static Control CreateShieldArc(
+        string name,
+        float radius,
+        float sweepRadians,
+        float width,
+        Color color,
+        float cell)
+    {
+        var arc = new Control();
+        arc.Name = name;
+        arc.Size = new Vector2(cell, cell);
+        arc.PivotOffset = new Vector2(cell / 2f, cell / 2f);
+        arc.MouseFilter = Control.MouseFilterEnum.Ignore;
+        arc.Draw += () =>
+        {
+            if (!IsInstanceValid(arc))
+                return;
+
+            var center = new Vector2(cell / 2f, cell / 2f);
+            float start = -Mathf.Pi / 2f;
+            arc.DrawArc(
+                center,
+                radius,
+                start,
+                start + sweepRadians,
+                GameConstants.BaseCoreShieldArcSegments,
+                color,
+                width,
+                antialiased: true);
+        };
+        return arc;
     }
 
     /// <summary>
     /// Idle marker animation: spawn portals spin and pulse by transform; the base core
-    /// keeps its fixed geometry and pulses by alpha only. No marker repaints per frame.
+    /// keeps its fixed geometry, pulses by alpha, and animates only its two shield arcs
+    /// (opposite rotations). No marker repaints per frame and the core never scales.
     /// </summary>
     public override void _Process(double delta)
     {
         if (!(delta > 0f))
             return;
 
-        _markerPhase += (float)delta;
+        float deltaSeconds = (float)delta;
+        _markerPhase += deltaSeconds;
 
         if (_spawnPortals.Count > 0)
         {
@@ -361,6 +416,13 @@ public partial class GridManager : Node2D
             float alpha = Mathf.Lerp(GameConstants.BaseCorePulseAlphaMin, 1f, wave);
             _baseCore.Modulate = new Color(1f, 1f, 1f, alpha);
         }
+
+        // The arcs counter-rotate by transform only; the core stays static.
+        float arcStep = GameConstants.BaseCoreShieldRotationSpeed * deltaSeconds;
+        if (_baseCoreArcA != null && IsInstanceValid(_baseCoreArcA))
+            _baseCoreArcA.Rotation += arcStep;
+        if (_baseCoreArcB != null && IsInstanceValid(_baseCoreArcB))
+            _baseCoreArcB.Rotation -= arcStep;
     }
 
     /// <summary>Read-only view of the spawn portals for tests (one per spawn cell).</summary>

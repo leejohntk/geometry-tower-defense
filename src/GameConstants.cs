@@ -393,6 +393,17 @@ public static class GameConstants
     public const float BaseCorePulseAlphaMin = 0.82f;
     public const float BaseCorePulseSpeed = 1.8f;
 
+    // Two counter-rotating shield arcs give the base marker visible motion without
+    // moving or scaling the core. Rotation-only; the arcs are children of BaseCore.
+    public const float BaseCoreShieldRotationSpeed = 0.9f;   // radians/sec per arc
+    public const float BaseCoreOuterArcDegrees = 220f;
+    public const float BaseCoreInnerArcDegrees = 140f;
+    public const float BaseCoreInnerShieldRadiusRatio = 0.86f; // x outer shield radius
+    public const float BaseCoreShieldArcWidth = 1.8f;        // px, outer arc
+    public const float BaseCoreInnerShieldArcWidth = 1.6f;   // px, inner arc
+    public const float BaseCoreInnerShieldArcAlpha = 0.55f;  // vs the full shield color
+    public const int BaseCoreShieldArcSegments = 32;
+
     // HUD top status bar. Procedural icons and stat groups replace the old text
     // placeholders; the bar itself stays a subtle dark strip over the battlefield.
     public static readonly Color HudTopBarBackgroundColor = new Color(0.04f, 0.04f, 0.09f, 0.9f);
