@@ -87,6 +87,23 @@ const HUD_CARD_HEIGHT := 72.0
 const HUD_CARD_GAP := 8.0
 const HUD_TOP_BAR_HEIGHT := 40.0
 
+## Top-bar stat layout, stated from the spec independently of the nodes measured:
+## three 128-wide groups starting at x=16 with a 12px gap, 28x28 icons, and a 2px
+## bottom accent border.
+const TOPBAR_ACCENT_HEIGHT := 2.0
+const TOPBAR_GROUP_START_X := 16.0
+const TOPBAR_GROUP_WIDTH := 128.0
+const TOPBAR_GROUP_GAP := 12.0
+const TOPBAR_ICON_SIZE := 28.0
+const TOPBAR_CAPTION_FONT := 10
+const TOPBAR_VALUE_FONT_MIN := 18
+const TOPBAR_VALUE_FONT_MAX := 20
+const TOPBAR_STATS := [
+    {"group": "Block_Health", "icon": "HpIcon", "caption": "HEALTH", "value": "HpLabel", "text": "3"},
+    {"group": "Block_Coins", "icon": "CoinIcon", "caption": "COINS", "value": "CoinsLabel", "text": "10"},
+    {"group": "Block_Wave", "icon": "WaveIcon", "caption": "WAVE", "value": "WaveLabel", "text": "0/5"},
+]
+
 ## Skill-tree info band: idle hint text and the labels every band must carry.
 const SKILL_INFO_HINT := "Hover a skill to see its description."
 const SKILL_INFO_CHILDREN := ["Panel", "Name", "Rank", "Description"]
@@ -651,6 +668,7 @@ func _evaluate_game_hud(game_hud: Node) -> void:
             "hud.top_bar_inside_viewport", "GameHUD/Block_TopBar", rect, viewport_rect,
             "Keep the top status bar inside the viewport.", GAME_HUD_SOURCE
         )
+        _evaluate_top_bar(top_bar)
 
     if sidebar_block != null:
         var sidebar_rect: Rect2 = sidebar_block.get_global_rect()
@@ -686,6 +704,219 @@ func _evaluate_game_hud(game_hud: Node) -> void:
             )
 
         _evaluate_hud_cards(sidebar_block)
+
+
+## Top status bar: click-through procedural decorations, three named stat groups with
+## non-text icons, uppercase captions, and the historical value labels, plus a tidy
+## non-overlapping layout inside the 40px bar.
+func _evaluate_top_bar(top_bar: Control) -> void:
+    var bar_rect: Rect2 = top_bar.get_global_rect()
+
+    var pattern := _require(top_bar, "Pattern", "GameHUD/Block_TopBar", GAME_HUD_SOURCE)
+    if pattern != null:
+        _check_inside(
+            "hud.topbar.pattern_inside_bar", "GameHUD/Block_TopBar/Pattern",
+            pattern.get_global_rect(), bar_rect,
+            "Keep the top-bar pattern inside the bar.", GAME_HUD_SOURCE, "WARNING"
+        )
+        _check(
+            "hud.topbar.pattern_click_through", "GameHUD/Block_TopBar/Pattern",
+            "mouse_filter=%d" % pattern.mouse_filter,
+            "mouse_filter=%d (ignore)" % Control.MOUSE_FILTER_IGNORE,
+            pattern.mouse_filter == Control.MOUSE_FILTER_IGNORE,
+            "Make the top-bar pattern click-through.", GAME_HUD_SOURCE, "WARNING"
+        )
+
+    var border := _require(top_bar, "Border", "GameHUD/Block_TopBar", GAME_HUD_SOURCE)
+    if border != null:
+        var border_rect: Rect2 = border.get_global_rect()
+        _check_inside(
+            "hud.topbar.border_inside_bar", "GameHUD/Block_TopBar/Border",
+            border_rect, bar_rect,
+            "Keep the top-bar accent border inside the bar.", GAME_HUD_SOURCE, "WARNING"
+        )
+        _check(
+            "hud.topbar.border_click_through", "GameHUD/Block_TopBar/Border",
+            "mouse_filter=%d" % border.mouse_filter,
+            "mouse_filter=%d (ignore)" % Control.MOUSE_FILTER_IGNORE,
+            border.mouse_filter == Control.MOUSE_FILTER_IGNORE,
+            "Make the top-bar accent border click-through.", GAME_HUD_SOURCE, "WARNING"
+        )
+        _check(
+            "hud.topbar.border_bottom_accent", "GameHUD/Block_TopBar/Border",
+            "height=%.2f bottom=%.2f bar.bottom=%.2f" % [
+                border_rect.size.y, border_rect.end.y, bar_rect.end.y,
+            ],
+            "height=%.1f and bottom=bar.bottom" % TOPBAR_ACCENT_HEIGHT,
+            _approx(border_rect.size.y, TOPBAR_ACCENT_HEIGHT)
+                and _approx(border_rect.end.y, bar_rect.end.y),
+            "Draw a 2px accent line along the bar's bottom edge.",
+            GAME_HUD_SOURCE, "WARNING"
+        )
+
+    var group_rects := []
+    for index in range(TOPBAR_STATS.size()):
+        var stat: Dictionary = TOPBAR_STATS[index]
+        var group_name := String(stat["group"])
+        var group := _require(top_bar, group_name, "GameHUD/Block_TopBar", GAME_HUD_SOURCE)
+        if group == null:
+            continue
+
+        var group_rect: Rect2 = group.get_global_rect()
+        group_rects.append(group_rect)
+        var group_path := "GameHUD/Block_TopBar/%s" % group_name
+
+        _check_inside(
+            "hud.topbar.%s.inside_bar" % group_name.to_lower(), group_path, group_rect, bar_rect,
+            "Keep the stat group inside the top bar.", GAME_HUD_SOURCE, "WARNING"
+        )
+        _check(
+            "hud.topbar.%s.click_through" % group_name.to_lower(), group_path,
+            "mouse_filter=%d" % group.mouse_filter,
+            "mouse_filter=%d (ignore)" % Control.MOUSE_FILTER_IGNORE,
+            group.mouse_filter == Control.MOUSE_FILTER_IGNORE,
+            "Make the stat group wrapper click-through.", GAME_HUD_SOURCE, "WARNING"
+        )
+
+        var expected_x := TOPBAR_GROUP_START_X + index * (TOPBAR_GROUP_WIDTH + TOPBAR_GROUP_GAP)
+        _check(
+            "hud.topbar.%s.layout" % group_name.to_lower(), group_path,
+            "x=%.2f y=%.2f w=%.2f h=%.2f" % [
+                group_rect.position.x, group_rect.position.y,
+                group_rect.size.x, group_rect.size.y,
+            ],
+            "x=%.2f y=0 w=%.1f h=%.1f" % [
+                expected_x, TOPBAR_GROUP_WIDTH, HUD_TOP_BAR_HEIGHT,
+            ],
+            _approx(group_rect.position.x, expected_x)
+                and _approx(group_rect.position.y, 0.0)
+                and _approx(group_rect.size.x, TOPBAR_GROUP_WIDTH)
+                and _approx(group_rect.size.y, HUD_TOP_BAR_HEIGHT),
+            "Lay the stat groups out left-aligned with the shared group width and gap.",
+            GAME_HUD_SOURCE, "WARNING"
+        )
+
+        var icon := _require(group, String(stat["icon"]), group_path, GAME_HUD_SOURCE)
+        if icon != null:
+            _check(
+                "hud.topbar.%s.icon_not_text" % group_name.to_lower(),
+                "%s/%s" % [group_path, String(stat["icon"])],
+                "class=%s" % icon.get_class(),
+                "a Control subclass that is not a Label",
+                not (icon is Label),
+                "Replace the text placeholder with a procedural icon Control.",
+                GAME_HUD_SOURCE, "WARNING"
+            )
+            _check(
+                "hud.topbar.%s.icon_size" % group_name.to_lower(),
+                "%s/%s" % [group_path, String(stat["icon"])],
+                "size=(%.2f, %.2f)" % [icon.size.x, icon.size.y],
+                "size=(%.1f, %.1f)" % [TOPBAR_ICON_SIZE, TOPBAR_ICON_SIZE],
+                _approx(icon.size.x, TOPBAR_ICON_SIZE)
+                    and _approx(icon.size.y, TOPBAR_ICON_SIZE),
+                "Render each top-bar icon at ~28x28.",
+                GAME_HUD_SOURCE, "WARNING"
+            )
+            _check(
+                "hud.topbar.%s.icon_click_through" % group_name.to_lower(),
+                "%s/%s" % [group_path, String(stat["icon"])],
+                "mouse_filter=%d" % icon.mouse_filter,
+                "mouse_filter=%d (ignore)" % Control.MOUSE_FILTER_IGNORE,
+                icon.mouse_filter == Control.MOUSE_FILTER_IGNORE,
+                "Make the procedural icon click-through.",
+                GAME_HUD_SOURCE, "WARNING"
+            )
+            _check_inside(
+                "hud.topbar.%s.icon_inside_group" % group_name.to_lower(),
+                "%s/%s" % [group_path, String(stat["icon"])],
+                icon.get_global_rect(), group_rect,
+                "Keep the icon inside its stat group.", GAME_HUD_SOURCE, "WARNING"
+            )
+
+        var caption := _require_label(group, "Caption", group_path, GAME_HUD_SOURCE)
+        if caption != null:
+            _check(
+                "hud.topbar.%s.caption" % group_name.to_lower(),
+                "%s/Caption" % group_path,
+                "text=%s" % String(caption.text),
+                "text=%s (uppercase)" % String(stat["caption"]),
+                String(caption.text) == String(stat["caption"]),
+                "Label each stat group with its uppercase caption.",
+                GAME_HUD_SOURCE, "WARNING"
+            )
+            _check(
+                "hud.topbar.%s.caption_font" % group_name.to_lower(),
+                "%s/Caption" % group_path,
+                "font=%d" % caption.get_theme_font_size("font_size"),
+                "font=%d" % TOPBAR_CAPTION_FONT,
+                caption.get_theme_font_size("font_size") == TOPBAR_CAPTION_FONT,
+                "Use the small caption font size.",
+                GAME_HUD_SOURCE, "WARNING"
+            )
+            _check_inside(
+                "hud.topbar.%s.caption_inside_group" % group_name.to_lower(),
+                "%s/Caption" % group_path,
+                caption.get_global_rect(), group_rect,
+                "Keep the caption inside its stat group (no clipping).",
+                GAME_HUD_SOURCE, "WARNING"
+            )
+
+        var value_label := _require_label(group, String(stat["value"]), group_path, GAME_HUD_SOURCE)
+        if value_label != null:
+            _check(
+                "hud.topbar.%s.value" % group_name.to_lower(),
+                "%s/%s" % [group_path, String(stat["value"])],
+                "text=%s" % String(value_label.text),
+                "text=%s (initial format)" % String(stat["text"]),
+                String(value_label.text) == String(stat["text"]),
+                "Keep the historical value label name and text format.",
+                GAME_HUD_SOURCE, "WARNING"
+            )
+            var value_font := value_label.get_theme_font_size("font_size")
+            _check(
+                "hud.topbar.%s.value_font" % group_name.to_lower(),
+                "%s/%s" % [group_path, String(stat["value"])],
+                "font=%d" % value_font,
+                "font=%d..%d" % [TOPBAR_VALUE_FONT_MIN, TOPBAR_VALUE_FONT_MAX],
+                value_font >= TOPBAR_VALUE_FONT_MIN and value_font <= TOPBAR_VALUE_FONT_MAX,
+                "Use an 18-20px bright value font.",
+                GAME_HUD_SOURCE, "WARNING"
+            )
+            _check_inside(
+                "hud.topbar.%s.value_inside_group" % group_name.to_lower(),
+                "%s/%s" % [group_path, String(stat["value"])],
+                value_label.get_global_rect(), group_rect,
+                "Keep the value inside its stat group (no clipping).",
+                GAME_HUD_SOURCE, "WARNING"
+            )
+
+    # Pairwise non-overlap and left-to-right order across the three groups.
+    var layout_ok: bool = group_rects.size() == TOPBAR_STATS.size()
+    for i in range(group_rects.size()):
+        for j in range(i + 1, group_rects.size()):
+            if group_rects[i].intersects(group_rects[j]):
+                layout_ok = false
+        if i > 0 and group_rects[i].position.x <= group_rects[i - 1].end.x:
+            layout_ok = false
+    _check(
+        "hud.topbar.groups_no_overlap", "GameHUD/Block_TopBar",
+        "groups=%d gaps=non-overlapping left-to-right" % group_rects.size(),
+        "groups=%d, no pairwise overlap, increasing x" % TOPBAR_STATS.size(),
+        layout_ok,
+        "Lay the stat groups out left-aligned with clear gaps and no overlap.",
+        GAME_HUD_SOURCE, "WARNING"
+    )
+
+    _check(
+        "hud.topbar.no_text_placeholders", "GameHUD/Block_TopBar",
+        "contains '[HP]'=%s contains '[$]'=%s" % [
+            str(_tree_has_text(top_bar, "[hp]")), str(_tree_has_text(top_bar, "[$]")),
+        ],
+        "both false (procedural icons instead of text placeholders)",
+        not _tree_has_text(top_bar, "[hp]") and not _tree_has_text(top_bar, "[$]"),
+        "Remove the [HP] and [$] text placeholders; draw procedural icons.",
+        GAME_HUD_SOURCE, "WARNING"
+    )
 
 
 ## Placement cards: each Place* button is a 160x72 icon card with empty text and

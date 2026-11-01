@@ -391,6 +391,15 @@ public static class GameConstants
     public const float BaseCorePulseAmplitude = 0.05f;
     public const float BaseCorePulseSpeed = 1.8f;
 
+    // HUD top status bar. Procedural icons and stat groups replace the old text
+    // placeholders; the bar itself stays a subtle dark strip over the battlefield.
+    public static readonly Color HudTopBarBackgroundColor = new Color(0.04f, 0.04f, 0.09f, 0.9f);
+    public static readonly Color HudTopBarAccentColor = new Color(0.35f, 0.45f, 0.8f, 0.9f);
+    public static readonly Color HudTopBarPatternColor = new Color(0.45f, 0.55f, 0.9f, 0.05f);
+    public static readonly Color HudHealthColor = new Color(1f, 0.3f, 0.3f);
+    public static readonly Color HudCoinColor = new Color(1f, 0.9f, 0.2f);
+    public static readonly Color HudWaveColor = new Color(0.5f, 0.7f, 1f);
+
     // HUD tower placement cards. Buttons keep their node names/paths and signals;
     // only their content and size change.
     public const float SidebarCardWidth = 160f;

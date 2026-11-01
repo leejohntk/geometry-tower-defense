@@ -1,4 +1,5 @@
 using Godot;
+using System;
 using System.Collections.Generic;
 
 namespace GeometryTowerDefense;
@@ -33,12 +34,32 @@ public partial class GameHUD : CanvasLayer
     // stay legible.
     private readonly List<(Button Button, Control Icon, Label Name, Label Cost)> _placementCards = new();
 
+    // Top-bar stat layout (local to Block_TopBar). A 28x28 icon, a small uppercase
+    // caption, and the value sit side by side in one 128-wide group; groups start at
+    // x=16 with a 12px gap, all inside the 40px bar. The caption/value heights are
+    // centred from their measured minimum sizes so no line is clipped.
+    private const float TopBarStatStartX = 16f;
+    private const float TopBarStatGroupGap = 12f;
+    private const float TopBarStatGroupWidth = 128f;
+    private const float TopBarStatIconSize = 28f;
+    private const float TopBarStatTextX = 34f;
+    private const float TopBarStatCaptionWidth = 50f;
+    private const float TopBarStatValueX = 88f;
+    private const float TopBarStatValueWidth = 40f;
+    private const float TopBarStatCaptionHeight = 23f;
+    private const float TopBarStatValueHeight = 26f;
+    private const int TopBarCaptionFontSize = 10;
+    private const int TopBarValueFontSize = 18;
+    private const float TopBarAccentHeight = 2f;
+    private const float TopBarPatternSpacing = 18f;
+
     public override void _Ready()
     {
         var viewportSize = GetViewport().GetVisibleRect().Size;
 
         // Top bar group — spans the full viewport width, at top. The wrapper sits at
-        // the origin so its children keep absolute positions.
+        // the origin so its children keep absolute positions. It is a visual-only
+        // overlay: every descendant is click-through.
         var topBarBlock = new Control();
         topBarBlock.Name = "Block_TopBar";
         topBarBlock.Position = Vector2.Zero;
@@ -49,70 +70,43 @@ public partial class GameHUD : CanvasLayer
         var topBarBg = new ColorRect();
         topBarBg.Name = "Background";
         topBarBg.Size = new Vector2(viewportSize.X, GameConstants.TopBarHeight);
-        topBarBg.Color = new Color(0.05f, 0.05f, 0.1f, 0.85f);
+        topBarBg.Color = GameConstants.HudTopBarBackgroundColor;
         topBarBg.Position = Vector2.Zero;
+        topBarBg.MouseFilter = Control.MouseFilterEnum.Ignore;
         topBarBlock.AddChild(topBarBg);
 
-        float currentX = 16f;
+        // Faint procedural diagonal lattice behind the stats (alpha <= 0.06).
+        var pattern = new Control();
+        pattern.Name = "Pattern";
+        pattern.Position = Vector2.Zero;
+        pattern.Size = new Vector2(viewportSize.X, GameConstants.TopBarHeight);
+        pattern.MouseFilter = Control.MouseFilterEnum.Ignore;
+        pattern.Draw += () => DrawTopBarPattern(pattern);
+        topBarBlock.AddChild(pattern);
 
-        // HP display
-        var hpIcon = new Label();
-        hpIcon.Name = "HpIcon";
-        hpIcon.Text = "[HP]";
-        hpIcon.Position = new Vector2(currentX, 4);
-        hpIcon.Size = new Vector2(40, 32);
-        hpIcon.AddThemeColorOverride("font_color", new Color(1f, 0.3f, 0.3f));
-        topBarBlock.AddChild(hpIcon);
-        currentX += 45f;
+        // Two-pixel bottom accent border.
+        var border = new Control();
+        border.Name = "Border";
+        border.Position = new Vector2(0f, GameConstants.TopBarHeight - TopBarAccentHeight);
+        border.Size = new Vector2(viewportSize.X, TopBarAccentHeight);
+        border.MouseFilter = Control.MouseFilterEnum.Ignore;
+        border.Draw += () => DrawTopBarBorder(border);
+        topBarBlock.AddChild(border);
 
-        _hpLabel = new Label();
-        _hpLabel.Name = "HpLabel";
-        _hpLabel.Text = "3";
-        _hpLabel.Position = new Vector2(currentX, 4);
-        _hpLabel.Size = new Vector2(40, 32);
-        _hpLabel.AddThemeFontSizeOverride("font_size", 20);
-        _hpLabel.AddThemeColorOverride("font_color", new Color(1f, 1f, 1f));
-        topBarBlock.AddChild(_hpLabel);
-        currentX += 80f;
-
-        // Coins display
-        var coinIcon = new Label();
-        coinIcon.Name = "CoinIcon";
-        coinIcon.Text = "[$]";
-        coinIcon.Position = new Vector2(currentX, 4);
-        coinIcon.Size = new Vector2(40, 32);
-        coinIcon.AddThemeColorOverride("font_color", new Color(1f, 0.9f, 0.2f));
-        topBarBlock.AddChild(coinIcon);
-        currentX += 45f;
-
-        _coinsLabel = new Label();
-        _coinsLabel.Name = "CoinsLabel";
-        _coinsLabel.Text = "10";
-        _coinsLabel.Position = new Vector2(currentX, 4);
-        _coinsLabel.Size = new Vector2(40, 32);
-        _coinsLabel.AddThemeFontSizeOverride("font_size", 20);
-        _coinsLabel.AddThemeColorOverride("font_color", new Color(1f, 1f, 1f));
-        topBarBlock.AddChild(_coinsLabel);
-        currentX += 80f;
-
-        // Wave display
-        var waveIcon = new Label();
-        waveIcon.Name = "WaveIcon";
-        waveIcon.Text = "Wave";
-        waveIcon.Position = new Vector2(currentX, 4);
-        waveIcon.Size = new Vector2(50, 32);
-        waveIcon.AddThemeColorOverride("font_color", new Color(0.5f, 0.7f, 1f));
-        topBarBlock.AddChild(waveIcon);
-        currentX += 55f;
-
-        _waveLabel = new Label();
-        _waveLabel.Name = "WaveLabel";
-        _waveLabel.Text = "0/5";
-        _waveLabel.Position = new Vector2(currentX, 4);
-        _waveLabel.Size = new Vector2(60, 32);
-        _waveLabel.AddThemeFontSizeOverride("font_size", 20);
-        _waveLabel.AddThemeColorOverride("font_color", new Color(1f, 1f, 1f));
-        topBarBlock.AddChild(_waveLabel);
+        // Three stat groups, left-aligned with a uniform gap. Each group spans its
+        // procedural icon, uppercase caption, and the existing value label.
+        float groupX = TopBarStatStartX;
+        _hpLabel = BuildStatGroup(
+            topBarBlock, "Block_Health", "HpIcon", "HpLabel", "HEALTH", "3",
+            GameConstants.HudHealthColor, HudIcons.DrawHealth, groupX);
+        groupX += TopBarStatGroupWidth + TopBarStatGroupGap;
+        _coinsLabel = BuildStatGroup(
+            topBarBlock, "Block_Coins", "CoinIcon", "CoinsLabel", "COINS", "10",
+            GameConstants.HudCoinColor, HudIcons.DrawCoin, groupX);
+        groupX += TopBarStatGroupWidth + TopBarStatGroupGap;
+        _waveLabel = BuildStatGroup(
+            topBarBlock, "Block_Wave", "WaveIcon", "WaveLabel", "WAVE", "0/5",
+            GameConstants.HudWaveColor, HudIcons.DrawWave, groupX);
 
         // The sidebar sits to the RIGHT of the play area (grid), not overlapping it.
         float sidebarX = GameConstants.PlayAreaWidth;
@@ -173,6 +167,110 @@ public partial class GameHUD : CanvasLayer
         sidebarBlock.AddChild(_startWaveButton);
 
         UpdateCardDims();
+    }
+
+    /// <summary>
+    /// Builds one top-bar stat group: a click-through wrapper spanning a procedural
+    /// icon, an uppercase caption, and the value label (returned so the existing
+    /// HpLabel/CoinsLabel/WaveLabel fields can be updated by signal handlers).
+    /// </summary>
+    private static Label BuildStatGroup(
+        Control parent,
+        string groupName,
+        string iconName,
+        string valueName,
+        string captionText,
+        string valueText,
+        Color color,
+        Action<CanvasItem, Vector2, float, Color> drawIcon,
+        float x)
+    {
+        var group = new Control();
+        group.Name = groupName;
+        group.Position = new Vector2(x, 0f);
+        group.Size = new Vector2(TopBarStatGroupWidth, GameConstants.TopBarHeight);
+        group.MouseFilter = Control.MouseFilterEnum.Ignore;
+        parent.AddChild(group);
+
+        float iconRadius = TopBarStatIconSize / 2f;
+        var icon = new Control();
+        icon.Name = iconName;
+        icon.Size = new Vector2(TopBarStatIconSize, TopBarStatIconSize);
+        icon.Position = new Vector2(0f, (GameConstants.TopBarHeight - TopBarStatIconSize) / 2f);
+        icon.MouseFilter = Control.MouseFilterEnum.Ignore;
+        icon.Draw += () =>
+        {
+            if (!IsInstanceValid(icon))
+                return;
+            drawIcon(icon, new Vector2(iconRadius, iconRadius), iconRadius, color);
+        };
+        group.AddChild(icon);
+
+        var caption = new Label();
+        caption.Name = "Caption";
+        caption.Text = captionText;
+        caption.VerticalAlignment = VerticalAlignment.Center;
+        caption.AddThemeFontSizeOverride("font_size", TopBarCaptionFontSize);
+        caption.AddThemeColorOverride("font_color", color);
+        caption.MouseFilter = Control.MouseFilterEnum.Ignore;
+        group.AddChild(caption);
+
+        var value = new Label();
+        value.Name = valueName;
+        value.Text = valueText;
+        value.VerticalAlignment = VerticalAlignment.Center;
+        value.AddThemeFontSizeOverride("font_size", TopBarValueFontSize);
+        value.AddThemeColorOverride("font_color", new Color(1f, 1f, 1f));
+        value.MouseFilter = Control.MouseFilterEnum.Ignore;
+        group.AddChild(value);
+
+        // Centre the text rows from their real minimum sizes so the 40px bar never
+        // clips a caption or value (fonts resolve their line height from the theme).
+        float captionHeight = Mathf.Max(
+            TopBarStatCaptionHeight, caption.GetCombinedMinimumSize().Y);
+        float valueHeight = Mathf.Max(
+            TopBarStatValueHeight, value.GetCombinedMinimumSize().Y);
+        caption.Position = new Vector2(
+            TopBarStatTextX,
+            (GameConstants.TopBarHeight - captionHeight) / 2f);
+        caption.Size = new Vector2(TopBarStatCaptionWidth, captionHeight);
+        value.Position = new Vector2(
+            TopBarStatValueX,
+            (GameConstants.TopBarHeight - valueHeight) / 2f);
+        value.Size = new Vector2(TopBarStatValueWidth, valueHeight);
+
+        return value;
+    }
+
+    /// <summary>
+    /// Faint diagonal lattice behind the top-bar stats. Painted once when the bar is
+    /// built (never per frame); alpha is capped by HudTopBarPatternColor.
+    /// </summary>
+    private static void DrawTopBarPattern(Control pattern)
+    {
+        if (!IsInstanceValid(pattern))
+            return;
+
+        Vector2 size = pattern.Size;
+        Color line = GameConstants.HudTopBarPatternColor;
+        for (float x = -size.Y; x < size.X; x += TopBarPatternSpacing)
+        {
+            pattern.DrawLine(
+                new Vector2(x, size.Y),
+                new Vector2(x + size.Y, 0f),
+                line,
+                1f,
+                antialiased: true);
+        }
+    }
+
+    /// <summary>Two-pixel accent line along the bar's bottom edge.</summary>
+    private static void DrawTopBarBorder(Control border)
+    {
+        if (!IsInstanceValid(border))
+            return;
+
+        border.DrawRect(new Rect2(Vector2.Zero, border.Size), GameConstants.HudTopBarAccentColor);
     }
 
     /// <summary>
