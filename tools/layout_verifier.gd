@@ -924,9 +924,9 @@ func _evaluate_top_bar(top_bar: Control) -> void:
 ## sits below the stack. Expected labels/costs come from the spec, not the nodes.
 func _evaluate_hud_cards(sidebar_block: Control) -> void:
     var expected_cards := [
-        {"name": "PlaceArrow", "label": "Arrow", "cost": "10$"},
-        {"name": "PlaceCannon", "label": "Cannon", "cost": "10$"},
-        {"name": "PlaceLaser", "label": "Laser", "cost": "10$"},
+        {"name": "PlaceArrow", "label": "Arrow", "cost": "10"},
+        {"name": "PlaceCannon", "label": "Cannon", "cost": "10"},
+        {"name": "PlaceLaser", "label": "Laser", "cost": "10"},
     ]
 
     var previous: Rect2 = Rect2()

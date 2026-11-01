@@ -120,7 +120,7 @@ public class GridMarkersTest
     }
 
     [TestCase]
-    public void Markers_AnimateByTransformOnly()
+    public void Markers_AnimateWithoutMovingTheBaseCore()
     {
         var grid = BuildGrid(Levels.Level4);
         try
@@ -128,16 +128,39 @@ public class GridMarkersTest
             var portal = grid.SpawnPortals[0];
             var baseCore = grid.BaseCore!;
             float rotationBefore = portal.Rotation;
-            Vector2 baseScaleBefore = baseCore.Scale;
+            Vector2 portalScaleBefore = portal.Scale;
+            Vector2 basePositionBefore = baseCore.Position;
+            float baseAlphaBefore = baseCore.Modulate.A;
 
             grid._Process(0.4);
 
+            // Spawn portals still rotate and pulse by transform.
             AssertThat(portal.Rotation).IsNotEqual(rotationBefore);
-            AssertThat(baseCore.Scale).IsNotEqual(baseScaleBefore);
+            AssertThat(portal.Scale).IsNotEqual(portalScaleBefore);
             // The portal keeps its cell-center pivot so the pulse stays centered.
             AssertThat(portal.PivotOffset).IsEqual(new Vector2(
                 GameConstants.CellSize / 2f,
                 GameConstants.CellSize / 2f));
+
+            // The base core keeps fixed, centred geometry; only its alpha pulses.
+            AssertThat(baseCore.Scale).IsEqual(Vector2.One);
+            AssertThat(baseCore.Position).IsEqual(basePositionBefore);
+            AssertThat(baseCore.Modulate.A).IsNotEqual(baseAlphaBefore);
+            AssertThat(baseCore.Modulate.A)
+                .IsGreaterEqual(GameConstants.BaseCorePulseAlphaMin - 0.0001f);
+            AssertThat(baseCore.Modulate.A).IsLessEqual(1f + 0.0001f);
+            AssertThat(baseCore.GetGlobalRect().GetCenter()).IsEqual(new Vector2(
+                GameConstants.CellCenterX(Levels.Level4.BaseCell.X),
+                GameConstants.CellCenterY(Levels.Level4.BaseCell.Y)));
+
+            // Several more frames must never write Scale or Position.
+            for (int i = 0; i < 10; i++)
+                grid._Process(1f / 60f);
+            AssertThat(baseCore.Scale).IsEqual(Vector2.One);
+            AssertThat(baseCore.Position).IsEqual(basePositionBefore);
+            AssertThat(baseCore.Modulate.A)
+                .IsGreaterEqual(GameConstants.BaseCorePulseAlphaMin - 0.0001f);
+            AssertThat(baseCore.Modulate.A).IsLessEqual(1f + 0.0001f);
         }
         finally
         {

@@ -27,9 +27,9 @@ public class GameHudPlacementCardTest
         {
             var cases = new (string Name, TowerType Type, string Label, string Cost)[]
             {
-                ("PlaceArrow", TowerType.Arrow, "Arrow", $"{GameConstants.ArrowTowerCost}$"),
-                ("PlaceCannon", TowerType.Cannon, "Cannon", $"{GameConstants.CannonTowerCost}$"),
-                ("PlaceLaser", TowerType.Laser, "Laser", $"{GameConstants.LaserTowerCost}$"),
+                ("PlaceArrow", TowerType.Arrow, "Arrow", $"{GameConstants.ArrowTowerCost}"),
+                ("PlaceCannon", TowerType.Cannon, "Cannon", $"{GameConstants.CannonTowerCost}"),
+                ("PlaceLaser", TowerType.Laser, "Laser", $"{GameConstants.LaserTowerCost}"),
             };
 
             foreach (var (name, type, label, cost) in cases)

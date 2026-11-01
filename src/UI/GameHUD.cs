@@ -328,7 +328,7 @@ public partial class GameHUD : CanvasLayer
 
         var costLabel = new Label();
         costLabel.Name = "Cost";
-        costLabel.Text = $"{GameConstants.TowerCost(type)}$";
+        costLabel.Text = GameConstants.TowerCost(type).ToString();
         costLabel.Position = new Vector2(GameConstants.SidebarCardTextX, 40);
         costLabel.Size = new Vector2(96, 22);
         costLabel.AddThemeFontSizeOverride("font_size", 14);

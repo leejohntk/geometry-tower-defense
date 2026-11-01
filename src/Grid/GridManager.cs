@@ -267,8 +267,10 @@ public partial class GridManager : Node2D
 
     /// <summary>
     /// Builds the base marker: a gold/white hexagonal core inside one shield ring.
-    /// Pulsing is a scale transform driven by <see cref="_Process"/>; it is
-    /// click-through and background-layered.
+    /// Its gentle pulse is an alpha (<see cref="CanvasItem.Modulate"/>) animation driven
+    /// by <see cref="_Process"/> — the geometry never scales or moves, so the
+    /// antialiased strokes stay crisp and centred. It is click-through and
+    /// background-layered.
     /// </summary>
     private void CreateBaseCore(Vector2I baseCell)
     {
@@ -324,8 +326,8 @@ public partial class GridManager : Node2D
     }
 
     /// <summary>
-    /// Idle marker animation: portal spin and gentle scale pulses, all as transforms.
-    /// No marker repaints per frame.
+    /// Idle marker animation: spawn portals spin and pulse by transform; the base core
+    /// keeps its fixed geometry and pulses by alpha only. No marker repaints per frame.
     /// </summary>
     public override void _Process(double delta)
     {
@@ -352,9 +354,12 @@ public partial class GridManager : Node2D
 
         if (_baseCore != null && IsInstanceValid(_baseCore))
         {
-            float scale = 1f + GameConstants.BaseCorePulseAmplitude
+            // Alpha-only pulse: the 64px control's geometry, scale, and position are
+            // never written, so the antialiased strokes cannot shimmer.
+            float wave = 0.5f + 0.5f
                 * Mathf.Sin(_markerPhase * GameConstants.BaseCorePulseSpeed);
-            _baseCore.Scale = new Vector2(scale, scale);
+            float alpha = Mathf.Lerp(GameConstants.BaseCorePulseAlphaMin, 1f, wave);
+            _baseCore.Modulate = new Color(1f, 1f, 1f, alpha);
         }
     }
 

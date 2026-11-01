@@ -388,7 +388,9 @@ public static class GameConstants
     public static readonly Color BaseCoreShieldColor = new Color(1f, 0.98f, 0.85f, 0.75f);
     public const float BaseCoreHexRadiusRatio = 0.28f;       // x cell size
     public const float BaseCoreShieldRadiusRatio = 0.4f;
-    public const float BaseCorePulseAmplitude = 0.05f;
+    // The base core pulses by alpha only (its geometry never scales/moves, which kept
+    // the antialiased strokes crisp). Alpha oscillates between this minimum and 1.
+    public const float BaseCorePulseAlphaMin = 0.82f;
     public const float BaseCorePulseSpeed = 1.8f;
 
     // HUD top status bar. Procedural icons and stat groups replace the old text
