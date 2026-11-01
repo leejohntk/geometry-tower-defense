@@ -84,6 +84,9 @@ Incremental/idle-style progression across sessions. Playing earns XP. XP spent o
 - **Clean UI.** Geometric HUD elements. Sans-serif fonts.
 - **Size in grid units.** The grid cell is 64 px (`GameConstants.CellSize`). Specify rendered sizes for new enemies, towers, and bosses as whole or half cells rather than arbitrary pixels. The Progenitor shipped at 1 cell (64 px) after playtest rejected 1.5 cells (96 px) and 1.125 cells (72 px); those two revisions cost two playtest passes.
 - **Telegraph timing.** A new boss/enemy signature behavior should be visible within roughly 3.5 s of engagement. The Progenitor's first summon at 6.5 s (6.0 s interval + 0.5 s windup) read as "never summoned" in playtest and was halved to 3.0 s + 0.5 s.
+- **Player-facing copy.** Do not expose internal calculation values, formulas, or window lengths in parentheses; describe the effect qualitatively and keep the rank-3 archetype relationship visible. Costs render as plain numbers (`10`), not `10$`. Both were playtest fixes on visual-overhaul.
+- **Anti-aliasing.** Procedural `CanvasItem` draws pass `antialiased: true`; the project uses 2D MSAA 4× (`rendering/anti_aliasing/quality/msaa_2d=2`) for gameplay geometry. Shipped in visual-overhaul playtest fix 4.
+- **Motion without jitter.** Static markers must not scale or move off their anchor per frame; animate rotation, alpha, or modulate instead. A per-frame scale pulse on the base core read as subpixel shimmer; it was replaced by counter-rotating shield arcs.
 - **2D plane.** All visuals flat on a single 2D plane. No 3D, no isometric perspective.
 
 ## Asset Policy

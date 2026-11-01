@@ -7,16 +7,18 @@ metadata:
 
 # Current Feature
 
-**Status:** awaiting playtest — visual-overhaul complete, PR open. Live phase in
-`.claude/state.json`; spec `.claude/specs/visual-overhaul.md` (approved 2026-10-30).
-Branch `feature/visual-overhaul`.
+**Last feature:** visual-overhaul — full-game procedural visual pass (PR #31, merged
+2026-11-01, squash `7cf39e1`). Nine playtest fix batches landed after the initial gates;
+final gates: build 0 warnings, 507 tests, layout verifier 335 assertions / 337 evaluated /
+2 skipped / 0 findings. The spec and archived regression holdouts were not updated for
+the playtest values (see Open follow-ups).
 
 **Live phase lives in `.claude/state.json`** — that file is the single source of truth for what is
 active right now (and is deleted at merge, which means "idle"). This file records *history*: what
 shipped, its gates, and open follow-ups. Do not track phase here — it goes stale the moment a PR
 merges.
 
-**Last feature:** tower-upgrades — in-level ranks, hidden XP gates, archetype specialization (PR #29, merged 2026-10-28)
+**Previous feature:** tower-upgrades — in-level ranks, hidden XP gates, archetype specialization (PR #29, merged 2026-10-28)
 **Branch:** `feature/tower-upgrades` (merged, deleted) — squash `5db78bb`
 **Spec:** `.claude/specs/tower-upgrades.md` (approved 2026-10-27)
 
@@ -148,6 +150,17 @@ Holdouts moved to `.claude/holdouts/regression/tower-skill-tree-mechanics/`.
 
 ## Post-Merge Follow-Up
 
+- **Visual-overhaul spec drift (2026-11-01)** — nine playtest fix batches changed pinned values
+  but the spec still pins 22×22 node icons (shipped 46×46), a `15$` cost format (shipped plain
+  number), and lists the top-bar redesign as Out of Scope (shipped in fix 6). The regression
+  holdouts were archived without a post-playtest re-verification. Fold the accepted deltas into
+  `.claude/specs/visual-overhaul.md` and the holdouts, or mark them historical.
+- **Remote feature branches linger (2026-11-01)** — `origin/feature/visual-overhaul` and the older
+  `origin/feature/layout-verifier` still exist; Merge Cleanup deletes only the local branch.
+  Add remote deletion to the cleanup step.
+- **Post-merge re-verification skipped (2026-11-01)** — `main` was fast-forwarded and the local
+  branch deleted, but no `dotnet build`/`dotnet test` ran after the squash (the tree equals the
+  pre-merge tip, so risk is low). Run #8 did re-verify; decide whether this stays practice.
 - **Progenitor architecture (deferred from /simplify)** — revisit when a second boss or summoner
   ships: wave spawn routing is still a kind branch in `WaveManager.SpawnNext`; `GameManager`
   tracks a single boss reference, so two Progenitors would silently tick only the last; summons
@@ -164,21 +177,26 @@ Holdouts moved to `.claude/holdouts/regression/tower-skill-tree-mechanics/`.
   `head -5`, which shows only the frontmatter). The line is removed; `.claude/state.json` is the
   sole phase owner. Proposal P4 (a post-merge `chore/post-merge-*` branch to flip the status) was
   **rejected** — it would have created a stray PR after every feature merge to maintain a
-  redundant line.
+  redundant line. **Recurred 2026-10-30:** a `Status:` line was reintroduced while drafting
+  visual-overhaul and still read "PR open" after the merge; run #9 removed it and queued a
+  skill-level instruction against adding one (P20).
 
 ## Recent Features
 
-- **Visual overhaul** (PR pending, 2026-10-30) — full procedural visual pass with no
+- **Visual overhaul** (PR #31, merged 2026-11-01) — full procedural visual pass with no
   gameplay changes: per-kind enemy silhouettes + transform idle motion + hit feedback +
   pooled death bursts; turret aim/recoil, arrow orientation fix and trails, richer
   explosion, laser impact glow; spawn portals + base core replace debug markers/labels;
   placement icon cards; skill-tree backdrop/glyphs/halos + bottom hover description band
   with 15 tuning-accurate descriptions; animated title and distinct victory/defeat
-  backdrops with styled buttons. Build 0 warnings, 499 tests, layout verifier 214/0,
-  holdouts 23/23. Review found one CRITICAL (status tint repainted only the overlay
-  container, so body-layer flashes/boss phase border went stale) plus 4 WARNING and 5
-  INFO; all fixed in one batch. Simplify pass then removed dead code and consolidated
-  button/ornament/test-support duplication.
+  backdrops with styled buttons. Initial gates: build 0 warnings, 499 tests, layout
+  verifier 214/0, holdouts 23/23. Review found one CRITICAL (status tint repainted only
+  the overlay container, so body-layer flashes/boss phase border went stale) plus 4
+  WARNING and 5 INFO; all fixed in one batch. Simplify pass then removed dead code and
+  consolidated button/ornament/test-support duplication. Nine playtest fix batches
+  followed (icons 46 px, 4× MSAA, description copy, top-bar restyle, plain-number costs,
+  base-core shield arcs); final gates were 507 tests and 335 layout assertions. The spec
+  and archived holdouts were not updated for those post-playtest values.
 - **Tower upgrades** (PR #29, merged 2026-10-28) — three coin-priced ranks per placed tower
   (5/10/15), each gated by hidden kill XP split by effective damage; rank 3 picks one of the
   tower's two skill-tree seed nodes, applied at minimum rank 1. Rank/XP/archetype live on the
