@@ -58,9 +58,14 @@ Human playtests
 ## Handoff Protocols
 
 ### Orchestrator → Implementer
-- Pass FULL spec text. NEVER mention holdouts or holdout file paths.
+- Pass FULL spec text. NEVER mention holdout scenarios, their paths, IDs (`H<n>`), or scenario
+  names.
 - Include acceptance criteria and edge cases from spec.
 - Do NOT include holdout scenarios.
+- Scope file listings and searches to `src/`, `Tests/`, and named harness files. Do not root a
+  recursive listing at the repo or put the holdouts path in an exclusion glob: the PreToolUse
+  guard matches the literal string and denies the whole command. This cost one round trip on
+  2026-10-30, when `find … -not -path "*/.claude/holdouts/*"` was denied.
 
 ### Implementer → Orchestrator
 - Files created/modified list
@@ -69,15 +74,26 @@ Human playtests
 - Issues/notes
 
 ### Orchestrator → Reviewer
-- Generate the diff (`git diff main...HEAD`, plus `git diff HEAD` and the untracked-file list) and
-  paste the diff text into every reviewer prompt.
+- Generate the diff (`git diff main...HEAD`, plus `git diff HEAD` and the untracked-file list).
+  For diffs under ~1,500 lines, paste the text. For larger diffs, write it to a temp file and pass
+  the absolute path; tell the reviewer to read it in chunks until every line is covered.
 - Reviewers have Read/Glob/Grep only — no shell. Never ask them to run `git diff`, build, or test.
 - Give each reviewer one lens; do not cross-contaminate.
+- Never time-kill a reviewer that is still producing tool activity. Wait for the completion
+  notification; the correctness lens took 24m42s on a 9,315-line diff on 2026-10-30. Split by
+  subsystem only after one attempt stalls, because cross-cutting bugs span subsystems.
 
 ### Reviewer → Orchestrator
 - Findings in `path:line: severity: finding. fix.` format
 - Severity: CRITICAL | WARNING | INFO
 - Lens-specific focus only
+
+### Playtest Deltas
+- Accepted playtest fixes update the spec and affected holdouts before merge. If the human expands
+  scope, update `Out of Scope` too.
+- Re-run holdouts after the final playtest batch. A pre-playtest "23/23" is not evidence about
+  post-playtest code; nine fix batches on visual-overhaul changed pinned values with no spec or
+  holdout update.
 
 ### Orchestrator → Human (PR)
 - Verification checklist:
