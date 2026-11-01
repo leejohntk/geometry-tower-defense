@@ -45,6 +45,10 @@ Add a second level plus two new unit types. Title screen gains Level 1 / Level 2
 ### Level 1 Regression
 - [ ] Level 1 unchanged: straight path (row 10), Arrow-only, basic-only, existing wave counts.
 
+> **Post-merge amendment (2026-11-01):** `PathRow` moved 10 → 7 so Level 1 is vertically
+> centred in the 14-row grid. The row-10 line above records the state at this feature's merge;
+> Level 1's shape, towers and waves are still unchanged.
+
 ## Edge Cases
 
 - **AoE kills multiple enemies in one frame:** all damaged enemies emit Destroyed and release to pool exactly once; no collection-modified exception, no double-free.

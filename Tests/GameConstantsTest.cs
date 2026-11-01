@@ -18,7 +18,7 @@ public class GameConstantsTest
         AssertThat(GameConstants.GridCols).IsEqual(20);
         AssertThat(GameConstants.GridRows).IsEqual(14);
         AssertThat(GameConstants.CellSize).IsEqual(64);
-        AssertThat(GameConstants.PathRow).IsEqual(10);
+        AssertThat(GameConstants.PathRow).IsEqual(7);
     }
 
     [TestCase]

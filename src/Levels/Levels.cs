@@ -32,7 +32,8 @@ public static class Levels
 
     private static LevelDefinition CreateLevel1()
     {
-        // Straight horizontal path along row 10, left to right.
+        // Straight horizontal path along the path row (7) — the vertical middle of the
+        // 14-row grid, matching the base/middle lane used by levels 2, 4, and 5.
         var corners = new[]
         {
             new Vector2I(0, GameConstants.PathRow),
@@ -178,16 +179,19 @@ public static class Levels
         {
             new Vector2I(0, 7), new Vector2I(19, 7)
         };
+        // Bottom lane, spawning on row 12 and running one row below the middle lane's
+        // body so row 8 stays clear between the two. Only the final (14,7) -> (19,7)
+        // run is shared with the other routes.
         var routeCCorners = new[]
         {
-            new Vector2I(0, 11), new Vector2I(4, 11), new Vector2I(4, 8), new Vector2I(9, 8),
-            new Vector2I(9, 10), new Vector2I(14, 10), new Vector2I(14, 7), new Vector2I(19, 7)
+            new Vector2I(0, 12), new Vector2I(4, 12), new Vector2I(4, 9), new Vector2I(9, 9),
+            new Vector2I(9, 11), new Vector2I(14, 11), new Vector2I(14, 7), new Vector2I(19, 7)
         };
         var paths = new IReadOnlyList<Vector2I>[]
         {
             LevelDefinition.BuildPath(routeACorners),  // 29 cells, top
             LevelDefinition.BuildPath(routeBCorners),  // 20 cells, middle straight lane
-            LevelDefinition.BuildPath(routeCCorners)   // 28 cells, bottom
+            LevelDefinition.BuildPath(routeCCorners)   // 29 cells, bottom
         };
 
         var waves = new List<WaveDefinition>

@@ -73,9 +73,11 @@ public class GridMarkersTest
         try
         {
             var spawn = Levels.Level1.SpawnCells[0];
+            var baseCell = Levels.Level1.BaseCell;
             AssertThat(grid.SpawnPortals.Count).IsEqual(1);
             AssertThat(grid.GetNodeOrNull<Control>($"SpawnPortal_{spawn.X}_{spawn.Y}")).IsNotNull();
-            AssertThat(grid.GetNodeOrNull<Control>("SpawnPortal_19_10")).IsNull();
+            // The base cell is a marker-only cell, never a spawn portal.
+            AssertThat(grid.GetNodeOrNull<Control>($"SpawnPortal_{baseCell.X}_{baseCell.Y}")).IsNull();
         }
         finally
         {

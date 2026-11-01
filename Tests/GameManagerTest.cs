@@ -33,7 +33,7 @@ public class GameManagerTest
         manager.PlacingTowerType = TowerType.Arrow;
         AssertThat(manager.IsPlacingTower).IsTrue();
 
-        // (row 0, col 0) is off the Level 1 path (row 10) and in bounds.
+        // (row 0, col 0) is off the Level 1 path (GameConstants.PathRow) and in bounds.
         AssertThat(manager.PlaceTower(0, 0)).IsTrue();
 
         // A successful placement consumes the selection even though the player can
@@ -52,7 +52,7 @@ public class GameManagerTest
 
         manager.PlacingTowerType = TowerType.Arrow;
 
-        // Level 1's path occupies row 10; a click there is a failed battlefield
+        // Level 1's path occupies GameConstants.PathRow; a click there is a failed battlefield
         // placement, not an exit.
         AssertThat(manager.PlaceTower(GameConstants.PathRow, 5)).IsFalse();
 

@@ -27,7 +27,7 @@ Implementer must never see this file. These scenarios are run by the orchestrato
 ## H4: Path Cell Rejection
 
 **Setup:** Pre-wave or mid-wave. Player has >= 10 coins.
-**Action:** Attempt to place tower on path cell (row 10, any column).
+**Action:** Attempt to place tower on path cell (row 7, any column — Level 1's centered path row).
 **Expect:** Rejected. Tower not placed. Coins not deducted. Visual feedback (red flash, or click does nothing on path cells).
 
 ## H5: Occupied Cell Rejection
@@ -118,7 +118,7 @@ Implementer must never see this file. These scenarios are run by the orchestrato
 ## H19: Tower Placement at Grid Boundaries
 
 **Setup:** Player has >= 10 coins.
-**Action:** Place towers at: cell (0, 0) top-left corner, cell (0, 19) top-right, cell (19, 0) bottom-left, cell (19, 19) bottom-right. Also attempt cell (0, 10) — path cell on left edge, cell (19, 10) — path cell on right edge.
+**Action:** Place towers at: cell (0, 0) top-left corner, cell (0, 19) top-right, cell (19, 0) bottom-left, cell (19, 19) bottom-right. Also attempt cell (0, 7) — path cell on left edge, cell (19, 7) — path cell on right edge.
 **Expect:** Corner placements succeed (non-path). Path cell placements rejected.
 **Verify:** Towers at corners render fully visible, not clipped. Range calculation correct from corners.
 

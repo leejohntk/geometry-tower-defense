@@ -23,7 +23,7 @@ public class MainTest
     private const string ViewportHeightSetting = "display/window/size/viewport_height";
 
     // Cell (col 0, row 1): inside the battlefield, below the HUD top bar, and off
-    // Level 1's path (row 10).
+    // Level 1's path (GameConstants.PathRow).
     private static readonly Vector2 BattlefieldPoint =
         new Vector2(GameConstants.CellCenterX(0), GameConstants.CellCenterY(1));
 

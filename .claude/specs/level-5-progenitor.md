@@ -26,7 +26,7 @@ stronger enemy mix as HP falls.
 
 - [ ] Level 5 has exactly three routes; each is axis-aligned, connected, in-bounds in the 20×14
       grid, non-self-intersecting, and ends at the shared base cell `(19,7)`.
-- [ ] Spawn cells are `(0,2)`, `(0,7)`, `(0,11)`; round-robin spawn events are distributed across
+- [ ] Spawn cells are `(0,2)`, `(0,7)`, `(0,12)`; round-robin spawn events are distributed across
       all three routes.
 - [ ] Level 5 waves escalate in total enemy count (12, 15, 18, 21, 24 including the boss).
 - [ ] The final wave contains exactly one `Progenitor` spawn, positioned mid-wave: at least two
@@ -55,6 +55,9 @@ stronger enemy mix as HP falls.
 - [ ] The Progenitor displays a geometric HP bar above itself with ticks at the 66% and 33%
       phase thresholds; border color shifts by phase.
 - [ ] Levels 1–4 are unchanged: same routes, same wave counts, same behavior.
+      (Post-merge amendment 2026-11-01: Level 1's `PathRow` moved 10 → 7 for vertical centring;
+      its route shape, tower flags and wave counts are unchanged. Route C above likewise moved
+      one row down to open the gap below the middle lane.)
 - [ ] Title screen shows a Level 5 button; all six menu buttons remain inside `Block_LevelMenu`
       with uniform stacking gaps, and the layout verifier passes with Level 5 enumerated.
 - [ ] `dotnet build` exits 0 with no warnings; `dotnet test` all pass.
@@ -105,7 +108,7 @@ stronger enemy mix as HP falls.
 
 ## Level 5 Definition
 
-Base: `(19,7)`. Spawns: route A `(0,2)`, route B `(0,7)`, route C `(0,11)`.
+Base: `(19,7)`. Spawns: route A `(0,2)`, route B `(0,7)`, route C `(0,12)`.
 
 Route A (top, 29 cells):
 ```
@@ -117,10 +120,13 @@ Route B (middle, 20 cells — straight lane):
 (0,7) (19,7)
 ```
 
-Route C (bottom, 28 cells):
+Route C (bottom, 29 cells):
 ```
-(0,11) (4,11) (4,8) (9,8) (9,10) (14,10) (14,7) (19,7)
+(0,12) (4,12) (4,9) (9,9) (9,11) (14,11) (14,7) (19,7)
 ```
+
+The bottom lane runs one row lower than before so row 8 stays empty between it and the middle
+lane (columns 0–13) — the three lanes read as separate until the shared final run.
 
 Routes share the final `(14,7)→(19,7)` run; `GridManager` draws shared cells once. All three
 routes are shorter and more direct than Level 4's weave — pressure comes from three simultaneous

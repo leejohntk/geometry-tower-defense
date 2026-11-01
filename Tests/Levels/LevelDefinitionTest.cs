@@ -13,7 +13,7 @@ namespace GeometryTowerDefense.Tests;
 public class LevelDefinitionTest
 {
     [TestCase]
-    public void Level1_HasStraightPathOnRow10()
+    public void Level1_HasStraightPathOnPathRow()
     {
         var path = Levels.Level1.Paths[0];
 
