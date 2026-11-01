@@ -87,6 +87,44 @@ public partial class ExplosionEffect : Node2D
             false,
             GameConstants.CannonExplosionStrokeWidth
         );
+
+        // Inner shockwave ring: a second, smaller ring that leads the outer edge so the
+        // blast reads as a wave instead of a flat disc. Drawn inside the same envelope,
+        // so the damage-radius contract above is untouched.
+        float innerRadius = radius * GameConstants.CannonExplosionInnerRingScale;
+        if (innerRadius > 0.5f)
+        {
+            DrawCircle(
+                Vector2.Zero,
+                innerRadius,
+                GameConstants.CannonExplosionOutlineColor with { A = alpha * 0.75f },
+                false,
+                GameConstants.CannonExplosionInnerRingWidth
+            );
+        }
+
+        // Radial debris spokes: pure trig from the spoke index, no cached buffers and
+        // no per-frame allocation.
+        int spokes = GameConstants.CannonExplosionSpokes;
+        if (spokes > 0 && radius > 0.5f)
+        {
+            float inner = radius * GameConstants.CannonExplosionSpokeInnerRatio;
+            float outer = Math.Min(
+                radius * GameConstants.CannonExplosionSpokeLengthRatio,
+                radius + GameConstants.CannonExplosionStrokeWidth);
+            float step = (float)(Math.Tau / spokes);
+            for (int i = 0; i < spokes; i++)
+            {
+                float angle = step * i;
+                var direction = new Vector2((float)Math.Cos(angle), (float)Math.Sin(angle));
+                DrawLine(
+                    direction * inner,
+                    direction * outer,
+                    GameConstants.CannonExplosionOutlineColor with { A = alpha * 0.9f },
+                    GameConstants.CannonExplosionSpokeWidth
+                );
+            }
+        }
     }
 
     /// <summary>

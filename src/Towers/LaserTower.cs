@@ -47,7 +47,33 @@ public partial class LaserTower : Tower
         SkillMechanics.LaserRampMaxMultiplier(
             SeedRankFor(TowerArchetype.RampUp, SkillTreeCatalog.LaserRampUp));
 
-    protected override Color RangeColor => new Color(0.8f, 0.3f, 1.0f);
+    protected override Color RangeColor => GameConstants.LaserTowerFillColor;
+
+    /// <summary>
+    /// The emitter's aim pointer is drawn along +X, so its resting aim points right.
+    /// </summary>
+    public override float DefaultAimAngle => 0f;
+
+    /// <summary>
+    /// True while the primary impact glow is visible (a live beam is hitting a target).
+    /// Presentation only; exposes the glow state without reading pixels.
+    /// </summary>
+    public bool IsImpactGlowVisible => _impactGlow?.Visible ?? false;
+
+    /// <summary>Number of visible chain impact glows right now.</summary>
+    public int VisibleChainGlowCount
+    {
+        get
+        {
+            int count = 0;
+            for (int i = 0; i < _chainGlows.Length; i++)
+            {
+                if (_chainGlows[i] != null && _chainGlows[i].Visible)
+                    count++;
+            }
+            return count;
+        }
+    }
 
     private Line2D? _beam;
     private Line2D? _chainBeam;
@@ -57,6 +83,15 @@ public partial class LaserTower : Tower
     // The tower's own procedural emitter body. Its drawing branches on the chosen
     // archetype (linked rim nodes or a rising wedge core); no separate overlay.
     private Control? _body;
+    private Vector2 _bodyBasePosition;
+
+    // Laser impact glows: one ring at the primary beam endpoint and a small one at
+    // each chain endpoint. Their positions/modulate are written each frame the beam is
+    // up (transform/property only); they are never drawn while idle.
+    private Control? _impactGlow;
+    private Control[] _chainGlows = System.Array.Empty<Control>();
+    private float _pulsePhase = 0f;
+    private bool _emitterPulseActive = false;
 
     // Continuous-beam state: the held target (plus its identity generation), ramp
     // progress, and the ignite-roll accumulator. All reset together when the held
@@ -157,10 +192,13 @@ public partial class LaserTower : Tower
         float cell = GameConstants.CellSize;
 
         // Magenta/purple emitter body.
+        _bodyBasePosition = new Vector2(-cell / 2f, -cell / 2f);
         _body = new Control();
         _body.Name = "LaserEmitter";
         _body.Size = new Vector2(cell, cell);
-        _body.Position = new Vector2(-cell / 2f, -cell / 2f);
+        _body.Position = _bodyBasePosition;
+        // Rotate around the cell centre so the aim pointer reflects the target.
+        _body.PivotOffset = new Vector2(cell / 2f, cell / 2f);
         _body.MouseFilter = Control.MouseFilterEnum.Ignore;
         _body.Draw += DrawBody;
         AddChild(_body);
@@ -185,6 +223,65 @@ public partial class LaserTower : Tower
         AddChild(_chainBeam);
         _chainBeamBuffer = new Vector2[GameConstants.SkillMaxRanks * GameConstants.SkillLaserChainPerRank + 1];
         _chainTargets.Capacity = GameConstants.SkillMaxRanks;
+
+        CreateImpactGlows();
+        OnAimUpdated();
+    }
+
+    /// <summary>
+    /// Creates the primary impact glow and the fixed pool of chain impact glows. All
+    /// controls are click-through decorations; only their transform/modulate changes
+    /// while the beam is up.
+    /// </summary>
+    private void CreateImpactGlows()
+    {
+        _impactGlow = CreateGlowControl(
+            "ImpactGlow",
+            GameConstants.LaserImpactGlowRadius,
+            GameConstants.LaserImpactGlowStroke);
+        AddChild(_impactGlow);
+
+        var chainGlowRoot = new Control();
+        chainGlowRoot.Name = "ChainImpactGlows";
+        chainGlowRoot.MouseFilter = Control.MouseFilterEnum.Ignore;
+        AddChild(chainGlowRoot);
+
+        int maxChain = GameConstants.SkillMaxRanks * GameConstants.SkillLaserChainPerRank;
+        _chainGlows = new Control[maxChain];
+        float chainRadius = GameConstants.LaserImpactGlowRadius * GameConstants.LaserChainImpactGlowScale;
+        for (int i = 0; i < maxChain; i++)
+        {
+            var glow = CreateGlowControl(
+                $"ChainImpact_{i}",
+                chainRadius,
+                GameConstants.LaserImpactGlowStroke * GameConstants.LaserChainImpactGlowScale);
+            chainGlowRoot.AddChild(glow);
+            _chainGlows[i] = glow;
+        }
+    }
+
+    /// <summary>
+    /// Builds one glow control: a ring plus a bright core, sized to fit the ring with
+    /// room for its stroke. Drawing runs only when the control first enters the tree,
+    /// so a glow never repaints per frame.
+    /// </summary>
+    private static Control CreateGlowControl(string name, float radius, float stroke)
+    {
+        float size = (radius + stroke) * 2f + 4f;
+        var glow = new Control();
+        glow.Name = name;
+        glow.Size = new Vector2(size, size);
+        glow.MouseFilter = Control.MouseFilterEnum.Ignore;
+        glow.ZIndex = 2;
+        glow.Visible = false;
+        glow.Draw += () =>
+        {
+            if (!IsInstanceValid(glow)) return;
+            var center = new Vector2(size / 2f, size / 2f);
+            glow.DrawCircle(center, radius, GameConstants.LaserImpactGlowColor with { A = 0.55f }, false, stroke);
+            glow.DrawCircle(center, radius * 0.4f, GameConstants.LaserImpactGlowColor, true);
+        };
+        return glow;
     }
 
     protected override void OnArchetypeChanged()
@@ -205,8 +302,8 @@ public partial class LaserTower : Tower
         float cell = GameConstants.CellSize;
         float radius = cell / 2f - 4f;
         Vector2 center = new(cell / 2f, cell / 2f);
-        var fill = new Color(0.8f, 0.3f, 1f);
-        var outline = new Color(0.4f, 0.1f, 0.6f);
+        Color fill = GameConstants.LaserTowerFillColor;
+        Color outline = GameConstants.LaserTowerOutlineColor;
 
         switch (Archetype)
         {
@@ -231,6 +328,38 @@ public partial class LaserTower : Tower
                 _body.DrawCircle(center, radius * 0.4f, new Color(0.5f, 0.15f, 0.8f)); // Inner core
                 break;
         }
+
+        DrawAimPointer(center, radius);
+    }
+
+    /// <summary>
+    /// Small nib at the emitter's rim along +X. The body's Rotation (applied every
+    /// frame in OnAimUpdated) aims it at the current target.
+    /// </summary>
+    private void DrawAimPointer(Vector2 center, float radius)
+    {
+        if (_body == null || !IsInstanceValid(_body))
+            return;
+
+        var pointer = new[]
+        {
+            center + new Vector2(radius * 1.02f, 0f),
+            center + new Vector2(radius * 0.5f, -radius * 0.22f),
+            center + new Vector2(radius * 0.5f, radius * 0.22f)
+        };
+        _body.DrawColoredPolygon(pointer, new Color(0.95f, 0.75f, 1f));
+    }
+
+    /// <summary>
+    /// Emitter aim: the body rotates so its +X pointer faces the target. Recoil does
+    /// not apply to the continuous laser; its firing cue is the emitter pulse.
+    /// </summary>
+    protected override void OnAimUpdated()
+    {
+        if (_body == null || !IsInstanceValid(_body))
+            return;
+
+        _body.Rotation = AimAngle - DefaultAimAngle;
     }
 
     /// <summary>
@@ -272,11 +401,12 @@ public partial class LaserTower : Tower
             return;
 
         var target = CurrentTarget;
-        if (target != null && !target.IsDead && IsTargetInRange(target))
+        bool beamActive = target != null && !target.IsDead && IsTargetInRange(target);
+        if (beamActive)
         {
             // Beam endpoints are in this node's local space; the tower is at its origin.
             _beam.SetPointPosition(0, Vector2.Zero);
-            _beam.SetPointPosition(1, target.Position - Position);
+            _beam.SetPointPosition(1, target!.Position - Position);
             ApplyBeamRamp();
             _beam.Visible = true;
         }
@@ -286,6 +416,81 @@ public partial class LaserTower : Tower
         }
 
         UpdateChainBeam();
+        UpdateImpactGlows(beamActive ? target : null);
+        UpdateEmitterPulse((float)delta, beamActive);
+    }
+
+    /// <summary>
+    /// Positions the primary and chain impact glows at the live beam endpoints. A dead
+    /// or out-of-range target hides them immediately (no stranded ring), and extra
+    /// chain glows hide when the chain shrinks. Each frame writes transform/modulate
+    /// only — the rings themselves are drawn once.
+    /// </summary>
+    private void UpdateImpactGlows(Enemy? target)
+    {
+        bool active = target != null;
+        float ramp = RampProgress(_rampMultiplier, RampMaxMultiplier);
+        float alpha = Mathf.Lerp(
+            GameConstants.LaserImpactGlowAlphaMin,
+            GameConstants.LaserImpactGlowAlphaMax,
+            ramp);
+
+        if (_impactGlow != null)
+        {
+            _impactGlow.Visible = active;
+            if (active)
+            {
+                Vector2 local = target!.Position - Position;
+                _impactGlow.Position = local - _impactGlow.Size / 2f;
+                _impactGlow.Modulate = new Color(1f, 1f, 1f, alpha);
+            }
+        }
+
+        int chainCount = active ? _chainTargets.Count : 0;
+        for (int i = 0; i < _chainGlows.Length; i++)
+        {
+            var glow = _chainGlows[i];
+            if (glow == null)
+                continue;
+
+            bool used = i < chainCount;
+            glow.Visible = used;
+            if (!used)
+                continue;
+
+            Vector2 local = _chainTargets[i] - Position;
+            glow.Position = local - glow.Size / 2f;
+            glow.Modulate = new Color(1f, 1f, 1f, alpha * 0.85f);
+        }
+    }
+
+    /// <summary>
+    /// Subtle emitter scale pulse while the beam is active (transform only). Stops and
+    /// resets the moment the beam ends, so no residual pulse lingers.
+    /// </summary>
+    private void UpdateEmitterPulse(float delta, bool beamActive)
+    {
+        if (_body == null || !IsInstanceValid(_body))
+            return;
+
+        if (!beamActive)
+        {
+            // Reset once on the active -> inactive transition; after that the idle
+            // emitter writes nothing per frame.
+            if (_emitterPulseActive || _body.Scale != Vector2.One)
+            {
+                _emitterPulseActive = false;
+                _pulsePhase = 0f;
+                _body.Scale = Vector2.One;
+            }
+            return;
+        }
+
+        _emitterPulseActive = true;
+        _pulsePhase += delta;
+        float scale = 1f + GameConstants.LaserEmitterPulseAmplitude
+            * Mathf.Sin(_pulsePhase * GameConstants.LaserEmitterPulseSpeed);
+        _body.Scale = new Vector2(scale, scale);
     }
 
     /// <summary>

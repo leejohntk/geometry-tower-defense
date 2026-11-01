@@ -34,32 +34,103 @@ public partial class ArrowTower : Tower
         SkillMechanics.ArrowCritChance(
             SeedRankFor(TowerArchetype.Crit, SkillTreeCatalog.ArrowCritChance));
 
-    protected override Color RangeColor => new Color(0.2f, 0.5f, 1.0f);
+    protected override Color RangeColor => GameConstants.ArrowTowerFillColor;
+
+    /// <summary>
+    /// The arrow rests pointing up (the triangle is drawn tip-up), so its resting
+    /// aim angle is -90 degrees.
+    /// </summary>
+    public override float DefaultAimAngle => -Mathf.Pi / 2f;
 
     // The tower's own procedural body. The silhouette changes with the chosen
     // archetype (no separate accent overlay) while staying recognisably an arrow.
     private Control? _body;
+    private Control? _bowFlash;
+    private Vector2 _bodyBasePosition;
 
-    private static readonly Color BodyFill = new(0.2f, 0.5f, 1f);
-    private static readonly Color BodyOutline = new(0.05f, 0.1f, 0.4f);
+    private static readonly Color BodyFill = GameConstants.ArrowTowerFillColor;
+    private static readonly Color BodyOutline = GameConstants.ArrowTowerOutlineColor;
     private const float OutlineWidth = 2f;
 
     public override void _Ready()
     {
         float cell = GameConstants.CellSize;
 
+        _bodyBasePosition = new Vector2(-cell / 2f, -cell / 2f);
         _body = new Control();
         _body.Name = "ArrowBody";
         _body.Size = new Vector2(cell, cell);
-        _body.Position = new Vector2(-cell / 2f, -cell / 2f);
+        _body.Position = _bodyBasePosition;
+        // Rotate around the cell centre so the triangle reflects the aim direction
+        // without moving the tower's simulation position.
+        _body.PivotOffset = new Vector2(cell / 2f, cell / 2f);
         _body.MouseFilter = Control.MouseFilterEnum.Ignore;
         _body.Draw += DrawBody;
         AddChild(_body);
+
+        // Short bow-flash cue shown only while a shot's recoil is playing. Repainted
+        // only during that ~0.12 s window, never while idle.
+        _bowFlash = new Control();
+        _bowFlash.Name = "BowFlash";
+        _bowFlash.Size = new Vector2(cell, cell);
+        _bowFlash.Position = _bodyBasePosition;
+        _bowFlash.MouseFilter = Control.MouseFilterEnum.Ignore;
+        _bowFlash.Visible = false;
+        _bowFlash.Draw += DrawBowFlash;
+        AddChild(_bowFlash);
+
+        OnAimUpdated();
     }
 
     protected override void OnArchetypeChanged()
     {
         _body?.QueueRedraw();
+    }
+
+    /// <summary>
+    /// Applies the aim/recoil transforms: the body rotates to the aim angle (relative
+    /// to its drawn, tip-up orientation) and kicks back along the aim axis while the
+    /// recoil cue runs. Purely visual — Position is never written.
+    /// </summary>
+    protected override void OnAimUpdated()
+    {
+        if (_body == null || !IsInstanceValid(_body))
+            return;
+
+        _body.Rotation = AimAngle - DefaultAimAngle;
+
+        float recoil = GameConstants.TowerRecoilDistance * RecoilProgress;
+        var aim = new Vector2(Mathf.Cos(AimAngle), Mathf.Sin(AimAngle));
+        _body.Position = _bodyBasePosition - aim * recoil;
+
+        if (_bowFlash != null && IsInstanceValid(_bowFlash))
+        {
+            _bowFlash.Visible = IsRecoiling;
+            if (IsRecoiling)
+                _bowFlash.QueueRedraw();
+        }
+    }
+
+    /// <summary>
+    /// Bow-flash: two short strokes forming a chevron just ahead of the arrow tip,
+    /// opened perpendicular to the aim. Two DrawLine calls, so no per-frame array.
+    /// </summary>
+    private void DrawBowFlash()
+    {
+        if (_bowFlash == null || !IsInstanceValid(_bowFlash))
+            return;
+
+        float cell = GameConstants.CellSize;
+        var center = new Vector2(cell / 2f, cell / 2f);
+        var aim = new Vector2(Mathf.Cos(AimAngle), Mathf.Sin(AimAngle));
+        var perp = new Vector2(-aim.Y, aim.X);
+        float radius = GameConstants.TowerBowFlashRadius;
+        Vector2 tip = center + aim * radius;
+        Vector2 back = center + aim * (radius * 0.55f);
+        Color color = GameConstants.TowerBowFlashColor with { A = RecoilProgress };
+
+        _bowFlash.DrawLine(tip, back + perp * 9f, color, GameConstants.TowerBowFlashWidth);
+        _bowFlash.DrawLine(tip, back - perp * 9f, color, GameConstants.TowerBowFlashWidth);
     }
 
     /// <summary>

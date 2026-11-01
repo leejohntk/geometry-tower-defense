@@ -69,7 +69,8 @@ public partial class Main : Node2D
         _gameOverScreen = new ResultScreen(
             new Color(0.8f, 0.05f, 0.05f, 0.6f),
             "GAME OVER",
-            "The enemies reached your base..."
+            "The enemies reached your base...",
+            ResultScreenMode.Defeat
         );
         _gameOverScreen.Name = "GameOverScreen";
         _gameOverScreen.ReturnToTitle += OnReturnToTitle;
@@ -80,7 +81,8 @@ public partial class Main : Node2D
         _victoryScreen = new ResultScreen(
             new Color(0.9f, 0.7f, 0.1f, 0.5f),
             "VICTORY",
-            "You defended your base! All waves cleared!"
+            "You defended your base! All waves cleared!",
+            ResultScreenMode.Victory
         );
         _victoryScreen.Name = "VictoryScreen";
         _victoryScreen.ReturnToTitle += OnReturnToTitle;

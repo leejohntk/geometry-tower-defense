@@ -40,6 +40,7 @@ public partial class GameManager : Node2D
     private readonly List<Projectile> _activeProjectiles = new();
     private readonly List<ExplosionEffect> _activeExplosionEffects = new();
     private readonly List<PierceSparkEffect> _activePierceSparks = new();
+    private readonly List<DeathBurstEffect> _activeDeathBursts = new();
 
     // Object pools
     private ObjectPool<Enemy>? _enemyPool;
@@ -47,6 +48,7 @@ public partial class GameManager : Node2D
     private ObjectPool<CannonProjectile>? _cannonProjectilePool;
     private ObjectPool<ExplosionEffect>? _explosionEffectPool;
     private ObjectPool<PierceSparkEffect>? _pierceSparkPool;
+    private ObjectPool<DeathBurstEffect>? _deathBurstPool;
 
     // Cached list for collision detection (avoids per-frame allocation)
     private readonly List<(Projectile, Enemy)> _projectileCollisionPairs = new();
@@ -232,6 +234,11 @@ public partial class GameManager : Node2D
         // Pierce sparks are spawned per passed-through enemy, so several can be alive
         // at once for a single fully-piercing arrow (pool grows on demand if exceeded).
         _pierceSparkPool = new ObjectPool<PierceSparkEffect>(12, this);
+
+        // Death bursts are spawned per kill, so a busy wave can have many alive at
+        // once. The pool bounds the active node count; the pool grows on demand if a
+        // single frame exceeds it.
+        _deathBurstPool = new ObjectPool<DeathBurstEffect>(GameConstants.DeathBurstPoolSize, this);
     }
 
     public override void _Process(double delta)
@@ -401,7 +408,9 @@ public partial class GameManager : Node2D
 
             float rampMultiplier = laser.UpdateRamp(target, delta);
             float tickDamage = laser.Dps * rampMultiplier * delta;
-            target.TakeDamage(tickDamage, ignoreArmor: true, source: laser);
+            // Continuous drain is not a discrete "hit": the beam + impact glow carry
+            // the feedback, and a per-frame pulse would strobe the target forever.
+            target.TakeDamage(tickDamage, ignoreArmor: true, source: laser, hitFeedback: false);
 
             if (target.IsDead)
             {
@@ -450,7 +459,7 @@ public partial class GameManager : Node2D
                 break;
 
             damage *= GameConstants.SkillLaserChainFalloff;
-            next.TakeDamage(damage, ignoreArmor: true, source: laser);
+            next.TakeDamage(damage, ignoreArmor: true, source: laser, hitFeedback: false);
             _chainHitEnemies.Add(next);
             _chainTargets.Add(next.Position);
             from = next;
@@ -710,6 +719,10 @@ public partial class GameManager : Node2D
         // Notify wave manager
         _waveManager?.NotifyEnemyDestroyed();
 
+        // A kill (never a base arrival) plays the pooled geometric death burst at the
+        // death position, colored with the enemy's fill and shaped by its kind.
+        SpawnDeathBurst(enemy.Position, enemy.Kind, enemy.FillColor);
+
         // Drop tower credit before pooling so a released enemy never keeps a strong
         // reference to a tower that a level reset may free.
         enemy.ClearAttribution();
@@ -807,6 +820,61 @@ public partial class GameManager : Node2D
         _activePierceSparks.Remove(effect);
         effect.Finished -= OnPierceSparkFinished;
         _pierceSparkPool?.Release(effect);
+    }
+
+    /// <summary>
+    /// Number of in-flight death bursts. Bounded by the pool size plus any fallback
+    /// growth, so a large wave can never leave unbounded effect nodes active.
+    /// </summary>
+    public int ActiveDeathBurstCount => _activeDeathBursts.Count;
+
+    /// <summary>
+    /// Test-only view of the in-flight death bursts so their position, color, and kind
+    /// scaling can be asserted without reading pixels.
+    /// </summary>
+    internal IReadOnlyList<DeathBurstEffect> ActiveDeathBursts => _activeDeathBursts;
+
+    /// <summary>
+    /// Spawns a pooled death burst at a kill position. The effect releases itself when
+    /// its short animation finishes.
+    /// </summary>
+    private void SpawnDeathBurst(Vector2 position, EnemyKind kind, Color color)
+    {
+        // Pools are created in Initialize; a manager driven without it simply has no
+        // visual layer to hand the burst to.
+        if (_deathBurstPool == null)
+            return;
+
+        DeathBurstEffect? effect = null;
+
+        // Bound the active burst count at the pool size: a massive simultaneous kill
+        // wave reuses the oldest burst (Play resets every field) instead of acquiring
+        // new nodes forever. The removed burst keeps its node and is re-added below.
+        if (_activeDeathBursts.Count >= GameConstants.DeathBurstPoolSize)
+        {
+            var oldest = _activeDeathBursts[0];
+            _activeDeathBursts.RemoveAt(0);
+            if (IsInstanceValid(oldest))
+            {
+                oldest.Finished -= OnDeathBurstFinished;
+                effect = oldest;
+            }
+        }
+
+        effect ??= _deathBurstPool.Acquire();
+        if (effect == null)
+            return;
+
+        effect.Finished += OnDeathBurstFinished;
+        _activeDeathBursts.Add(effect);
+        effect.Play(position, color, kind);
+    }
+
+    private void OnDeathBurstFinished(DeathBurstEffect effect)
+    {
+        _activeDeathBursts.Remove(effect);
+        effect.Finished -= OnDeathBurstFinished;
+        _deathBurstPool?.Release(effect);
     }
 
     private void ReleaseProjectile(Projectile projectile)
@@ -1089,6 +1157,18 @@ public partial class GameManager : Node2D
             }
         }
         _activePierceSparks.Clear();
+
+        // Release in-flight death bursts back to pool so no effect survives into the
+        // next level (pools persist across restarts).
+        foreach (var burst in _activeDeathBursts)
+        {
+            if (IsInstanceValid(burst))
+            {
+                burst.Finished -= OnDeathBurstFinished;
+                _deathBurstPool?.Release(burst);
+            }
+        }
+        _activeDeathBursts.Clear();
 
         // Free towers (not pooled)
         foreach (var tower in _activeTowers)

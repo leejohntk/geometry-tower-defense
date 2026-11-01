@@ -53,6 +53,20 @@ public partial class Enemy : Node2D
     private bool _isDead = false;
     private Control? _circleContainer;
 
+    // Presentation state (visual overhaul). The container is never rotated: it owns the
+    // un-rotated overlays (boss health bar, summon telegraph). The Body child carries
+    // the silhouette and is animated by transform only (Rotation / Scale), so idle
+    // motion never repaints every frame. The outer ring is a separate Progenitor-only
+    // child that counter-rotates around the phase-colored border.
+    private Control? _bodyContainer;
+    private Control? _outerRingContainer;
+    // Un-rotated overlays (boss health bar, summon telegraph) rendered in a sibling
+    // added after Body/OuterRing so the silhouette can never composite over them.
+    private Control? _overlayContainer;
+    private EnemySilhouette _silhouette = EnemySilhouette.For(EnemyKind.Basic);
+    private float _idlePhase = 0f;
+    private float _hitPulseRemaining = 0f;
+
     // Status state (Part 2). Stun pauses movement; burn is a damage-over-time that
     // ignores armor; hit flash is a brief crit brightening. Timers tick in the
     // centralized status pass (GameManager) — never in _Process — and are reset on
@@ -81,12 +95,15 @@ public partial class Enemy : Node2D
     private float _burnPulsePhase = 0f;
     private int _burnPulseStep = 0;
 
-    // Cached armored geometry + fill-color array so the per-frame redraw allocates
-    // nothing. The diamond/inset points depend on _diameter and are rebuilt in
-    // UpdateVisual (which runs on Configure); the color array is reused and its
-    // single element reassigned on every draw.
-    private Vector2[] _diamondPoints = System.Array.Empty<Vector2>();
+    // Cached silhouette geometry + fill-color array so the redraw allocates nothing.
+    // The vertex arrays depend on _diameter and the kind's profile, and are rebuilt in
+    // UpdateVisual (which runs on Configure); the color array is reused and its single
+    // element reassigned on every draw.
+    private Vector2[] _bodyPoints = System.Array.Empty<Vector2>();
+    private Vector2[] _bodyOutlinePoints = System.Array.Empty<Vector2>();
     private Vector2[] _insetPoints = System.Array.Empty<Vector2>();
+    private Vector2[] _rivetPoints = System.Array.Empty<Vector2>();
+    private Vector2[] _outerRingPoints = System.Array.Empty<Vector2>();
     private readonly Color[] _fillColorArray = new Color[1];
 
     // Progenitor summon state machine. Timers are ticked in GameManager's centralized
@@ -100,11 +117,6 @@ public partial class Enemy : Node2D
     private int _pendingSummonCount = 0;
     private readonly EnemyKind[] _pendingSummonKinds = new EnemyKind[GameConstants.ProgenitorMaxSquadSize];
     private SkillRandom _summonRolls = SkillRandom.Default;
-
-    // Cached octagon geometry for the Progenitor (fill ring + closed outline), rebuilt
-    // on Configure like the armored diamond.
-    private Vector2[] _octagonPoints = System.Array.Empty<Vector2>();
-    private Vector2[] _octagonOutlinePoints = System.Array.Empty<Vector2>();
 
     /// <summary>
     /// The kind this enemy is currently configured as.
@@ -176,6 +188,33 @@ public partial class Enemy : Node2D
     /// Rendered diameter in pixels.
     /// </summary>
     public float Diameter => _diameter;
+
+    /// <summary>
+    /// The kind's base fill color, before any status tint. Used for the death burst so
+    /// it matches the enemy the player just killed.
+    /// </summary>
+    public Color FillColor => _fillColor;
+
+    /// <summary>
+    /// Presentation profile for the current kind: silhouette sides, idle transform
+    /// motion, layered detail flags, and death-burst shape.
+    /// </summary>
+    public EnemySilhouette Silhouette => _silhouette;
+
+    /// <summary>Body rotation in radians (idle spin; transform-only, never a redraw).</summary>
+    public float BodyRotation => _bodyContainer?.Rotation ?? 0f;
+
+    /// <summary>Body scale (idle pulse plus hit pop; transform-only, never a redraw).</summary>
+    public Vector2 BodyScale => _bodyContainer?.Scale ?? Vector2.One;
+
+    /// <summary>Progenitor outer-ring rotation in radians (counter-rotating).</summary>
+    public float OuterRingRotation => _outerRingContainer?.Rotation ?? 0f;
+
+    /// <summary>
+    /// Seconds of normal-hit pulse remaining. Weaker and shorter than the crit flash;
+    /// zero for burn DoT ticks, which keep their own proc flash.
+    /// </summary>
+    public float HitPulseRemaining => _hitPulseRemaining;
 
     /// <summary>
     /// True while this enemy is stunned (movement paused).
@@ -409,130 +448,276 @@ public partial class Enemy : Node2D
 
     private void CreateVisual()
     {
+        // The container is never rotated: it owns the un-rotated overlays (the boss
+        // health bar and the summon telegraph ring).
         _circleContainer = new Control();
         _circleContainer.Name = "CircleContainer";
         _circleContainer.MouseFilter = Control.MouseFilterEnum.Ignore;
         AddChild(_circleContainer);
-        _circleContainer.Draw += () => DrawEnemyShape(_circleContainer);
+
+        // The silhouette lives on its own child so idle spin/pulse transforms can
+        // never rotate or scale the boss health bar or telegraph ring.
+        _bodyContainer = new Control();
+        _bodyContainer.Name = "Body";
+        _bodyContainer.MouseFilter = Control.MouseFilterEnum.Ignore;
+        _circleContainer.AddChild(_bodyContainer);
+        _bodyContainer.Draw += () => DrawEnemyShape(_bodyContainer);
+
+        // Progenitor-only counter-rotating ring. Created for every kind so a pooled
+        // enemy reused as a boss needs no node churn; hidden when the profile has none.
+        _outerRingContainer = new Control();
+        _outerRingContainer.Name = "OuterRing";
+        _outerRingContainer.MouseFilter = Control.MouseFilterEnum.Ignore;
+        _circleContainer.AddChild(_outerRingContainer);
+        _outerRingContainer.Draw += () => DrawOuterRing(_outerRingContainer);
+
+        // Added last so it renders above both the body and the outer ring: the boss
+        // health bar and the summon telegraph must never be hidden by the silhouette.
+        _overlayContainer = new Control();
+        _overlayContainer.Name = "Overlay";
+        _overlayContainer.MouseFilter = Control.MouseFilterEnum.Ignore;
+        _circleContainer.AddChild(_overlayContainer);
+        _overlayContainer.Draw += () => DrawEnemyOverlay(_overlayContainer);
+
         UpdateVisual();
     }
 
+    /// <summary>
+    /// Rebuilds diameter/profile-dependent geometry and lays out the visual children.
+    /// Runs on Configure (never per draw), so drawing allocates nothing.
+    /// </summary>
     private void UpdateVisual()
     {
-        // Geometry is diameter-dependent; rebuild on configure (not per draw).
-        RebuildArmoredGeometry();
-        RebuildProgenitorGeometry();
+        _silhouette = EnemySilhouette.For(Kind);
+        RebuildSilhouetteGeometry();
+        ResetIdleTransform();
 
         if (_circleContainer == null) return;
 
         float radius = _diameter / 2f;
+        var size = new Vector2(_diameter, _diameter);
+        var pivot = new Vector2(radius, radius);
+
         _circleContainer.Position = new Vector2(-radius, -radius);
-        _circleContainer.Size = new Vector2(_diameter, _diameter);
-        _circleContainer.QueueRedraw();
-    }
+        _circleContainer.Size = size;
 
-    /// <summary>
-    /// Rebuilds the cached armored diamond/inset vertex arrays from the current
-    /// diameter. No-op for non-armored kinds.
-    /// </summary>
-    private void RebuildArmoredGeometry()
-    {
-        if (Kind != EnemyKind.Armored)
-            return;
-
-        float diameter = _diameter;
-        Vector2 center = new Vector2(diameter / 2f, diameter / 2f);
-
-        _diamondPoints = new Vector2[]
+        if (_bodyContainer != null)
         {
-            new Vector2(center.X, 0f),          // top
-            new Vector2(diameter, center.Y),    // right
-            new Vector2(center.X, diameter),    // bottom
-            new Vector2(0f, center.Y)           // left
-        };
-
-        _insetPoints = new Vector2[]
-        {
-            new Vector2(center.X, 2f),
-            new Vector2(diameter - 2f, center.Y),
-            new Vector2(center.X, diameter - 2f),
-            new Vector2(2f, center.Y),
-            new Vector2(center.X, 2f)
-        };
-    }
-
-    /// <summary>
-    /// Rebuilds the cached octagon fill/outline vertex arrays from the current
-    /// diameter. No-op for non-Progenitor kinds.
-    /// </summary>
-    private void RebuildProgenitorGeometry()
-    {
-        if (!IsProgenitor)
-            return;
-
-        const int sides = 8;
-        float diameter = _diameter;
-        Vector2 center = new Vector2(diameter / 2f, diameter / 2f);
-        float radius = diameter / 2f;
-
-        _octagonPoints = new Vector2[sides];
-        _octagonOutlinePoints = new Vector2[sides + 1];
-
-        for (int i = 0; i < sides; i++)
-        {
-            float angle = Mathf.Tau * i / sides;
-            Vector2 point = center + new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * radius;
-            _octagonPoints[i] = point;
-            _octagonOutlinePoints[i] = point;
+            _bodyContainer.Position = Vector2.Zero;
+            _bodyContainer.Size = size;
+            _bodyContainer.PivotOffset = pivot;
+            _bodyContainer.QueueRedraw();
         }
 
-        // Close the outline polyline back to the first vertex.
-        _octagonOutlinePoints[sides] = _octagonOutlinePoints[0];
+        if (_outerRingContainer != null)
+        {
+            _outerRingContainer.Position = Vector2.Zero;
+            _outerRingContainer.Size = size;
+            _outerRingContainer.PivotOffset = pivot;
+            _outerRingContainer.Visible = _silhouette.OuterRing;
+            _outerRingContainer.QueueRedraw();
+        }
+
+        if (_overlayContainer != null)
+        {
+            _overlayContainer.Position = Vector2.Zero;
+            _overlayContainer.Size = size;
+            _overlayContainer.Visible = _silhouette.PhaseBorder;
+            _overlayContainer.QueueRedraw();
+        }
     }
 
+    /// <summary>
+    /// Clears every idle transform so a reconfigured or pooled enemy starts from the
+    /// same visual state (no leftover spin angle, pulse scale, or hit pop).
+    /// </summary>
+    private void ResetIdleTransform()
+    {
+        _idlePhase = 0f;
+        _hitPulseRemaining = 0f;
+
+        if (_bodyContainer != null)
+        {
+            _bodyContainer.Rotation = 0f;
+            _bodyContainer.Scale = Vector2.One;
+        }
+
+        if (_outerRingContainer != null)
+            _outerRingContainer.Rotation = 0f;
+    }
+
+    /// <summary>
+    /// Rebuilds the cached silhouette/inset/rivet/outer-ring vertex arrays from the
+    /// current diameter and profile. Allocates only on Configure, never on draw.
+    /// </summary>
+    private void RebuildSilhouetteGeometry()
+    {
+        int sides = _silhouette.Sides;
+        if (sides <= 0)
+        {
+            _bodyPoints = System.Array.Empty<Vector2>();
+            _bodyOutlinePoints = System.Array.Empty<Vector2>();
+            _insetPoints = System.Array.Empty<Vector2>();
+            _rivetPoints = System.Array.Empty<Vector2>();
+            _outerRingPoints = System.Array.Empty<Vector2>();
+            return;
+        }
+
+        float radius = _diameter / 2f;
+        var center = new Vector2(radius, radius);
+        // Orientation is explicit in the profile, never inferred from a detail flag.
+        float start = _silhouette.StartAngle;
+
+        _bodyPoints = new Vector2[sides];
+        _bodyOutlinePoints = new Vector2[sides + 1];
+        for (int i = 0; i < sides; i++)
+        {
+            float angle = start + Mathf.Tau * i / sides;
+            var point = center + new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * radius;
+            _bodyPoints[i] = point;
+            _bodyOutlinePoints[i] = point;
+        }
+        _bodyOutlinePoints[sides] = _bodyOutlinePoints[0];
+
+        if (_silhouette.InsetBorder)
+        {
+            _insetPoints = new Vector2[sides + 1];
+            float insetRadius = radius * GameConstants.EnemyArmoredInsetRatio;
+            for (int i = 0; i < sides; i++)
+            {
+                float angle = start + Mathf.Tau * i / sides;
+                _insetPoints[i] = center + new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * insetRadius;
+            }
+            _insetPoints[sides] = _insetPoints[0];
+        }
+        else
+        {
+            _insetPoints = System.Array.Empty<Vector2>();
+        }
+
+        if (_silhouette.Rivets)
+        {
+            _rivetPoints = new Vector2[sides];
+            float rivetRadius = radius * GameConstants.EnemyArmoredInsetRatio * 0.7f;
+            for (int i = 0; i < sides; i++)
+            {
+                float angle = start + Mathf.Tau * i / sides;
+                _rivetPoints[i] = center + new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * rivetRadius;
+            }
+        }
+        else
+        {
+            _rivetPoints = System.Array.Empty<Vector2>();
+        }
+
+        if (_silhouette.OuterRing)
+        {
+            _outerRingPoints = new Vector2[sides + 1];
+            float ringRadius = radius * GameConstants.EnemyProgenitorOuterRingScale;
+            for (int i = 0; i < sides; i++)
+            {
+                float angle = Mathf.Tau * i / sides;
+                _outerRingPoints[i] = center + new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * ringRadius;
+            }
+            _outerRingPoints[sides] = _outerRingPoints[0];
+        }
+        else
+        {
+            _outerRingPoints = System.Array.Empty<Vector2>();
+        }
+    }
+
+    /// <summary>
+    /// Un-rotated overlays: the boss health bar and the summon telegraph ring. Only
+    /// the Progenitor profile enables these.
+    /// </summary>
+    private void DrawEnemyOverlay(Control container)
+    {
+        if (!IsInstanceValid(container) || !_silhouette.PhaseBorder)
+            return;
+
+        float radius = _diameter / 2f;
+        var center = new Vector2(radius, radius);
+        DrawProgenitorHealthBar(container, center);
+        DrawSummonPulseRing(container, center, radius);
+    }
+
+    /// <summary>
+    /// Paints the silhouette from the kind's presentation profile: a circle for
+    /// Sides == 0, otherwise the cached regular polygon, plus the profile's layered
+    /// details (inner ring, inset border, rivets, phase border).
+    /// </summary>
     private void DrawEnemyShape(Control container)
     {
         if (!IsInstanceValid(container)) return;
 
         float radius = _diameter / 2f;
-        Vector2 center = new Vector2(_diameter / 2f, _diameter / 2f);
+        var center = new Vector2(radius, radius);
         Color fill = EffectiveFillColor();
 
-        if (IsProgenitor)
+        if (_silhouette.Sides == 0)
         {
-            // Geometry is rebuilt on Configure; drawing before that (or after a
-            // partial teardown) must not touch an empty vertex array.
-            if (_octagonPoints.Length == 0)
-                return;
-
-            // Large octagon with a thick phase-colored border, plus the geometric HP
-            // bar and (mid-windup) the telegraph pulse ring.
-            _fillColorArray[0] = fill;
-            container.DrawPolygon(_octagonPoints, _fillColorArray);
-            container.DrawPolyline(
-                _octagonOutlinePoints,
-                PhaseBorderColor,
-                GameConstants.ProgenitorBorderWidth);
-            DrawProgenitorHealthBar(container, center);
-            DrawSummonPulseRing(container, center, radius);
+            // Basic: filled circle, dark border, and a thin inner ring.
+            container.DrawCircle(center, radius, fill);
+            container.DrawCircle(
+                center,
+                radius - GameConstants.EnemySilhouetteStrokeWidth,
+                _borderColor,
+                false,
+                GameConstants.EnemySilhouetteStrokeWidth);
+            if (_silhouette.InnerRing)
+            {
+                container.DrawCircle(
+                    center,
+                    radius * GameConstants.EnemyBasicInnerRingRatio,
+                    _borderColor with { A = _borderColor.A * 0.7f },
+                    false,
+                    1.5f);
+            }
             return;
         }
 
-        if (Kind == EnemyKind.Armored)
-        {
-            // Grey square rendered as a diamond (rotated 45°), matching the geometric
-            // theme. Vertices come from the cached arrays rebuilt on Configure.
-            _fillColorArray[0] = fill;
-            container.DrawPolygon(_diamondPoints, _fillColorArray);
-            container.DrawPolyline(_insetPoints, _borderColor, 2.0f);
+        // Geometry is rebuilt on Configure; drawing before that (or after a partial
+        // teardown) must not touch an empty vertex array.
+        if (_bodyPoints.Length == 0)
             return;
+
+        _fillColorArray[0] = fill;
+        container.DrawPolygon(_bodyPoints, _fillColorArray);
+
+        Color border = _silhouette.PhaseBorder ? PhaseBorderColor : _borderColor;
+        float borderWidth = _silhouette.PhaseBorder
+            ? GameConstants.ProgenitorBorderWidth
+            : GameConstants.EnemySilhouetteStrokeWidth;
+        container.DrawPolyline(_bodyOutlinePoints, border, borderWidth);
+
+        if (_silhouette.InsetBorder && _insetPoints.Length > 0)
+            container.DrawPolyline(_insetPoints, _borderColor, 1.5f);
+
+        if (_silhouette.Rivets)
+        {
+            for (int i = 0; i < _rivetPoints.Length; i++)
+                container.DrawCircle(_rivetPoints[i], GameConstants.EnemyArmoredRivetRadius, _borderColor);
         }
+    }
 
-        // Filled circle
-        container.DrawCircle(center, radius, fill);
+    /// <summary>
+    /// Paints the Progenitor's counter-rotating outer ring: a slightly larger
+    /// phase-colored polygon with a node at each corner. Hidden for other kinds.
+    /// </summary>
+    private void DrawOuterRing(Control container)
+    {
+        if (!IsInstanceValid(container) || !_silhouette.OuterRing || _outerRingPoints.Length == 0)
+            return;
 
-        // Dark border
-        container.DrawCircle(center, radius - 2, _borderColor, false, 2.0f);
+        Color ring = PhaseBorderColor with { A = 0.6f };
+        container.DrawPolyline(
+            _outerRingPoints,
+            ring,
+            GameConstants.EnemyProgenitorOuterRingWidth);
+
+        for (int i = 0; i < _outerRingPoints.Length - 1; i++)
+            container.DrawCircle(_outerRingPoints[i], 2f, PhaseBorderColor with { A = 0.85f });
     }
 
     /// <summary>
@@ -636,6 +821,15 @@ public partial class Enemy : Node2D
             color = color.Lerp(
                 GameConstants.BurnProcFlashColor with { A = color.A },
                 GameConstants.BurnProcFlashStrength);
+        }
+
+        // Normal-hit pulse: a weaker brighten than the crit flash, and applied first so
+        // a crit (which sets both states in the same hit) always reads strongest.
+        if (_hitPulseRemaining > 0f)
+        {
+            color = color.Lerp(
+                new Color(1f, 1f, 1f, color.A),
+                GameConstants.EnemyHitPulseStrength);
         }
 
         if (_hitFlashRemaining > 0f)
@@ -823,8 +1017,56 @@ public partial class Enemy : Node2D
         _summonCountdown = Mathf.Min(_summonCountdown, ProgenitorSummons.IntervalForPhase(phase));
     }
 
+    /// <summary>
+    /// Idle transform animation: spin, gentle scale pulse, and the short hit-pop scale.
+    /// Written as node Rotation / Scale only — never a per-frame QueueRedraw — and it
+    /// never touches the simulation anchor, position, or collision radius.
+    /// </summary>
+    private void AnimateVisual(float delta)
+    {
+        if (_bodyContainer == null || !(delta > 0f))
+            return;
+
+        bool pulsing = _silhouette.PulseAmplitude > 0f;
+        bool hitPulsing = _hitPulseRemaining > 0f;
+
+        if (pulsing)
+            _idlePhase += delta;
+
+        if (_silhouette.SpinSpeed != 0f)
+            _bodyContainer.Rotation += _silhouette.SpinSpeed * delta;
+
+        if (pulsing || hitPulsing)
+        {
+            float scale = 1f;
+            if (pulsing)
+            {
+                scale += _silhouette.PulseAmplitude
+                    * Mathf.Sin(_idlePhase * _silhouette.PulseSpeed);
+            }
+            if (hitPulsing)
+            {
+                scale += GameConstants.EnemyHitPulseScale
+                    * (_hitPulseRemaining / GameConstants.EnemyHitPulseDuration);
+            }
+            _bodyContainer.Scale = new Vector2(scale, scale);
+        }
+        else if (_bodyContainer.Scale.X != 1f || _bodyContainer.Scale.Y != 1f)
+        {
+            // Correct the residual pop once, then write nothing in the steady state.
+            _bodyContainer.Scale = Vector2.One;
+        }
+
+        if (_outerRingContainer != null && _outerRingContainer.Visible)
+            _outerRingContainer.Rotation += GameConstants.EnemyProgenitorOuterRingSpinSpeed * delta;
+    }
+
     public override void _Process(double delta)
     {
+        // Idle presentation runs first and is transform-only (spin / pulse / hit pop),
+        // so it costs no redraws. Movement below is unchanged.
+        AnimateVisual((float)delta);
+
         if (_isDead || _waypoints.Count == 0)
             return;
 
@@ -908,6 +1150,7 @@ public partial class Enemy : Node2D
         _burnRemaining = 0f;
         _burnDps = 0f;
         _hitFlashRemaining = 0f;
+        _hitPulseRemaining = 0f;
         _burnFlashRemaining = 0f;
         _burnPulsePhase = 0f;
         _burnPulseStep = 0;
@@ -928,6 +1171,16 @@ public partial class Enemy : Node2D
         // release and the next Configure.
         Kind = EnemyKind.Basic;
         CoinDrop = GameConstants.CoinDropPerKill;
+
+        // No stale silhouette, spin, pulse, hit pop, or outer ring may survive reuse.
+        // The profile is a struct (no allocation); vertex arrays are rebuilt by the
+        // next Configure, and the Basic circle path needs none.
+        _silhouette = EnemySilhouette.For(Kind);
+        ResetIdleTransform();
+        if (_outerRingContainer != null)
+            _outerRingContainer.Visible = false;
+        if (_overlayContainer != null)
+            _overlayContainer.Visible = false;
         RedrawVisual();
     }
 
@@ -942,7 +1195,11 @@ public partial class Enemy : Node2D
     /// releases and resets the enemy. Omitting the source keeps the old behavior:
     /// damage applies normally but awards no XP.
     /// </summary>
-    public void TakeDamage(float damage, bool ignoreArmor = false, Tower? source = null)
+    public void TakeDamage(
+        float damage,
+        bool ignoreArmor = false,
+        Tower? source = null,
+        bool hitFeedback = true)
     {
         if (_isDead)
             return;
@@ -971,12 +1228,34 @@ public partial class Enemy : Node2D
             return;
         }
 
-        if (IsProgenitor && applied > 0f)
+        if (applied > 0f)
         {
-            // Phase recompute on every damaging hit, and repaint the border/bar.
-            UpdateProgenitorPhase();
-            RedrawVisual();
+            // Every damaging hit reads: a normal hit gets a short, faint brighten and
+            // a scale pop (never as strong as a crit). Burn DoT ticks opt out so the
+            // drain does not strobe the whole life bar of the enemy.
+            if (hitFeedback)
+                ApplyNormalHitFeedback();
+
+            if (IsProgenitor)
+            {
+                // Phase recompute on every damaging hit, and repaint the border/bar.
+                UpdateProgenitorPhase();
+                RedrawVisual();
+            }
         }
+    }
+
+    /// <summary>
+    /// Arms the normal-hit pulse. A crit flash already in progress is stronger, so
+    /// the normal cue never downgrades it.
+    /// </summary>
+    private void ApplyNormalHitFeedback()
+    {
+        if (_hitFlashRemaining > 0f)
+            return;
+
+        _hitPulseRemaining = GameConstants.EnemyHitPulseDuration;
+        RedrawVisual();
     }
 
     /// <summary>
@@ -1079,7 +1358,8 @@ public partial class Enemy : Node2D
         bool wasBurning = _burnRemaining > 0f;
         bool wasFlashing = _hitFlashRemaining > 0f;
         bool wasBurnFlashing = _burnFlashRemaining > 0f;
-        if (!wasStunned && !wasBurning && !wasFlashing && !wasBurnFlashing)
+        bool wasHitPulsing = _hitPulseRemaining > 0f;
+        if (!wasStunned && !wasBurning && !wasFlashing && !wasBurnFlashing && !wasHitPulsing)
             return;
 
         bool redraw = false;
@@ -1090,7 +1370,7 @@ public partial class Enemy : Node2D
             // the timer. Total burn damage is dps * duration (2 dps x 2s = 4). The
             // credited source survives contact so the killing tick still awards XP.
             float burnTime = Mathf.Min(delta, _burnRemaining);
-            TakeDamage(_burnDps * burnTime, ignoreArmor: true, _burnSource);
+            TakeDamage(_burnDps * burnTime, ignoreArmor: true, source: _burnSource, hitFeedback: false);
             if (_isDead)
                 return;
             _burnRemaining = Mathf.Max(0f, _burnRemaining - delta);
@@ -1113,6 +1393,7 @@ public partial class Enemy : Node2D
         _stunRemaining = Mathf.Max(0f, _stunRemaining - delta);
         _hitFlashRemaining = Mathf.Max(0f, _hitFlashRemaining - delta);
         _burnFlashRemaining = Mathf.Max(0f, _burnFlashRemaining - delta);
+        _hitPulseRemaining = Mathf.Max(0f, _hitPulseRemaining - delta);
 
         // The tint is otherwise a pure function of *which* statuses are active, so
         // redraw only on a status-set transition (a status applied, or one expiring) —
@@ -1121,7 +1402,8 @@ public partial class Enemy : Node2D
         if ((_stunRemaining > 0f) != wasStunned ||
             (_burnRemaining > 0f) != wasBurning ||
             (_hitFlashRemaining > 0f) != wasFlashing ||
-            (_burnFlashRemaining > 0f) != wasBurnFlashing)
+            (_burnFlashRemaining > 0f) != wasBurnFlashing ||
+            (_hitPulseRemaining > 0f) != wasHitPulsing)
         {
             redraw = true;
         }
@@ -1168,8 +1450,17 @@ public partial class Enemy : Node2D
         return 0.5f - 0.5f * System.MathF.Cos(System.MathF.Tau * progress);
     }
 
+    /// <summary>
+    /// Repaints every presenting layer after a status/phase change: the body carries the
+    /// tint (stun/burn/crit/normal-hit), the outer ring carries the phase color, and the
+    /// overlay carries the health bar and summon telegraph.
+    /// </summary>
     private void RedrawVisual()
     {
-        _circleContainer?.QueueRedraw();
+        _bodyContainer?.QueueRedraw();
+        if (_outerRingContainer != null && _outerRingContainer.Visible)
+            _outerRingContainer.QueueRedraw();
+        if (_overlayContainer != null && _overlayContainer.Visible)
+            _overlayContainer.QueueRedraw();
     }
 }
