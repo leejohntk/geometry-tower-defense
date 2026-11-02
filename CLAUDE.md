@@ -1,6 +1,6 @@
 ---
 name: geometry-tower-defense
-description: Godot 4.7 C# geometry-themed tower defense game. Orchestrator agent — never implements. Coordinates sub-agents (implementer, reviewer, investigator, distiller). Runs dark factory loop.
+description: Godot 4.7 C# geometry-themed tower defense game. Orchestrator agent — never implements. Coordinates sub-agents (implementer, reviewer, investigator, distiller). Runs software factory loop.
 ---
 
 # Geometry Tower Defense
@@ -44,7 +44,7 @@ godot
 4. **Never read `.claude/holdouts/` files.** Implementer agent must never see holdout scenarios. Enforced by permission deny (deterministic).
 5. **Always run `dotnet build` after .cs edits.** Post-tool-use hook reminds. SubagentStop hook blocks "done" if build not run.
 6. **Always run tests before claiming work is done.** SubagentStop hook validates.
-7. **Serial feature execution.** One feature in flight at a time. Human queues next feature idea while dark part runs.
+7. **Serial feature execution.** One feature in flight at a time. Human queues next feature idea while build phase runs.
 8. **Orchestrator never implements.** Main session coordinates only. All game code written by implementer sub-agent.
 9. **No AI-generated assets.** Never generate art, sprites, textures, sound effects, or music using AI/LLM tools. All assets must be ethically sourced: open source (CC0, MIT, public domain), hand-authored procedural geometry using Godot's built-in drawing nodes, or from free asset sites with clear permissive licensing. See `.claude/memory/game-design.md` Asset Policy section for details.
 
@@ -54,7 +54,7 @@ godot
 |-------|---------|------|
 | `idle` | No feature active. `state.json` deleted. | Human describes feature → /spec |
 | `spec_draft` | Orchestrator wrote spec + holdouts. | Human reviews → /spec approve |
-| `spec_approved` | Human approved spec + holdouts. Dark part begins. | Orchestrator spawns implementer |
+| `spec_approved` | Human approved spec + holdouts. Build phase begins. | Orchestrator spawns implementer |
 | `implementing` | Implementer writing code. | Build passes → multi-lens review |
 | `reviewing` | 3-lens adversarial review running. | Findings addressed → holdout verification |
 | `awaiting_playtest` | All gates green. PR open. | Human playtests |

@@ -1,5 +1,5 @@
 ---
-description: Implement a feature from spec through PR. Dark factory loop: spec → plan → branch → implement → multi-lens review → holdout verify → simplify → PR.
+description: Implement a feature from spec through PR. Software factory loop: spec → plan → branch → implement → multi-lens review → holdout verify → simplify → PR.
 context: fork
 allowed-tools:
   - Read
@@ -20,7 +20,7 @@ allowed-tools:
   - mcp__godot__get_debug_output
 ---
 
-# /implement-feature — Dark Factory Loop
+# /implement-feature — Software Factory Loop
 
 Orchestrator runs this skill when human approves spec + holdouts.
 

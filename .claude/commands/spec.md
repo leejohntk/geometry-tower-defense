@@ -1,5 +1,5 @@
 ---
-description: Human describes feature → orchestrator proposes spec + holdout scenarios → human reviews and approves → dark part begins automatically
+description: Human describes feature → orchestrator proposes spec + holdout scenarios → human reviews and approves → build phase begins automatically
 argument-hint: "Describe the feature you want"
 ---
 
@@ -25,5 +25,5 @@ Human invokes: `/spec I want a piercing tower that shoots through multiple enemi
    - Human can modify, add, remove spec items and holdout scenarios.
    - Human says "approved" when both look good.
 
-4. **Dark factory loop begins automatically.** No separate kickoff command needed.
+4. **Software factory loop begins automatically.** No separate kickoff command needed.
    - Orchestrator writes state.json, creates feature branch, spawns implementer.
