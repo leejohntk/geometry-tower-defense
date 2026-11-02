@@ -413,19 +413,24 @@ public partial class TowerUpgradePanel : Control
 
         // Dock to the selected tower's cell: horizontally centred and above the cell,
         // except in row 0 where it opens below so it can never sit under the top bar.
-        // Clamp inside the battlefield so it never leaves the play area.
+        // The panel is a screen-space Control while the grid starts at BattlefieldTop,
+        // so the cell anchor and the clamp range both carry that offset. Clamp inside
+        // the battlefield so it never leaves the play area or rises under the top bar.
         float centerX = GameConstants.CellCenterX(_anchorCol);
         float x = Mathf.Clamp(
             centerX - Size.X / 2f,
             0f,
             GameConstants.PlayAreaWidth - Size.X);
 
-        float cellTop = _anchorRow * GameConstants.CellSize;
+        float cellTop = GameConstants.BattlefieldTop + _anchorRow * GameConstants.CellSize;
         float y = _anchorRow == 0
             ? cellTop + GameConstants.CellSize + GameConstants.TowerUpgradePanelCellGap
             : cellTop - GameConstants.TowerUpgradePanelCellGap - Size.Y;
 
-        y = Mathf.Clamp(y, GameConstants.TopBarHeight, GameConstants.PlayAreaHeight - Size.Y);
+        y = Mathf.Clamp(
+            y,
+            GameConstants.BattlefieldTop,
+            GameConstants.BattlefieldTop + GameConstants.PlayAreaHeight - Size.Y);
 
         Position = new Vector2(x, y);
     }

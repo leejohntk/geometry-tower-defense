@@ -89,26 +89,23 @@ public class GameConstantsTest
     }
 
     [TestCase]
-    public void IsBattlefieldPoint_ExcludesHudChromeAndOuterMargins()
+    public void IsBattlefieldPoint_AcceptsOnlyTheGridRect()
     {
-        // Interior and the visible first row below the top bar are battlefield.
+        // World-space semantics: only the grid rectangle itself is battlefield. Main
+        // converts viewport input into GameManager-local space first, which is what
+        // excludes the HUD top bar, the sidebar, and the margin below the grid.
         AssertThat(GameConstants.IsBattlefieldPoint(new Vector2(100, 100))).IsTrue();
-        AssertThat(GameConstants.IsBattlefieldPoint(
-            new Vector2(0, GameConstants.TopBarHeight))).IsTrue();
+        AssertThat(GameConstants.IsBattlefieldPoint(Vector2.Zero)).IsTrue();
         AssertThat(GameConstants.IsBattlefieldPoint(
             new Vector2(GameConstants.PlayAreaWidth - 1, GameConstants.PlayAreaHeight - 1))).IsTrue();
 
-        // The top bar overlays the grid, so clicks under it are HUD, not battlefield.
-        AssertThat(GameConstants.IsBattlefieldPoint(
-            new Vector2(100, GameConstants.TopBarHeight - 1))).IsFalse();
-
-        // Sidebar (side menu), the margin below the grid, and negative space are outside.
+        // Negative world space and anything past the grid's right/bottom edge are outside.
+        AssertThat(GameConstants.IsBattlefieldPoint(new Vector2(-1, 100))).IsFalse();
+        AssertThat(GameConstants.IsBattlefieldPoint(new Vector2(100, -1))).IsFalse();
         AssertThat(GameConstants.IsBattlefieldPoint(
             new Vector2(GameConstants.PlayAreaWidth, 100))).IsFalse();
         AssertThat(GameConstants.IsBattlefieldPoint(
             new Vector2(100, GameConstants.PlayAreaHeight))).IsFalse();
-        AssertThat(GameConstants.IsBattlefieldPoint(new Vector2(-1, 100))).IsFalse();
-        AssertThat(GameConstants.IsBattlefieldPoint(new Vector2(100, -1))).IsFalse();
     }
 
     [TestCase]

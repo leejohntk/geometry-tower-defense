@@ -485,19 +485,24 @@ public static class GameConstants
     public const float SidebarWidth = 180f;
     public const float TopBarHeight = 40f;
 
+    // Vertical offset of the game world inside the viewport. The HUD top bar sits
+    // above the grid, so the battlefield begins exactly below it.
+    public const float BattlefieldTop = TopBarHeight;
+
     /// <summary>
     /// Total viewport width needed to fit both the play area and the sidebar side-by-side.
     /// </summary>
     public static int TotalViewportWidth => PlayAreaWidth + (int)SidebarWidth;
 
     /// <summary>
-    /// True when a screen-space point is over the visible battlefield: inside the grid
-    /// bounds and not under the HUD top bar. The sidebar, top bar, and the margin below
-    /// the grid are UI/outside, so clicks there must not act on the battlefield.
+    /// True when a GameManager-local (world) point is over the visible battlefield:
+    /// inside the grid bounds. Main converts viewport input with GameManager.ToLocal
+    /// before calling, so the HUD top bar above the grid, the sidebar beside it, and
+    /// the margin below the grid are already outside these bounds and never count.
     /// </summary>
-    public static bool IsBattlefieldPoint(Vector2 point) =>
-        point.X >= 0f && point.X < PlayAreaWidth &&
-        point.Y >= TopBarHeight && point.Y < PlayAreaHeight;
+    public static bool IsBattlefieldPoint(Vector2 worldPoint) =>
+        worldPoint.X >= 0f && worldPoint.X < PlayAreaWidth &&
+        worldPoint.Y >= 0f && worldPoint.Y < PlayAreaHeight;
 
     // Cell center helpers
     public static float CellCenterX(int col) => col * CellSize + CellSize / 2f;
