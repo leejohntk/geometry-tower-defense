@@ -226,9 +226,61 @@ public class TowerAimTest
             AssertThat(body.Position.X).IsLess(-32f);
             AssertThat(tower.Position).IsEqual(towerPosition);
 
+            // The bow-flash chevron sits at the arrow tip and follows the same kick,
+            // so the cue never detaches from the body while firing.
+            var bowFlash = tower.GetNodeOrNull<Control>("BowFlash");
+            AssertThat(bowFlash).IsNotNull();
+            AssertThat(bowFlash!.Position).IsEqual(body.Position);
+
             // After the recoil the body returns to its base offset.
             tower._Process(GameConstants.TowerShotRecoilDuration + 0.001f);
             AssertThat(body.Position).IsEqual(new Vector2(-32f, -32f));
+            AssertThat(bowFlash.Position).IsEqual(new Vector2(-32f, -32f));
+        }
+        finally
+        {
+            tower.GetParent()?.RemoveChild(tower);
+            tower.QueueFree();
+        }
+    }
+
+    [TestCase]
+    public void ArrowBody_IsCentredOnItsRotationPivot_AtEveryAimAngle()
+    {
+        float cell = GameConstants.CellSize;
+        Vector2 cellCentre = new(cell / 2f, cell / 2f);
+        Vector2[] body = ArrowTower.BodyPolygon(cell);
+
+        // Equilateral silhouette: the centroid is the cell centre, so the body spins
+        // about its own centre instead of orbiting the cell while aiming.
+        AssertThat(body.Length).IsEqual(3);
+        Vector2 centroid = (body[0] + body[1] + body[2]) / 3f;
+        AssertThat(centroid.X).IsEqualApprox(cellCentre.X, 0.001f);
+        AssertThat(centroid.Y).IsEqualApprox(cellCentre.Y, 0.001f);
+
+        // Every vertex stays inside the cell at any rotation (no spill into a
+        // neighbouring cell when aiming diagonally).
+        foreach (var vertex in body)
+            AssertThat(vertex.DistanceTo(cellCentre)).IsLessEqual(cell / 2f);
+
+        // Tip first, pointing up along the resting orientation's symmetry axis.
+        AssertThat(body[0].Y).IsLess(cellCentre.Y);
+        AssertThat(body[0].X).IsEqualApprox(cellCentre.X, 0.001f);
+
+        // While aiming diagonally the rendered triangle stays centred on the tower.
+        var tower = new ArrowTower();
+        tower.Initialize(5, 5);
+        ((SceneTree)Engine.GetMainLoop()).Root.AddChild(tower);
+        try
+        {
+            var arrowBody = tower.GetNode<Control>("ArrowBody");
+            tower.SetTarget(MakeEnemyAt(tower.Position + new Vector2(100f, 100f)));
+            Simulate(tower, 120);
+            AssertThat(tower.AimAngle).IsEqualApprox(Mathf.Pi / 4f, 0.0001f);
+
+            Vector2 renderedCentroid = arrowBody.GetTransform() * centroid;
+            AssertThat(renderedCentroid.X).IsEqualApprox(0f, 0.001f);
+            AssertThat(renderedCentroid.Y).IsEqualApprox(0f, 0.001f);
         }
         finally
         {

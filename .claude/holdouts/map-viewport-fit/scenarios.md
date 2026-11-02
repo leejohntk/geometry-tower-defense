@@ -11,6 +11,7 @@ Implementer must not see this file. Orchestrator runs these during holdout verif
 - **Setup:** Read project.godot viewport + stretch settings.
 - **Check:** viewport 1460 × 940; stretch mode canvas_items; aspect keep. `PlayAreaHeight (896) + TopBarHeight (40) = 936 <= 940`.
 - **Expected:** Bottom grid row (row 13, y 832–896) fully within window height. No scroll/resize needed to see the base row.
+- **Expected (post-merge amendment 2026-11-01):** the game world starts at `BattlefieldTop = TopBarHeight` (viewport y=40), so the HUD top bar sits above the grid instead of over row 0. The grid spans viewport y 40–936, leaving only the intentional 4 px margin at 940. Screen input at y<40 or y>=936 is not battlefield.
 
 ## H3 — Level 1 regression
 - **Setup:** Load Level 1.

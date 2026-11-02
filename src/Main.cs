@@ -40,6 +40,10 @@ public partial class Main : Node2D
         // Create game manager (hidden initially)
         _gameManager = new GameManager();
         _gameManager.Name = "GameManager";
+        // Shift the whole game world below the HUD top bar. Every gameplay node
+        // (grid, waves, enemies, towers, projectiles, previews, markers) is a child
+        // of GameManager, so one offset positions them all.
+        _gameManager.Position = new Vector2(0f, GameConstants.BattlefieldTop);
         _gameManager.SkillTree = _skillTree;
         _gameManager.GameOver += OnGameOverTriggered;
         _gameManager.Victory += OnVictoryTriggered;
@@ -302,10 +306,11 @@ public partial class Main : Node2D
                 return;
             }
 
-            // Track mouse for placement preview (shows ghost + highlight + range)
+            // Track mouse for placement preview (shows ghost + highlight + range).
+            // Preview and placement work in GameManager-local (battlefield) space.
             if (@event is InputEventMouseMotion mouseMotion)
             {
-                UpdateTowerPlacementPreview(mouseMotion.Position);
+                UpdateTowerPlacementPreview(ToBattlefieldPoint(mouseMotion.Position));
             }
 
             // Handle tower placement via mouse click
@@ -313,9 +318,10 @@ public partial class Main : Node2D
                 mouseButton.ButtonIndex == MouseButton.Left &&
                 mouseButton.Pressed)
             {
-                if (GameConstants.IsBattlefieldPoint(mouseButton.Position))
+                Vector2 battlefieldPoint = ToBattlefieldPoint(mouseButton.Position);
+                if (GameConstants.IsBattlefieldPoint(battlefieldPoint))
                 {
-                    TryPlaceTowerAtMouse(mouseButton.Position);
+                    TryPlaceTowerAtMouse(battlefieldPoint);
                 }
                 else
                 {
@@ -364,51 +370,56 @@ public partial class Main : Node2D
         }
 
         // Handle tower selection / range display (not in placement mode). Only a
-        // click on the battlefield can select a tower: the HUD top bar overlays
-        // row 0, so a click there must not toggle a tower's range underneath it.
+        // click on the battlefield can select a tower: the HUD top bar sits above
+        // the grid, so a click there must not toggle a tower's range underneath it.
         if (@event is InputEventMouseButton click &&
             click.ButtonIndex == MouseButton.Left &&
-            click.Pressed &&
-            GameConstants.IsBattlefieldPoint(click.Position))
+            click.Pressed)
         {
-            // Find which tower (if any) was clicked
-            Tower? clickedTower = null;
-            foreach (var tower in _gameManager.GetActiveTowers())
+            // Tower positions are GameManager-local, so the click must be converted
+            // into the same space for both the bounds test and the rect hit test.
+            Vector2 battlefieldPoint = ToBattlefieldPoint(click.Position);
+            if (GameConstants.IsBattlefieldPoint(battlefieldPoint))
             {
-                float towerSize = GameConstants.CellSize;
-                Rect2 towerRect = new Rect2(
-                    tower.Position - new Vector2(towerSize / 2f, towerSize / 2f),
-                    new Vector2(towerSize, towerSize)
-                );
-                if (towerRect.HasPoint(click.Position))
+                // Find which tower (if any) was clicked
+                Tower? clickedTower = null;
+                foreach (var tower in _gameManager.GetActiveTowers())
                 {
-                    clickedTower = tower;
-                    break;
+                    float towerSize = GameConstants.CellSize;
+                    Rect2 towerRect = new Rect2(
+                        tower.Position - new Vector2(towerSize / 2f, towerSize / 2f),
+                        new Vector2(towerSize, towerSize)
+                    );
+                    if (towerRect.HasPoint(battlefieldPoint))
+                    {
+                        clickedTower = tower;
+                        break;
+                    }
                 }
-            }
 
-            if (clickedTower != null)
-            {
-                if (_selectedTower == clickedTower)
+                if (clickedTower != null)
                 {
-                    // Clicked the same tower again — toggle range off and close the
-                    // panel with the selection.
-                    ClearTowerSelection();
+                    if (_selectedTower == clickedTower)
+                    {
+                        // Clicked the same tower again — toggle range off and close the
+                        // panel with the selection.
+                        ClearTowerSelection();
+                    }
+                    else
+                    {
+                        // Clicked a different tower — hide previous, show new, and dock
+                        // the upgrade panel to the new tower.
+                        _selectedTower?.HideRange();
+                        clickedTower.ShowRange();
+                        _selectedTower = clickedTower;
+                        OpenUpgradePanel(clickedTower);
+                    }
                 }
                 else
                 {
-                    // Clicked a different tower — hide previous, show new, and dock
-                    // the upgrade panel to the new tower.
-                    _selectedTower?.HideRange();
-                    clickedTower.ShowRange();
-                    _selectedTower = clickedTower;
-                    OpenUpgradePanel(clickedTower);
+                    // Clicked on empty space — drop the selection and close the panel.
+                    ClearTowerSelection();
                 }
-            }
-            else
-            {
-                // Clicked on empty space — drop the selection and close the panel.
-                ClearTowerSelection();
             }
         }
     }
@@ -469,10 +480,22 @@ public partial class Main : Node2D
     }
 
     /// <summary>
-    /// Update the tower placement preview (ghost + highlight + range) at the cell under the mouse.
-    /// Hides the preview when the pointer is over HUD chrome or outside the grid.
+    /// Converts a viewport-space (screen) point into the GameManager's local space, the
+    /// space the battlefield, grid, and towers live in. The GameManager is offset below
+    /// the HUD top bar, so this conversion is what excludes the top bar, the sidebar,
+    /// and the margin below the grid from battlefield clicks. Null-safe: before the game
+    /// manager exists the point is returned unchanged.
     /// </summary>
-    private void UpdateTowerPlacementPreview(Vector2 mousePos)
+    private Vector2 ToBattlefieldPoint(Vector2 viewportPoint) =>
+        _gameManager != null ? _gameManager.ToLocal(viewportPoint) : viewportPoint;
+
+    /// <summary>
+    /// Update the tower placement preview (ghost + highlight + range) at the cell under
+    /// the given GameManager-local (battlefield) point. Hides the preview when the point
+    /// is outside the grid — which, after Main converts viewport input, covers the HUD
+    /// top bar, the sidebar, and the margin below the grid.
+    /// </summary>
+    private void UpdateTowerPlacementPreview(Vector2 battlefieldPoint)
     {
         if (_gameManager?.Grid == null)
             return;
@@ -480,8 +503,7 @@ public partial class Main : Node2D
         if (_gameManager.PlacingTowerType == null)
             return;
 
-        // Never draw the ghost over HUD chrome (top bar / sidebar) or off the grid.
-        if (!GameConstants.IsBattlefieldPoint(mousePos))
+        if (!GameConstants.IsBattlefieldPoint(battlefieldPoint))
         {
             _gameManager.Grid.HidePlacementPreview();
             return;
@@ -489,7 +511,7 @@ public partial class Main : Node2D
 
         var type = _gameManager.PlacingTowerType.Value;
 
-        Vector2I gridPos = _gameManager.Grid.PixelToGrid(mousePos);
+        Vector2I gridPos = _gameManager.Grid.PixelToGrid(battlefieldPoint);
         int row = gridPos.Y;
         int col = gridPos.X;
 
@@ -506,12 +528,12 @@ public partial class Main : Node2D
         }
     }
 
-    private void TryPlaceTowerAtMouse(Vector2 mousePos)
+    private void TryPlaceTowerAtMouse(Vector2 battlefieldPoint)
     {
         if (_gameManager?.Grid == null)
             return;
 
-        Vector2I gridPos = _gameManager.Grid.PixelToGrid(mousePos);
+        Vector2I gridPos = _gameManager.Grid.PixelToGrid(battlefieldPoint);
 
         bool placed = _gameManager.PlaceTower(gridPos.Y, gridPos.X);
 

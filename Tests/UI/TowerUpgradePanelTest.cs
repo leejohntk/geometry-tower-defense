@@ -394,16 +394,17 @@ public class TowerUpgradePanelTest
     [TestCase]
     public void Positioning_DocksAboveCell_BelowForRowZero_AndClampsInsidePlayArea()
     {
-        // Row 0: opens below the cell so it can never sit under the top bar.
+        // Row 0: opens below the cell so it can never sit under the top bar. The
+        // panel and the grid are both offset by BattlefieldTop (screen space).
         var rowZeroTower = MakeTower(TowerType.Arrow, 0, 5);
         rowZeroTower.AddXp(5f);
         var rowZero = CreatePanel(rowZeroTower, 10);
         try
         {
-            float cellBottom = GameConstants.CellSize;
+            float cellBottom = GameConstants.BattlefieldTop + GameConstants.CellSize;
             AssertThat(rowZero.Visible).IsTrue();
             AssertThat(rowZero.Position.Y).IsGreaterEqual(cellBottom);
-            AssertThat(rowZero.Position.Y).IsGreaterEqual(GameConstants.TopBarHeight);
+            AssertThat(rowZero.Position.Y).IsGreaterEqual(GameConstants.BattlefieldTop);
         }
         finally
         {
@@ -416,25 +417,25 @@ public class TowerUpgradePanelTest
         var midRow = CreatePanel(tower, 100);
         try
         {
-            float cellTop = 5 * GameConstants.CellSize;
+            float cellTop = GameConstants.BattlefieldTop + 5 * GameConstants.CellSize;
             AssertThat(midRow.Visible).IsTrue();
             AssertThat(midRow.Size.Y).IsEqual(
                 GameConstants.TowerUpgradePanelPadding * 2f + GameConstants.TowerUpgradePanelUpgradeHeight);
             AssertThat(midRow.Position.Y + midRow.Size.Y).IsLessEqual(cellTop);
-            AssertThat(midRow.Position.Y).IsGreaterEqual(GameConstants.TopBarHeight);
+            AssertThat(midRow.Position.Y).IsGreaterEqual(GameConstants.BattlefieldTop);
         }
         finally
         {
             Free(midRow);
         }
 
-        // Row 1 has no room above: the panel clamps below the top bar instead.
+        // Row 1 has no room above: the panel clamps to the battlefield top instead.
         var nearTopTower = MakeTower(TowerType.Arrow, 1, 10);
         nearTopTower.AddXp(5f);
         var nearTop = CreatePanel(nearTopTower, 10);
         try
         {
-            AssertThat(nearTop.Position.Y).IsEqual(GameConstants.TopBarHeight);
+            AssertThat(nearTop.Position.Y).IsEqual(GameConstants.BattlefieldTop);
         }
         finally
         {
@@ -613,8 +614,11 @@ public class TowerUpgradePanelTest
         return manager.GetActiveTowers()[^1];
     }
 
+    // Screen-space click point for a cell: the grid is offset below the HUD top bar.
     private static Vector2 CellCenter(int row, int col) =>
-        new Vector2(GameConstants.CellCenterX(col), GameConstants.CellCenterY(row));
+        new Vector2(
+            GameConstants.CellCenterX(col),
+            GameConstants.BattlefieldTop + GameConstants.CellCenterY(row));
 
     private static void PushLeftClick(Main main, Vector2 position)
     {
@@ -786,32 +790,45 @@ public class TowerUpgradePanelTest
     }
 
     [TestCase]
-    public void BuyClickInsideAClampedPanel_OverTheTowerCell_DoesNotToggleRange()
+    public void PanelActionClickInsideAClampedPanel_OverTheTowerCell_DoesNotToggleRange()
     {
         var main = CreateStartedGame();
         try
         {
-            // Row 1 has no room above: the panel clamps down over the tower's cell,
-            // so the Buy button physically overlaps the tower click area.
+            // Row 1 has no room above for the taller archetype panel, so it clamps to
+            // the battlefield top and its card bottoms physically overlap the tower's
+            // cell. (The shorter upgrade panel now fits fully above row 1.)
             var tower = PlaceTower(main, TowerType.Arrow, row: 1, col: 10);
-            tower.AddXp(5f);
+            tower.AddXp(30f);
+            var manager = GetManager(main);
+            AssertThat(manager.TryUpgradeTower(tower)).IsTrue();
+            AssertThat(manager.TryUpgradeTower(tower)).IsTrue();
+            AssertThat(tower.Rank).IsEqual(2);
 
             PushLeftClick(main, CellCenter(1, 10));
             var panel = GetPanel(main);
-            var buy = panel.GetNode<Button>("Block_Upgrade/Buy");
+            AssertThat(panel.IsOpen).IsTrue();
+            var card = panel.GetNode<Button>("Block_ArchetypeChoice/Card_Pierce");
 
-            var buyCenter = buy.GetGlobalRect().GetCenter();
-            AssertThat(new Rect2(
-                new Vector2(GameConstants.CellCenterX(10) - GameConstants.CellSize / 2f,
-                            GameConstants.CellCenterY(1) - GameConstants.CellSize / 2f),
-                new Vector2(GameConstants.CellSize, GameConstants.CellSize))
-                .HasPoint(buyCenter)).IsTrue();
+            // Pick a point inside both the card and the tower's cell (screen space).
+            // The clamped panel's card bottoms overlap the cell; the left card also
+            // overlaps it horizontally (its centre is left of the cell).
+            var cardRect = card.GetGlobalRect();
+            var cellCenter = CellCenter(1, 10);
+            var cellRect = new Rect2(
+                cellCenter - new Vector2(GameConstants.CellSize / 2f, GameConstants.CellSize / 2f),
+                new Vector2(GameConstants.CellSize, GameConstants.CellSize));
+            var clickPoint = new Vector2(cellCenter.X - 20f, cellRect.Position.Y + 8f);
+            AssertThat(cardRect.HasPoint(clickPoint)).IsTrue();
+            AssertThat(cellRect.HasPoint(clickPoint)).IsTrue();
 
-            PushLeftClickAndRelease(main, buyCenter);
+            PushLeftClickAndRelease(main, clickPoint);
 
-            AssertThat(tower.Rank).IsEqual(1);
+            // The click acted on the card, not on the battlefield underneath it.
+            AssertThat(tower.Rank).IsEqual(3);
+            AssertThat(tower.Archetype).IsEqual(TowerArchetype.Pierce);
             AssertThat(HasRangeIndicator(tower)).IsTrue(); // range was not toggled off
-            // The next gate is closed, so the panel is gone after the purchase.
+            // Rank 3 has no further upgrade, so the panel is gone after the choice.
             AssertThat(panel.IsOpen).IsFalse();
         }
         finally
@@ -1121,7 +1138,9 @@ public class TowerUpgradePanelTest
             foreach (var tower in expectations)
             {
                 tower.AddXp(5f);
-                PushLeftClick(main, new Vector2(tower.Position.X, tower.Position.Y));
+                // Screen click point: tower.Position is GameManager-local, so route
+                // through CellCenter, which adds the BattlefieldTop offset.
+                PushLeftClick(main, CellCenter(tower.GridRow, tower.GridCol));
 
                 var panel = GetPanel(main);
                 AssertThat(panel.IsOpen).IsTrue();

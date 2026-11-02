@@ -101,10 +101,14 @@ public partial class ArrowTower : Tower
 
         float recoil = GameConstants.TowerRecoilDistance * RecoilProgress;
         var aim = new Vector2(Mathf.Cos(AimAngle), Mathf.Sin(AimAngle));
-        _body.Position = _bodyBasePosition - aim * recoil;
+        Vector2 kickedPosition = _bodyBasePosition - aim * recoil;
+        _body.Position = kickedPosition;
 
         if (_bowFlash != null && IsInstanceValid(_bowFlash))
         {
+            // The chevron sits at the arrow tip, so it follows the same recoil kick
+            // instead of staying behind while the body kicks back.
+            _bowFlash.Position = kickedPosition;
             _bowFlash.Visible = IsRecoiling;
             if (IsRecoiling)
                 _bowFlash.QueueRedraw();
@@ -134,6 +138,28 @@ public partial class ArrowTower : Tower
     }
 
     /// <summary>
+    /// The arrow silhouette's three vertices in body-local space, tip first. It is an
+    /// equilateral triangle inscribed in a circle centred on the cell centre, so its
+    /// centroid and circumcentre coincide with the rotation pivot: the body spins in
+    /// place while aiming instead of orbiting the cell and looking off-centre. The
+    /// circumradius (cell/2 - 4) keeps every vertex inside the cell at every aim
+    /// angle. Pure and static so the centering contract is testable without pixels.
+    /// </summary>
+    public static Vector2[] BodyPolygon(float cell)
+    {
+        float center = cell / 2f;
+        float radius = cell / 2f - 4f; // same 4px inset as the cannon/laser bodies
+        float halfBase = radius * Mathf.Cos(Mathf.Pi / 6f);
+        float baseY = center + radius / 2f;
+        return new[]
+        {
+            new Vector2(center, center - radius), // tip, pointing up at rest
+            new Vector2(center - halfBase, baseY), // bottom-left
+            new Vector2(center + halfBase, baseY), // bottom-right
+        };
+    }
+
+    /// <summary>
     /// Paints the arrow silhouette for the current archetype:
     /// none = blue triangle with a dark outline; Pierce = forked spearhead split by a
     /// vertical slit; Crit = base triangle with a light four-point star inset.
@@ -144,44 +170,46 @@ public partial class ArrowTower : Tower
             return;
 
         float cell = GameConstants.CellSize;
-        Vector2 top = new(cell / 2f, 4f);
-        Vector2 bottomLeft = new(4f, cell - 4f);
-        Vector2 bottomRight = new(cell - 4f, cell - 4f);
+        Vector2[] body = BodyPolygon(cell);
 
         switch (Archetype)
         {
             case TowerArchetype.Pierce:
-                DrawForkedSpearhead(cell);
+                DrawForkedSpearhead(cell, body);
                 break;
             case TowerArchetype.Crit:
-                DrawFilledTriangle(top, bottomLeft, bottomRight);
+                DrawFilledTriangle(body[0], body[1], body[2]);
                 DrawStar(new Vector2(cell / 2f, cell / 2f), 9f, 3f);
                 break;
             default:
-                DrawFilledTriangle(top, bottomLeft, bottomRight);
+                DrawFilledTriangle(body[0], body[1], body[2]);
                 break;
         }
     }
 
     /// <summary>
     /// Pierce: two narrow triangle halves with their own dark outlines and a visible
-    /// ~6 px vertical slit between them (constant width from tip to base).
+    /// ~6 px vertical slit between them (constant width from tip to base). Both prongs
+    /// share the base triangle's tip and base heights, so their combined centroid is
+    /// the cell centre just like the plain arrow.
     /// </summary>
-    private void DrawForkedSpearhead(float cell)
+    private void DrawForkedSpearhead(float cell, Vector2[] body)
     {
         float center = cell / 2f;
         const float slitHalfWidth = 3f;
         float innerLeft = center - slitHalfWidth;
         float innerRight = center + slitHalfWidth;
+        float tipY = body[0].Y;
+        float baseY = body[1].Y;
 
-        var leftTip = new Vector2(innerLeft, 4f);
-        var leftInnerBase = new Vector2(innerLeft, cell - 4f);
-        var leftOuterBase = new Vector2(4f, cell - 4f);
+        var leftTip = new Vector2(innerLeft, tipY);
+        var leftInnerBase = new Vector2(innerLeft, baseY);
+        var leftOuterBase = new Vector2(body[1].X, baseY);
         DrawFilledTriangle(leftTip, leftOuterBase, leftInnerBase);
 
-        var rightTip = new Vector2(innerRight, 4f);
-        var rightInnerBase = new Vector2(innerRight, cell - 4f);
-        var rightOuterBase = new Vector2(cell - 4f, cell - 4f);
+        var rightTip = new Vector2(innerRight, tipY);
+        var rightInnerBase = new Vector2(innerRight, baseY);
+        var rightOuterBase = new Vector2(body[2].X, baseY);
         DrawFilledTriangle(rightTip, rightInnerBase, rightOuterBase);
     }
 

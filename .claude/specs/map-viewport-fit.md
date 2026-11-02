@@ -16,6 +16,13 @@ Fix the map/window mismatch so the full play area is visible at launch without m
 - [ ] Play area becomes 1280 × 896. `PlayAreaWidth` 1280 unchanged, `PlayAreaHeight` 1280 → 896.
 - [ ] Window (design resolution) set to 1460 × 940 (project.godot `viewport_width`/`viewport_height`).
 - [ ] Full map visible at design resolution: bottom grid row (row 13, y 832–896) plus 40px topbar all fit inside 940px height. No vertical overflow.
+
+> **Post-merge amendment (2026-11-01):** the grid was still drawn at viewport y=0, so the
+> top bar overlapped row 0 and a 44 px empty strip remained below the grid. The world root
+> (`GameManager`) now sits at `BattlefieldTop = TopBarHeight` (y=40): the top bar is above
+> the grid, the grid spans y 40–936, and the 4 px below it is intentional margin. Main
+> converts viewport input to GameManager-local space before battlefield hit tests, and the
+> tower upgrade panel (a screen-space Control) adds the same offset when docking.
 - [ ] Level 1 unchanged: straight path on `PathRow` (10), spawn (0,10), base (19,10), same waves (3,5,7,9,12), Arrow-only.
 
 > **Post-merge amendment (2026-11-01):** `PathRow` later moved to 7 so Level 1 is vertically
@@ -41,7 +48,7 @@ Fix the map/window mismatch so the full play area is visible at launch without m
 - **Window smaller than design res (laptop):** canvas scales down, map fully visible, input mapping correct, no clipping.
 - **Window larger than design res (big monitor):** canvas scales up, map fully visible, crisp geometry, no layout drift.
 - **Non-16:9 window (e.g. 16:10, 4:3):** `aspect=keep` letterboxes minimally; HUD/map stay centered and usable.
-- **Topbar overlap:** topbar overlays the top ~40px of row 0 — unchanged from current behavior, no gameplay impact.
+- **Topbar overlap (superseded 2026-11-01):** the world root now starts at `BattlefieldTop = TopBarHeight`; the top bar sits above the grid with zero overlap, and the grid ends at y=936 inside the 940px viewport.
 - **Level 2 path rows near grid edge:** new route keeps all cells in rows 0–13; no cell touches the clipped boundary.
 - **Grid coordinate assumptions:** no game or test code may hardcode a row index ≥ 14 (e.g. old row 14, 19) as a valid cell.
 

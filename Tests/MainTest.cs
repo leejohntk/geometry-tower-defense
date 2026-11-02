@@ -22,19 +22,22 @@ public class MainTest
     private const string ViewportWidthSetting = "display/window/size/viewport_width";
     private const string ViewportHeightSetting = "display/window/size/viewport_height";
 
-    // Cell (col 0, row 1): inside the battlefield, below the HUD top bar, and off
-    // Level 1's path (GameConstants.PathRow).
+    // Cell (col 0, row 1) as a SCREEN point: the grid is offset below the HUD top bar
+    // by BattlefieldTop. Inside the battlefield and off Level 1's path
+    // (GameConstants.PathRow).
     private static readonly Vector2 BattlefieldPoint =
-        new Vector2(GameConstants.CellCenterX(0), GameConstants.CellCenterY(1));
+        new Vector2(
+            GameConstants.CellCenterX(0),
+            GameConstants.BattlefieldTop + GameConstants.CellCenterY(1));
 
     /// <summary>
     /// Size the root window from project.godot before building <see cref="Main"/>.
     /// Input pushed through <see cref="Viewport.PushInput"/> is transformed into the
     /// viewport's coordinate space, so at the headless 64x64 default the game's real
-    /// coordinates (sidebar x~1390, battlefield y=96) fall outside it and never reach
-    /// <c>Main._Input</c>. Assigning the size later than this is not safe: the tests
-    /// assert the assignment took so an environment mismatch fails loudly here instead
-    /// of as a mysterious missing preview.
+    /// coordinates (sidebar x~1390, battlefield screen y >= BattlefieldTop) fall
+    /// outside it and never reach <c>Main._Input</c>. Assigning the size later than
+    /// this is not safe: the tests assert the assignment took so an environment
+    /// mismatch fails loudly here instead of as a mysterious missing preview.
     /// </summary>
     private static void ApplyProjectViewportSize()
     {
@@ -223,6 +226,11 @@ public class MainTest
             PushLeftClick(main, BattlefieldPoint);
 
             AssertThat(manager.GetActiveTowers().Count).IsEqual(1);
+            // The click point is in screen space; landing on the intended cell proves
+            // Main converted it into GameManager-local space before placing.
+            var placed = manager.GetActiveTowers()[0];
+            AssertThat(placed.GridRow).IsEqual(1);
+            AssertThat(placed.GridCol).IsEqual(0);
             AssertThat(manager.Coins)
                 .IsEqual(GameConstants.StartingCoins + 20 - GameConstants.ArrowTowerCost);
             AssertThat(manager.Coins > 0).IsTrue();
@@ -235,6 +243,39 @@ public class MainTest
             // a second placement.
             PushLeftClick(main, BattlefieldPoint);
             AssertThat(manager.GetActiveTowers().Count).IsEqual(1);
+            AssertThat(manager.IsPlacingTower).IsFalse();
+        }
+        finally
+        {
+            Cleanup(main);
+        }
+    }
+
+    [TestCase]
+    public void ClicksOutsideTheGridDuringPlacement_CancelWithoutPlacing()
+    {
+        var main = CreateStartedGame();
+        try
+        {
+            var manager = GetManager(main);
+
+            // The top-bar strip is above the grid: its screen y converts to a negative
+            // GameManager-local y, so it must cancel placement, not place a tower.
+            EnterPlacement(main);
+            PushLeftClick(main, new Vector2(
+                GameConstants.CellCenterX(0), GameConstants.BattlefieldTop / 2f));
+
+            AssertThat(manager.GetActiveTowers().Count).IsEqual(0);
+            AssertThat(manager.IsPlacingTower).IsFalse();
+
+            // The margin below the grid converts past PlayAreaHeight, so it must not
+            // place a tower either.
+            EnterPlacement(main);
+            PushLeftClick(main, new Vector2(
+                GameConstants.CellCenterX(0),
+                GameConstants.BattlefieldTop + GameConstants.PlayAreaHeight + 1f));
+
+            AssertThat(manager.GetActiveTowers().Count).IsEqual(0);
             AssertThat(manager.IsPlacingTower).IsFalse();
         }
         finally
