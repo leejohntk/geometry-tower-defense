@@ -6,9 +6,9 @@
 
 ## Description
 
-The dark factory verifies code as text — a build, a test suite, and three reviewers reading the diff. Nothing observes the assembled UI. The result is that layout defects are invisible until a human playtests; the last feature took eight round trips, all on `src/UI/SkillTreeScreen.cs`, and the three that repeated (panel centering and two passes at left-branch label alignment) appear nowhere in that feature's spec.
+The software factory verifies code as text — a build, a test suite, and three reviewers reading the diff. Nothing observes the assembled UI. The result is that layout defects are invisible until a human playtests; the last feature took eight round trips, all on `src/UI/SkillTreeScreen.cs`, and the three that repeated (panel centering and two passes at left-branch label alignment) appear nowhere in that feature's spec.
 
-This feature adds a headless layout verifier. It builds the real C# UI from `src/Main.tscn`, walks the Control tree, and evaluates layout assertions derived from the spec's Visual section. It runs inside the dark part, before human review, and reports named measurements rather than a verdict.
+This feature adds a headless layout verifier. It builds the real C# UI from `src/Main.tscn`, walks the Control tree, and evaluates layout assertions derived from the spec's Visual section. It runs inside the build phase, before human review, and reports named measurements rather than a verdict.
 
 Measured on Godot 4.7.0 mono against this repository: Control layout and font metrics resolve correctly under `--headless`, are bit-identical across runs, and cell-precise rects are available for every node. `--write-movie` and viewport capture are not available headless and are out of scope.
 

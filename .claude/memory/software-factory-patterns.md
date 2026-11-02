@@ -1,11 +1,11 @@
 ---
-name: dark-factory-patterns
+name: software-factory-patterns
 description: Loop phases, handoff protocols, enforcement tiers, and agent orchestration patterns
 metadata:
   type: reference
 ---
 
-# Dark Factory Patterns
+# Software Factory Patterns
 
 ## The Loop
 
@@ -16,7 +16,7 @@ Orchestrator proposes spec + holdout scenarios
     ↓
 Human reviews both, approves            ← last human touchpoint before implementation
     ↓
-═══════ dark part begins ═══════
+═══════ build phase begins ═══════
     ↓
 Implementer builds (never sees holdouts)
     ↓
@@ -39,7 +39,7 @@ Human playtests
 |-------|-----------|--------------|
 | idle | (deleted) | Waiting for human feature description |
 | spec_draft | phase: spec_draft | Orchestrator writing spec + holdouts |
-| spec_approved | phase: spec_approved | Human approved. Dark part begins. |
+| spec_approved | phase: spec_approved | Human approved. Build phase begins. |
 | implementing | phase: implementing | Implementer writing code + tests |
 | reviewing | phase: reviewing | 3-lens review + adversarial challenges |
 | awaiting_playtest | phase: awaiting_playtest | PR open. Human playtesting. |

@@ -4,7 +4,7 @@ description: Show current project status — active feature, phase, branch, last
 
 # /status — Project Status
 
-Show current state of the dark factory loop.
+Show current state of the software factory loop.
 
 ## What It Shows
 
