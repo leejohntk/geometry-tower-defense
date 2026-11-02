@@ -104,6 +104,19 @@ const TOPBAR_STATS := [
     {"group": "Block_Wave", "icon": "WaveIcon", "caption": "WAVE", "value": "WaveLabel", "text": "0/5"},
 ]
 
+## Speedup cue geometry, stated from the spec independently of the nodes measured: a
+## fixed-rect, click-through fast-forward group right-aligned in the top bar's play-area
+## strip. The play area is 20 columns x 64 px cells; the sidebar begins at its right edge.
+## The cue is two 11x14 solid triangles with a 4px gap plus a 6px sweep reserve on either
+## side (=> 38px wide), 20px tall, right-aligned 16px inside the play-area edge.
+const HUD_PLAY_AREA_WIDTH := 1280.0
+const HUD_SPEEDUP_TRIANGLE_WIDTH := 11.0
+const HUD_SPEEDUP_TRIANGLE_GAP := 4.0
+const HUD_SPEEDUP_SWEEP_DISTANCE := 6.0
+const HUD_SPEEDUP_CUE_WIDTH := HUD_SPEEDUP_TRIANGLE_WIDTH * 2.0 + HUD_SPEEDUP_TRIANGLE_GAP + HUD_SPEEDUP_SWEEP_DISTANCE * 2.0
+const HUD_SPEEDUP_CUE_HEIGHT := 20.0
+const HUD_SPEEDUP_RIGHT_INSET := 16.0
+
 ## Skill-tree info band: idle hint text and the labels every band must carry.
 const SKILL_INFO_HINT := "Hover a skill to see its description."
 const SKILL_INFO_CHILDREN := ["Panel", "Name", "Rank", "Description"]
@@ -357,6 +370,10 @@ func _run() -> void:
     _skipped.append({
         "id": "hud.mid_wave_layout",
         "reason": "HUD mid-wave state (live HP/coins/wave values, level-gated tower buttons) requires gameplay; static HUD layout is measured, dynamic state is not",
+    })
+    _skipped.append({
+        "id": "hud.speedup_visible_state",
+        "reason": "the 1.5x visible/animated speedup cue requires a live GameManager toggle; the static scene is measured at the fresh 1.0x state, so visibility/animation are covered by the unit suites",
     })
     _skipped.append({
         "id": "victory.real_score_layout",
@@ -917,6 +934,110 @@ func _evaluate_top_bar(top_bar: Control) -> void:
         "Remove the [HP] and [$] text placeholders; draw procedural icons.",
         GAME_HUD_SOURCE, "WARNING"
     )
+
+    _evaluate_speedup_cue(top_bar)
+
+
+## Speedup cue: a named, click-through fast-forward group right-aligned inside the play
+## area's top-bar strip. It is visual-only (no icon/caption/value triple), so it is
+## asserted separately from TOPBAR_STATS rather than added to that table.
+func _evaluate_speedup_cue(top_bar: Control) -> void:
+    var bar_rect: Rect2 = top_bar.get_global_rect()
+    var group := "GameHUD/Block_TopBar/Block_Speedup"
+    var cue := _require(top_bar, "Block_Speedup", "GameHUD/Block_TopBar", GAME_HUD_SOURCE)
+    if cue == null:
+        return
+
+    var cue_rect: Rect2 = cue.get_global_rect()
+
+    _check_inside(
+        "hud.topbar.speedup_inside_bar", group, cue_rect, bar_rect,
+        "Keep the speedup cue inside the top bar.", GAME_HUD_SOURCE, "WARNING"
+    )
+    _check(
+        "hud.topbar.speedup_click_through", group,
+        "mouse_filter=%d" % cue.mouse_filter,
+        "mouse_filter=%d (ignore)" % Control.MOUSE_FILTER_IGNORE,
+        cue.mouse_filter == Control.MOUSE_FILTER_IGNORE,
+        "Make the speedup cue wrapper click-through; it must never consume input.",
+        GAME_HUD_SOURCE, "WARNING"
+    )
+    _check(
+        "hud.topbar.speedup_hidden_at_normal_speed", group,
+        "visible=%s" % str(cue.visible),
+        "visible=false (the verifier measures a fresh 1.0x game)",
+        not cue.visible,
+        "Hide the speedup cue while the clock runs at 1.0x.",
+        GAME_HUD_SOURCE, "WARNING"
+    )
+    _check(
+        "hud.topbar.speedup_vertically_centred", group,
+        "center=%.2f" % cue_rect.get_center().y,
+        "bar center=%.2f" % bar_rect.get_center().y,
+        _approx(cue_rect.get_center().y, bar_rect.get_center().y),
+        "Centre the speedup cue vertically in the top bar.",
+        GAME_HUD_SOURCE, "WARNING"
+    )
+    _check(
+        "hud.topbar.speedup_fixed_size", group,
+        "size=(%.2f, %.2f)" % [cue_rect.size.x, cue_rect.size.y],
+        "size=(%.1f, %.1f) from the spec's triangle/gap/sweep geometry" % [
+            HUD_SPEEDUP_CUE_WIDTH, HUD_SPEEDUP_CUE_HEIGHT,
+        ],
+        _approx(cue_rect.size.x, HUD_SPEEDUP_CUE_WIDTH)
+            and _approx(cue_rect.size.y, HUD_SPEEDUP_CUE_HEIGHT),
+        "Size the speedup cue from its triangle geometry; never let it resize on toggle.",
+        GAME_HUD_SOURCE, "WARNING"
+    )
+    _check(
+        "hud.topbar.speedup_right_edge_anchored", group,
+        "right=%.2f" % cue_rect.end.x,
+        "right=%.1f (play area width minus the %.1fpx inset)" % [
+            HUD_PLAY_AREA_WIDTH - HUD_SPEEDUP_RIGHT_INSET, HUD_SPEEDUP_RIGHT_INSET,
+        ],
+        _approx(cue_rect.end.x, HUD_PLAY_AREA_WIDTH - HUD_SPEEDUP_RIGHT_INSET),
+        "Anchor the speedup cue's right edge a fixed inset from the play-area edge.",
+        GAME_HUD_SOURCE, "WARNING"
+    )
+
+    var wave_group := top_bar.get_node_or_null("Block_Wave")
+    if wave_group is Control:
+        var wave_rect: Rect2 = wave_group.get_global_rect()
+        _check(
+            "hud.topbar.speedup_right_of_wave", group,
+            "left=%.2f wave.right=%.2f" % [cue_rect.position.x, wave_rect.end.x],
+            "left > wave.right and no overlap (clear gap from Block_Wave)",
+            cue_rect.position.x > wave_rect.end.x and not wave_rect.intersects(cue_rect),
+            "Place the speedup cue to the right of Block_Wave with a clear gap.",
+            GAME_HUD_SOURCE, "WARNING"
+        )
+    else:
+        _skipped.append({
+            "id": "hud.topbar.speedup_right_of_wave",
+            "reason": "Block_Wave could not be resolved, so the cue's horizontal order could not be measured",
+        })
+
+    var icon := _require(cue, "FastForwardIcon", group, GAME_HUD_SOURCE)
+    if icon != null:
+        _check(
+            "hud.topbar.speedup_icon_click_through", "%s/FastForwardIcon" % group,
+            "mouse_filter=%d" % icon.mouse_filter,
+            "mouse_filter=%d (ignore)" % Control.MOUSE_FILTER_IGNORE,
+            icon.mouse_filter == Control.MOUSE_FILTER_IGNORE,
+            "Make the fast-forward icon click-through.",
+            GAME_HUD_SOURCE, "WARNING"
+        )
+        _check(
+            "hud.topbar.speedup_icon_matches_cue_rect", "%s/FastForwardIcon" % group,
+            "size=(%.2f, %.2f)" % [icon.size.x, icon.size.y],
+            "size=(%.1f, %.1f) from the spec's cue geometry" % [
+                HUD_SPEEDUP_CUE_WIDTH, HUD_SPEEDUP_CUE_HEIGHT,
+            ],
+            _approx(icon.size.x, HUD_SPEEDUP_CUE_WIDTH)
+                and _approx(icon.size.y, HUD_SPEEDUP_CUE_HEIGHT),
+            "Fill the fixed cue rect with the fast-forward icon; the sweep draws inside it.",
+            GAME_HUD_SOURCE, "WARNING"
+        )
 
 
 ## Placement cards: each Place* button is a 160x72 icon card with empty text and

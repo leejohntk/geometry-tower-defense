@@ -29,6 +29,9 @@ public partial class GameManager : Node2D
     [Signal]
     public delegate void TowerPlacementStateChangedEventHandler(bool canPlace);
 
+    [Signal]
+    public delegate void SpeedupChangedEventHandler(bool active);
+
     // Core subsystems
     private GridManager? _gridManager;
     private WaveManager? _waveManager;
@@ -78,6 +81,7 @@ public partial class GameManager : Node2D
     private int _hp;
     private int _coins;
     private GameState _state = GameState.Playing;
+    private bool _speedupActive = false;
 
     // Guard against double initialization
     private bool _initialized = false;
@@ -99,6 +103,13 @@ public partial class GameManager : Node2D
     public GameState State => _state;
 
     /// <summary>
+    /// True while the whole-game clock runs at the speedup rate (1.5x). The single
+    /// owner of this state: input toggles it, the HUD reads it back through the
+    /// SpeedupChanged signal, and every exit from play resets it.
+    /// </summary>
+    public bool IsSpeedupActive => _speedupActive;
+
+    /// <summary>
     /// True if game is over (HP <= 0).
     /// </summary>
     public bool IsGameOver => _state == GameState.GameOver;
@@ -107,6 +118,19 @@ public partial class GameManager : Node2D
     /// True if player has won (all waves cleared).
     /// </summary>
     public bool IsVictory => _state == GameState.Victory;
+
+    /// <summary>
+    /// Single funnel for game-state transitions. Leaving play always drops the clock
+    /// to normal (the HUD cue hides before the result overlay appears); entering play
+    /// never touches it, so a sped-up run keeps its speed across waves.
+    /// </summary>
+    private void SetState(GameState state)
+    {
+        _state = state;
+
+        if (state != GameState.Playing)
+            ResetSpeedup();
+    }
 
     /// <summary>
     /// The active WaveManager.
@@ -180,6 +204,10 @@ public partial class GameManager : Node2D
         PlacingTowerType = null;
         _activeBoss = null;
         _bossRouteIndex = 0;
+
+        // A fresh level always begins at the normal clock, no matter how the previous
+        // run (or a stale global Engine.TimeScale) left it.
+        ResetSpeedup();
 
         // Create object pools once (persist across game restarts)
         if (!_poolsCreated)
@@ -673,7 +701,10 @@ public partial class GameManager : Node2D
         if (_hp <= 0)
         {
             _hp = 0;
-            _state = GameState.GameOver;
+
+            // Defeat ends the run: leaving play drops the clock now (before GameOver
+            // is emitted) so the HUD cue hides in the same frame as the overlay.
+            SetState(GameState.GameOver);
 
             // Stop the wave timer immediately on defeat. Without this the spawn timer
             // keeps firing after game over and keeps adding enemies to a finished run.
@@ -911,7 +942,9 @@ public partial class GameManager : Node2D
         if (_state != GameState.Playing)
             return;
 
-        _state = GameState.Victory;
+        // Victory ends the run: leaving play drops the clock now (before Victory is
+        // emitted) so the HUD cue hides in the same frame as the result overlay.
+        SetState(GameState.Victory);
 
         // Award victory SP once before flushing.
         if (_level != null)
@@ -932,6 +965,47 @@ public partial class GameManager : Node2D
 
         return _waveManager?.StartNextWave() ?? false;
     }
+
+    // === Speedup clock ===
+
+    /// <summary>
+    /// Flips the whole-game clock between the normal and speedup rates. Only acts
+    /// during an initialized, active game; returns true when the toggle took effect.
+    /// Speed persists across waves — wave completion never touches it.
+    /// </summary>
+    public bool ToggleSpeedup()
+    {
+        // An uninitialized manager has no level and nothing to speed up; refusing here
+        // also keeps it from writing the global clock before a game exists.
+        if (!_initialized || _state != GameState.Playing)
+            return false;
+
+        SetSpeedupActive(!_speedupActive);
+        return true;
+    }
+
+    /// <summary>
+    /// Applies the speedup state to the global engine clock and notifies the HUD.
+    /// The engine clock is assigned unconditionally so a reset also repairs a stale
+    /// global value; the signal only fires on an actual state change.
+    /// </summary>
+    private void SetSpeedupActive(bool active)
+    {
+        Engine.TimeScale = active ? GameConstants.SpeedupTimeScale : GameConstants.NormalTimeScale;
+
+        if (_speedupActive == active)
+            return;
+
+        _speedupActive = active;
+        EmitSignal(SignalName.SpeedupChanged, active);
+    }
+
+    /// <summary>
+    /// Restores the normal clock. Called on every exit from play (game over, victory,
+    /// return to title) and on new-level initialization so no run can inherit a
+    /// sped-up session.
+    /// </summary>
+    private void ResetSpeedup() => SetSpeedupActive(false);
 
     // === Tower placement ===
 
@@ -1071,9 +1145,10 @@ public partial class GameManager : Node2D
     /// <summary>
     /// Test-only seam: forces the game state so transaction rejection can be exercised
     /// without driving a full defeat/victory. Internal to the game assembly; production
-    /// transitions only through enemy arrivals and wave completion.
+    /// transitions only through enemy arrivals and wave completion. Routes through the
+    /// production funnel so an exit state also drops the clock.
     /// </summary>
-    internal void SetStateForTesting(GameState state) => _state = state;
+    internal void SetStateForTesting(GameState state) => SetState(state);
 
     /// <summary>
     /// Test-only seam: registers an externally constructed enemy into the live
@@ -1196,6 +1271,11 @@ public partial class GameManager : Node2D
         _level = null;
         PlacingTowerType = null;
         _initialized = false;
+
+        // Returning to the title drops the clock to normal too: the cue and the fast
+        // simulation must never survive into a menu or the next level's warm-up.
+        ResetSpeedup();
+
         // Do NOT call Initialize() — Main.StartNewGame() is the sole caller
     }
 }

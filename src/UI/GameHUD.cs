@@ -23,6 +23,7 @@ public partial class GameHUD : CanvasLayer
     private Button? _placeArrowButton;
     private Button? _placeCannonButton;
     private Button? _placeLaserButton;
+    private SpeedupCue? _speedupCue;
     private GameManager? _gameManager;
     private bool _allowCannon = false;
     private bool _allowLaser = false;
@@ -107,6 +108,19 @@ public partial class GameHUD : CanvasLayer
         _waveLabel = BuildStatGroup(
             topBarBlock, "Block_Wave", "WaveIcon", "WaveLabel", "WAVE", "0/5",
             GameConstants.HudWaveColor, HudIcons.DrawWave, groupX);
+
+        // Speedup cue: a fixed-rect fast-forward indicator right-aligned inside the
+        // play area's portion of the bar, well clear of Block_Wave and entirely left
+        // of the sidebar. Click-through and visual only; it defaults hidden and only
+        // GameManager's SpeedupChanged signal shows it.
+        _speedupCue = new SpeedupCue();
+        _speedupCue.Name = "Block_Speedup";
+        _speedupCue.Position = new Vector2(
+            GameConstants.PlayAreaWidth
+                - GameConstants.HudSpeedupCueRightInset
+                - GameConstants.HudSpeedupCueWidth,
+            (GameConstants.TopBarHeight - GameConstants.HudSpeedupCueHeight) / 2f);
+        topBarBlock.AddChild(_speedupCue);
 
         // The sidebar sits to the RIGHT of the play area (grid), not overlapping it.
         float sidebarX = GameConstants.PlayAreaWidth;
@@ -393,6 +407,7 @@ public partial class GameHUD : CanvasLayer
             _gameManager.GameOver -= OnGameOver;
             _gameManager.Victory -= OnVictory;
             _gameManager.TowerPlacementStateChanged -= OnTowerPlacementStateChanged;
+            _gameManager.SpeedupChanged -= OnSpeedupChanged;
         }
 
         _gameManager = gm;
@@ -403,12 +418,14 @@ public partial class GameHUD : CanvasLayer
         gm.GameOver += OnGameOver;
         gm.Victory += OnVictory;
         gm.TowerPlacementStateChanged += OnTowerPlacementStateChanged;
+        gm.SpeedupChanged += OnSpeedupChanged;
 
         // Sync initial state so HUD reflects current GameManager state
         OnCoinsChanged(gm.Coins);
         OnHpChanged(gm.HP);
         OnWaveChanged(0);
         OnTowerPlacementStateChanged(gm.Coins >= GameConstants.ArrowTowerCost);
+        OnSpeedupChanged(gm.IsSpeedupActive);
     }
 
     private void OnCoinsChanged(int coins)
@@ -441,6 +458,15 @@ public partial class GameHUD : CanvasLayer
     private void OnVictory()
     {
         DisableAllCards();
+    }
+
+    /// <summary>
+    /// Shows the top-bar fast-forward cue only while the game clock is sped up. The
+    /// cue owns its own animation and stops processing while hidden.
+    /// </summary>
+    private void OnSpeedupChanged(bool active)
+    {
+        _speedupCue?.SetActive(active);
     }
 
     /// <summary>

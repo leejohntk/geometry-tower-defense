@@ -7,6 +7,12 @@ metadata:
 
 # Current Feature
 
+**Active feature (in flight):** space-bar-speedup — Space starts a ready wave; mid-wave Space
+toggles `Engine.TimeScale` 1.0 ↔ 1.5. Speed persists across waves and resets on game over,
+victory, return to title, and new-level init. An animated fast-forward cue appears in the top
+bar only at 1.5×. Spec: `.claude/specs/space-bar-speedup.md` (approved 2026-11-02).
+Branch: `feature/space-bar-speedup`.
+
 **Last feature:** visual-overhaul — full-game procedural visual pass (PR #31, merged
 2026-11-01, squash `7cf39e1`). Nine playtest fix batches landed after the initial gates;
 final gates: build 0 warnings, 507 tests, layout verifier 335 assertions / 337 evaluated /
