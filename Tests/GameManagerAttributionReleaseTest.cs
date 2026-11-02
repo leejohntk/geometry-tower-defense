@@ -28,17 +28,6 @@ public class GameManagerAttributionReleaseTest
         return manager.GetActiveTowers()[^1];
     }
 
-    private static void RunToBase(Enemy enemy)
-    {
-        int ticks = 0;
-        while (!enemy.IsDead && ticks < 500)
-        {
-            enemy._Process(1f);
-            ticks++;
-        }
-        AssertThat(enemy.IsDead).IsTrue();
-    }
-
     [TestCase]
     public void KilledEnemy_DropsAllTowerReferencesBeforePooling()
     {
@@ -70,7 +59,7 @@ public class GameManagerAttributionReleaseTest
         enemy.TakeDamage(2f, source: tower);
         AssertThat(enemy.CreditSourceCount).IsEqual(1);
 
-        RunToBase(enemy);
+        WaveTestSupport.RunToBase(enemy);
 
         AssertThat(manager.ActiveEnemyCount).IsEqual(0);
         AssertThat(enemy.CreditSourceCount).IsEqual(0);
@@ -90,7 +79,7 @@ public class GameManagerAttributionReleaseTest
 
         // Force the early GameOver branch of OnEnemyReachedEnd.
         manager.SetStateForTesting(GameState.GameOver);
-        RunToBase(enemy);
+        WaveTestSupport.RunToBase(enemy);
 
         AssertThat(manager.ActiveEnemyCount).IsEqual(0);
         AssertThat(enemy.CreditSourceCount).IsEqual(0);

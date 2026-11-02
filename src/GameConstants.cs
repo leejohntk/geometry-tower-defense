@@ -404,6 +404,31 @@ public static class GameConstants
     public const float BaseCoreInnerShieldArcAlpha = 0.55f;  // vs the full shield color
     public const int BaseCoreShieldArcSegments = 32;
 
+    // === Space-bar speedup =======================================================
+
+    // Whole-game clock rates. Space toggles between them while a wave runs, and every
+    // exit from play restores the normal rate. Scaling Engine.TimeScale keeps wave
+    // timers, enemy movement, projectiles, and tower fire timing in sync with the clock.
+    public const float NormalTimeScale = 1f;
+    public const float SpeedupTimeScale = 1.5f;
+
+    // Top-bar speedup cue: two solid fast-forward triangles that sweep right with an
+    // alpha pulse while the clock is sped up. The wrapper keeps a fixed rect (hidden at
+    // normal speed) so toggling never shifts the bar layout. The cue width is derived
+    // from the triangles plus the sweep reserve on both sides: 2 * 11 + 4 + 2 * 6 = 38.
+    public const float HudSpeedupTriangleWidth = 11f;
+    public const float HudSpeedupTriangleHeight = 14f;
+    public const float HudSpeedupTriangleGap = 4f;
+    public const float HudSpeedupSweepDistance = 6f;
+    public const float HudSpeedupCueWidth =
+        HudSpeedupTriangleWidth * 2f + HudSpeedupTriangleGap + HudSpeedupSweepDistance * 2f;
+    public const float HudSpeedupCueHeight = 20f;
+    public const float HudSpeedupCueRightInset = 16f;   // gap from the play area's right edge
+    public const float HudSpeedupCycleSeconds = 0.8f;
+    public const float HudSpeedupAlphaMin = 0.55f;
+    public const float HudSpeedupAlphaMax = 1f;
+    public static readonly Color HudSpeedupColor = new Color(0.55f, 0.85f, 1f);
+
     // HUD top status bar. Procedural icons and stat groups replace the old text
     // placeholders; the bar itself stays a subtle dark strip over the battlefield.
     public static readonly Color HudTopBarBackgroundColor = new Color(0.04f, 0.04f, 0.09f, 0.9f);

@@ -296,6 +296,19 @@ public partial class Main : Node2D
         if (!_gameRunning || _gameManager == null)
             return;
 
+        // Space is the context-sensitive in-level control: while a wave runs it
+        // toggles the whole-game clock, otherwise it starts the ready wave. Checked
+        // before the placement branch so a running wave can still be sped up while
+        // aiming. Every new Space press during play is consumed — even in a no-op
+        // state (e.g. placement between waves) — so a focused Button can never also
+        // fire ui_accept from the same physical press.
+        if (IsSpacePress(@event))
+        {
+            OnSpacePressed();
+            GetViewport().SetInputAsHandled();
+            return;
+        }
+
         if (_gameManager.IsPlacingTower)
         {
             // Escape cancels the current placement selection.
@@ -422,6 +435,42 @@ public partial class Main : Node2D
                 }
             }
         }
+    }
+
+    /// <summary>
+    /// True when the event is a new Space key press. Key repeat and key release are
+    /// deliberately inert, and the check is on the key itself rather than ui_accept
+    /// so Enter and gamepad input never trigger the in-level control.
+    /// </summary>
+    private static bool IsSpacePress(InputEvent @event) =>
+        @event is InputEventKey key &&
+        key.Pressed &&
+        !key.Echo &&
+        key.Keycode == Key.Space;
+
+    /// <summary>
+    /// One context-sensitive action per Space press. Priority: a running wave toggles
+    /// the clock (even in tower-placement mode); otherwise, with no wave running and
+    /// not placing, the ready wave starts through the same path as the Start Wave
+    /// button. A no-op state simply does nothing; the caller always consumes the press.
+    /// </summary>
+    private void OnSpacePressed()
+    {
+        if (_gameManager == null || _gameManager.State != GameState.Playing)
+            return;
+
+        // A running wave always takes the press; Space can never start a wave mid-wave.
+        if (_gameManager.WaveManager?.IsWaveActive ?? false)
+        {
+            _gameManager.ToggleSpeedup();
+            return;
+        }
+
+        // Start Wave is disabled while placing, so Space is inert between waves.
+        if (_gameManager.IsPlacingTower)
+            return;
+
+        OnStartWavePressed();
     }
 
     /// <summary>
