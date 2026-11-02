@@ -59,7 +59,7 @@ First playable level of Geometry Tower Defense. Player defends a house on the ri
 ## Visual / Geometry Theme
 
 - **Grid:** Thin gray lines on dark background
-- **Path:** Light brown/tan cells along row 10
+- **Path:** Light brown/tan cells along the centered path row (row 7 of the 14-row grid)
 - **House (base):** Simple geometric house shape — square base + triangle roof, red/orange
 - **Enemy (circle):** Red circle with dark border. 48px diameter within 64px cell
 - **Arrow Tower:** Upward-pointing triangle (isosceles), blue/cyan fill, dark border. Fits within 64px cell

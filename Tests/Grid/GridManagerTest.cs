@@ -12,12 +12,12 @@ namespace GeometryTowerDefense.Tests;
 public class GridManagerTest
 {
     [TestCase]
-    public void Level2Path_BlocksPlacementOnNonRow10PathCells()
+    public void Level2Path_BlocksPlacementOnNonPathRowCells()
     {
         var grid = new GridManager();
         grid.Configure(Levels.Level2);
 
-        // (col 3, row 11) is on the winding vertical segment, off row 10.
+        // (col 3, row 11) is on the winding vertical segment, off the path row.
         AssertThat(grid.IsOnPath(11, 3)).IsTrue();
         AssertThat(grid.CanPlaceTower(11, 3)).IsFalse();
 
@@ -26,14 +26,15 @@ public class GridManagerTest
     }
 
     [TestCase]
-    public void Level1Path_BlocksPlacementOnRow10Only()
+    public void Level1Path_BlocksPlacementOnPathRowOnly()
     {
         var grid = new GridManager();
         grid.Configure(Levels.Level1);
 
-        AssertThat(grid.IsOnPath(10, 0)).IsTrue();
-        AssertThat(grid.CanPlaceTower(10, 5)).IsFalse();
-        AssertThat(grid.CanPlaceTower(9, 5)).IsTrue(); // row 9 is not on the path
+        AssertThat(grid.IsOnPath(GameConstants.PathRow, 0)).IsTrue();
+        AssertThat(grid.CanPlaceTower(GameConstants.PathRow, 5)).IsFalse();
+        // The row immediately above the path is not on it.
+        AssertThat(grid.CanPlaceTower(GameConstants.PathRow - 1, 5)).IsTrue();
     }
 
     [TestCase]

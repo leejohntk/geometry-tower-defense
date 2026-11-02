@@ -15,9 +15,11 @@ observation is verified; "looks right" is not a pass.
 
 **Expected:**
 - Id 5, three routes.
-- Spawn cells exactly `(0,2)`, `(0,7)`, `(0,11)`.
+- Spawn cells exactly `(0,2)`, `(0,7)`, `(0,12)`.
 - Every route connected, in-bounds 20×14, does not self-intersect.
 - All routes end at base `(19,7)`.
+- Route C (bottom lane) is separated from the middle lane: for columns 0–13 no route C cell
+  occupies row 8, so one empty row sits between the two lanes until the shared final run.
 - Shared final cells are deduped in the grid (no double-draw, no buildable shared cell).
 - Cannon and Laser allowed.
 
@@ -162,7 +164,9 @@ Levels 1–4 definitions and their expected enemy totals.
 **Expected:**
 - Build 0 warnings / 0 errors.
 - All tests pass, 0 skipped without documented reason.
-- Levels 1–4 routes, tower flags, and wave totals unchanged.
+- Levels 2–4 routes, tower flags, and wave totals unchanged. Level 1 keeps its straight
+  single-route shape and wave totals; its path row moved 10→7 (post-merge amendment
+  2026-11-01, vertical centring) and must be the only Level 1 route difference.
 - Existing skill-tree, laser, cannon, swarm, and armor tests unchanged and passing.
 - Layout verifier PASS.
 

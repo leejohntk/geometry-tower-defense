@@ -14,8 +14,8 @@ Implementer must not see this file. Orchestrator runs these during holdout verif
 
 ## H3 — Level 1 regression
 - **Setup:** Load Level 1.
-- **Check:** Straight path, all waypoints row 10. Spawn (0,10), base (19,10). Waves (3,5,7,9,12). Arrow-only, no cannon button.
-- **Expected:** Identical to pre-feature behavior.
+- **Check:** Straight path, all waypoints row 7 (post-merge amendment: `PathRow` moved 10→7 to centre Level 1 vertically). Spawn (0,7), base (19,7). Waves (3,5,7,9,12). Arrow-only, no cannon button.
+- **Expected:** Same shape and behaviour as pre-feature; only the path row moved to the 14-row grid's middle.
 
 ## H4 — Level 2 spawn/base at left/right edge, near vertical center
 - **Setup:** Inspect Level 2 path.

@@ -33,14 +33,14 @@ public class Level5Test
         AssertThat(level.SpawnCells.Count).IsEqual(3);
         AssertThat(level.SpawnCells[0]).IsEqual(new Vector2I(0, 2));
         AssertThat(level.SpawnCells[1]).IsEqual(new Vector2I(0, 7));
-        AssertThat(level.SpawnCells[2]).IsEqual(new Vector2I(0, 11));
+        AssertThat(level.SpawnCells[2]).IsEqual(new Vector2I(0, 12));
         AssertThat(level.BaseCell).IsEqual(BaseCell);
     }
 
     [TestCase]
     public void Level5_Routes_HaveSpecCellCounts_AndAreValid()
     {
-        int[] expectedCounts = { 29, 20, 28 };
+        int[] expectedCounts = { 29, 20, 29 };
 
         for (int i = 0; i < Levels.Level5.Paths.Count; i++)
         {
@@ -80,7 +80,25 @@ public class Level5Test
         union.UnionWith(routeC);
         int repeatedCells = routeA.Count + routeB.Count + routeC.Count - union.Count;
         AssertThat(repeatedCells).IsEqual(shared.Count * 2); // each shared cell appears 3x
-        AssertThat(union.Count).IsEqual(65);
+        AssertThat(union.Count).IsEqual(66);
+    }
+
+    [TestCase]
+    public void Level5_ThirdRoute_IsOneRowBelowWithGapAbove()
+    {
+        var routeB = Levels.Level5.Paths[1];
+        var routeC = Levels.Level5.Paths[2];
+
+        // Left of the shared final run, the bottom lane's body sits on row 9 at its
+        // northernmost (row 12 at spawn, row 11 on the second leg). Row 8 stays empty.
+        var laneCells = routeC.Where(cell => cell.X < 14).ToList();
+        AssertThat(laneCells.Count > 0).IsTrue();
+        AssertThat(laneCells.Any(cell => cell.Y == 8)).IsFalse();
+        AssertThat(laneCells.Min(cell => cell.Y)).IsEqual(9);
+
+        // The middle lane is the straight row-7 run, so neither lane intrudes into row 8
+        // and the one-row gap between them is preserved.
+        AssertThat(routeB.Any(cell => cell.Y == 8)).IsFalse();
     }
 
     [TestCase]

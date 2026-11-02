@@ -49,7 +49,7 @@ Implementer must not see this file. Orchestrator runs these during holdout verif
 
 ## H10 — Level 1 regression
 - **Setup:** Load Level 1.
-- **Check:** Straight path (all waypoints row 10). No cannon button. No swarm enemy ever spawns. Wave counts match existing (3,5,7,9,12).
+- **Check:** Straight path (all waypoints row 7; `PathRow` moved 10→7 post-merge to centre Level 1). No cannon button. No swarm enemy ever spawns. Wave counts match existing (3,5,7,9,12).
 - **Expected:** Level 1 behavior identical to pre-feature.
 
 ## H11 — Level select flows

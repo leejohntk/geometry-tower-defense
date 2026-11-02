@@ -17,6 +17,11 @@ Fix the map/window mismatch so the full play area is visible at launch without m
 - [ ] Window (design resolution) set to 1460 × 940 (project.godot `viewport_width`/`viewport_height`).
 - [ ] Full map visible at design resolution: bottom grid row (row 13, y 832–896) plus 40px topbar all fit inside 940px height. No vertical overflow.
 - [ ] Level 1 unchanged: straight path on `PathRow` (10), spawn (0,10), base (19,10), same waves (3,5,7,9,12), Arrow-only.
+
+> **Post-merge amendment (2026-11-01):** `PathRow` later moved to 7 so Level 1 is vertically
+> centred in the 14-row grid (row 7 matches the middle lane/base used by Levels 2, 4 and 5).
+> The "Level 1 unchanged" line above records the state at this feature's merge, not current
+> behaviour.
 - [ ] Level 2 winding path redrawn into the 14-row grid. Reference route (implementer may adjust as long as criteria hold):
   `(0,7) → (3,7) → (3,11) → (7,11) → (7,3) → (11,3) → (11,11) → (15,11) → (15,7) → (19,7)`.
   - [ ] Spawn at left edge (0,7); base at right edge (19,7).
