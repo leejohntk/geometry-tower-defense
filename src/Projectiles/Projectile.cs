@@ -135,9 +135,18 @@ public abstract partial class Projectile : Node2D
 
         // A pooled projectile must never reuse the previous shot's trail.
         EnsureTrail();
-        _trail?.Reset(Position);
+        _trail?.Reset(TrailSamplePosition);
         UpdateTrailVisual();
     }
+
+    /// <summary>
+    /// Position recorded into the visual trail. Trail renderers are top-level nodes
+    /// (they draw behind the projectile without inheriting its rotation), so they
+    /// render in world space: samples must be global, not the GameManager-local
+    /// <see cref="Node2D.Position"/>. A projectile outside the tree (unit tests) has no
+    /// parent transform, so its local position already is the world position.
+    /// </summary>
+    private Vector2 TrailSamplePosition => IsInsideTree() ? GlobalPosition : Position;
 
     public override void _Process(double delta)
     {
@@ -148,7 +157,7 @@ public abstract partial class Projectile : Node2D
         Position += _direction * moveDistance;
         _distanceTraveled += moveDistance;
 
-        _trail?.Advance(Position, (float)delta);
+        _trail?.Advance(TrailSamplePosition, (float)delta);
         UpdateTrailVisual();
 
         if (_distanceTraveled >= _maxRangePixels)

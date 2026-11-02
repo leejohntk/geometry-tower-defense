@@ -224,6 +224,68 @@ public class ProjectileTrailTest
     }
 
     [TestCase]
+    public void ArrowTrail_DrawsInWorldSpace_WhenTheGameWorldIsOffset()
+    {
+        // The game world is offset below the HUD top bar (BattlefieldTop). The trail
+        // Line2D is a top-level node, so it draws in world space: samples recorded as
+        // GameManager-local positions would render above the arrow (disjointed trail).
+        var world = new Node2D { Position = new Vector2(0f, GameConstants.BattlefieldTop) };
+        ((SceneTree)Engine.GetMainLoop()).Root.AddChild(world);
+        var arrow = new ArrowProjectile();
+        world.AddChild(arrow);
+        try
+        {
+            var tower = MakeArrowTower(); // tower.Position is GameManager-local
+            var enemy = MakeEnemyAt(tower.Position);
+            arrow.Initialize(tower, tower.Position + new Vector2(200f, 0f), enemy);
+
+            // Cross one sample interval so the trail has a drawable segment.
+            arrow._Process(0.05f);
+
+            var trail = arrow.GetNodeOrNull<Line2D>("Trail");
+            AssertThat(trail).IsNotNull();
+            AssertThat(trail!.Points.Length).IsGreater(1);
+            // The buffer is oldest-first (for the fade gradient), so the newest sample
+            // is at index count - 1 and sits exactly on the arrow's world position.
+            int sampleCount = arrow.TrailSampleCount;
+            AssertThat(sampleCount).IsGreater(1);
+            AssertThat(trail.Points[sampleCount - 1]).IsEqual(arrow.GlobalPosition);
+            AssertThat(trail.Points[sampleCount - 1].Y).IsGreater(arrow.Position.Y);
+        }
+        finally
+        {
+            world.Free();
+        }
+    }
+
+    [TestCase]
+    public void CannonTrail_DrawsInWorldSpace_WhenTheGameWorldIsOffset()
+    {
+        // Same top-level world-space contract for the cannon's smoke puffs.
+        var world = new Node2D { Position = new Vector2(0f, GameConstants.BattlefieldTop) };
+        ((SceneTree)Engine.GetMainLoop()).Root.AddChild(world);
+        var shell = new CannonProjectile();
+        world.AddChild(shell);
+        try
+        {
+            var tower = new CannonTower();
+            tower.Initialize(5, 5);
+            var enemy = MakeEnemyAt(tower.Position);
+            shell.Initialize(tower, tower.Position + new Vector2(200f, 0f), enemy);
+
+            // Initialization seeds one sample and places the newest puff immediately.
+            var puff = shell.GetNodeOrNull<Polygon2D>("SmokePuff_0");
+            AssertThat(puff).IsNotNull();
+            AssertThat(puff!.Position).IsEqual(shell.GlobalPosition);
+            AssertThat(puff.Position.Y).IsGreater(shell.Position.Y);
+        }
+        finally
+        {
+            world.Free();
+        }
+    }
+
+    [TestCase]
     public void Trail_DoesNotChangeCollisionRadius()
     {
         var tower = MakeArrowTower();
