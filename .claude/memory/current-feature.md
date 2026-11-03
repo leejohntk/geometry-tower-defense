@@ -7,17 +7,23 @@ metadata:
 
 # Current Feature
 
-**Active feature (in flight):** space-bar-speedup — Space starts a ready wave; mid-wave Space
-toggles `Engine.TimeScale` 1.0 ↔ 1.5. Speed persists across waves and resets on game over,
-victory, return to title, and new-level init. An animated fast-forward cue appears in the top
-bar only at 1.5×. Spec: `.claude/specs/space-bar-speedup.md` (approved 2026-11-02).
-Branch: `feature/space-bar-speedup`.
+**Active feature (awaiting playtest):** tower-hotkeys — top-row `1`/`2`/`3` select
+Arrow/Cannon/Laser placement, gated by `GameState.Playing`, the level's tower permissions, and
+`Coins >= GameConstants.TowerCost(type)`. Same key cancels, an eligible different key switches
+type; mouse click still places. Spec: `.claude/specs/tower-hotkeys.md` (approved 2026-11-03).
+Branch: `feature/tower-hotkeys`. PR #37 open. Gates: build 0 warnings / 0 errors; 560 tests;
+layout verifier PASS (344 assertions, 346 evaluated, 3 skipped, 0 findings); holdouts 11/11
+scenarios (13 checks); review 0 CRITICAL / 2 WARNING / 4 INFO (warnings + test gaps fixed in one
+batch); simplify 4 cleanups applied.
 
-**Last feature:** visual-overhaul — full-game procedural visual pass (PR #31, merged
-2026-11-01, squash `7cf39e1`). Nine playtest fix batches landed after the initial gates;
-final gates: build 0 warnings, 507 tests, layout verifier 335 assertions / 337 evaluated /
-2 skipped / 0 findings. The spec and archived regression holdouts were not updated for
-the playtest values (see Open follow-ups).
+**Playtest fix 1 (2026-11-03):** removed the crosshair cursor from placement and made the ghost
+appear immediately at the current pointer cell on hotkey/card selection, with the tracked pointer
+reset at each new level. Spec and holdouts updated; 560 tests and all holdouts re-verified.
+
+**Last feature:** space-bar-speedup — Space starts a ready wave; mid-wave Space toggles
+`Engine.TimeScale` 1.0 ↔ 1.5. Speed persists across waves and resets on game over, victory,
+return to title, and new-level init. An animated fast-forward cue appears in the top bar only at
+1.5×. PR #35, merged 2026-11-01 (squash `29d72ad`); spec `.claude/specs/space-bar-speedup.md`.
 
 **Live phase lives in `.claude/state.json`** — that file is the single source of truth for what is
 active right now (and is deleted at merge, which means "idle"). This file records *history*: what
@@ -156,6 +162,15 @@ Holdouts moved to `.claude/holdouts/regression/tower-skill-tree-mechanics/`.
 
 ## Post-Merge Follow-Up
 
+- **Tower eligibility predicate duplication (2026-11-03)** — the play-state + level-permission
+  + affordability rule now lives in `Main.CanSelectTowerForPlacement`,
+  `GameHUD.UpdateTowerButtonStates`, and GameManager's arrow-only
+  `TowerPlacementStateChanged` emissions. `GameManager.PlaceTower` still does not check level
+  permission. Extract one owner (e.g. `LevelDefinition.AllowsTower` + a manager predicate)
+  before adding a tower type.
+- **Main input test harness duplication (2026-11-03)** — `MainTest`, `MainSpeedupTest`, and
+  `MainHotkeysTest` each carry their own Main bootstrap, node lookups, and viewport input
+  helpers. Extract a shared Main harness into `Tests/Support/` on the next input feature.
 - **Visual-overhaul spec drift (2026-11-01)** — nine playtest fix batches changed pinned values
   but the spec still pins 22×22 node icons (shipped 46×46), a `15$` cost format (shipped plain
   number), and lists the top-bar redesign as Out of Scope (shipped in fix 6). The regression
@@ -189,6 +204,14 @@ Holdouts moved to `.claude/holdouts/regression/tower-skill-tree-mechanics/`.
 
 ## Recent Features
 
+- **Tower hotkeys** (PR open, 2026-11-03) — top-row `1`/`2`/`3` select Arrow/Cannon/Laser
+  placement during play, gated by level permission and current coins. Same key cancels,
+  another eligible key switches type, ineligible presses are no-ops, and digits are consumed
+  during play. Click still places. Holdouts moved to
+  `.claude/holdouts/regression/tower-hotkeys/`.
+- **Space-bar speedup** (PR #35, merged 2026-11-01) — context-sensitive Space during play:
+  starts a ready wave, or toggles a 1.5× whole-game clock while a wave runs. Animated top-bar
+  fast-forward cue only at 1.5×; every exit path restores `Engine.TimeScale` to 1.0.
 - **Visual overhaul** (PR #31, merged 2026-11-01) — full procedural visual pass with no
   gameplay changes: per-kind enemy silhouettes + transform idle motion + hit feedback +
   pooled death bursts; turret aim/recoil, arrow orientation fix and trails, richer

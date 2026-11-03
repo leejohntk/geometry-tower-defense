@@ -19,6 +19,11 @@ public partial class Main : Node2D
     private Tower? _selectedTower = null;
     private LevelDefinition? _selectedLevel = null;
 
+    // Latest pointer position seen during active play, in viewport space. Lets a
+    // placement selection draw its ghost immediately instead of waiting for the next
+    // mouse-motion event. Null until the pointer first moves during play.
+    private Vector2? _lastMouseViewportPosition = null;
+
     public override void _Ready()
     {
         // Load the persistent skill tree before any screen or game object needs it.
@@ -126,6 +131,10 @@ public partial class Main : Node2D
         if (_selectedLevel == null)
             return;
 
+        // A new level starts with no known pointer position: a stale cell from the
+        // previous level must not seed a placement ghost before the mouse moves here.
+        _lastMouseViewportPosition = null;
+
         // Hide title
         if (_titleScreen != null)
             _titleScreen.Visible = false;
@@ -205,29 +214,59 @@ public partial class Main : Node2D
 
         var type = (TowerType)towerType;
 
+        // Cancelling the active selection is always allowed: a balance that has since
+        // dropped below the type's cost must never trap the player in placement mode.
+        // Checked before the eligibility gate so a second card click or key press still
+        // exits, matching the pre-shortcut behavior.
         if (_gameManager.PlacingTowerType == type)
         {
-            // Cancel placement
             ExitTowerPlacementMode();
+            return;
         }
-        else
-        {
-            // Enter placement mode for the requested type
-            _gameManager.PlacingTowerType = type;
-            _gameHUD?.SetStartWaveEnabled(false); // Disable wave start during placement
-            Input.SetDefaultCursorShape(Input.CursorShape.Cross);
 
-            // Placement wins over the upgrade panel: close it and drop the selection
-            // (hiding any range that was showing).
-            ClearTowerSelection();
-        }
+        // Sidebar cards and number-key shortcuts share this eligibility-gated transition.
+        if (!CanSelectTowerForPlacement(type))
+            return;
+
+        // Enter placement mode for the requested type. A switch keeps the mode but
+        // replaces the pending type. Either way, redraw the ghost at the last known
+        // pointer position immediately: the player should not have to nudge the mouse
+        // before the newly chosen type's preview appears.
+        _gameManager.PlacingTowerType = type;
+        RefreshTowerPlacementPreviewAtLastMouse();
+        UpdateStartWaveButtonState();
+
+        // Placement wins over the upgrade panel: close it and drop the selection
+        // (hiding any range that was showing).
+        ClearTowerSelection();
+    }
+
+    /// <summary>
+    /// True when play is active, the selected level allows the tower type, and the
+    /// current balance covers its full cost. This is the shared eligibility rule for
+    /// sidebar-card clicks and number-key shortcut presses; it mirrors the HUD's card
+    /// disabled state so keyboard and mouse always agree. Affordability uses
+    /// <see cref="GameConstants.TowerCost"/>; availability uses the selected level.
+    /// </summary>
+    private bool CanSelectTowerForPlacement(TowerType type)
+    {
+        if (_gameManager == null || _gameManager.State != GameState.Playing)
+            return false;
+
+        bool allowedByLevel = type switch
+        {
+            TowerType.Cannon => _selectedLevel?.AllowCannonTower ?? false,
+            TowerType.Laser => _selectedLevel?.AllowLaserTower ?? false,
+            _ => true
+        };
+
+        return allowedByLevel && _gameManager.Coins >= GameConstants.TowerCost(type);
     }
 
     private void OnGameOverTriggered()
     {
         // The run can end while the player is aiming. Leave placement mode first so
-        // the ghost/range preview and the Cross cursor cannot linger under the
-        // result overlay.
+        // the ghost/range preview cannot linger under the result overlay.
         ExitTowerPlacementMode();
 
         // The upgrade panel must never linger over a result screen.
@@ -296,6 +335,11 @@ public partial class Main : Node2D
         if (!_gameRunning || _gameManager == null)
             return;
 
+        // Track the pointer while play is active so a placement selection can draw its
+        // ghost at the current cell immediately, without a fresh motion event.
+        if (@event is InputEventMouseMotion latestMotion)
+            _lastMouseViewportPosition = latestMotion.Position;
+
         // Space is the context-sensitive in-level control: while a wave runs it
         // toggles the whole-game clock, otherwise it starts the ready wave. Checked
         // before the placement branch so a running wave can still be sped up while
@@ -305,6 +349,18 @@ public partial class Main : Node2D
         if (IsSpacePress(@event))
         {
             OnSpacePressed();
+            GetViewport().SetInputAsHandled();
+            return;
+        }
+
+        // Top-row number keys are the tower-placement shortcuts for the sidebar
+        // cards. Checked before the placement branch so a digit also works while
+        // aiming (same key cancels, another eligible key switches type). Every new
+        // press during play is consumed — even a no-op for an unaffordable or
+        // unavailable tower — so a focused Button can never receive the same event.
+        if (TryGetTowerHotkey(@event, out TowerType hotkeyType))
+        {
+            OnPlaceTowerPressed((int)hotkeyType);
             GetViewport().SetInputAsHandled();
             return;
         }
@@ -438,15 +494,56 @@ public partial class Main : Node2D
     }
 
     /// <summary>
-    /// True when the event is a new Space key press. Key repeat and key release are
-    /// deliberately inert, and the check is on the key itself rather than ui_accept
-    /// so Enter and gamepad input never trigger the in-level control.
+    /// True for a new key-down: key repeat and key release are inert. The keycode is
+    /// returned so each caller can match its own key without re-reading the event.
+    /// </summary>
+    private static bool IsNewKeyPress(InputEvent @event, out Key keycode)
+    {
+        if (@event is InputEventKey key && key.Pressed && !key.Echo)
+        {
+            keycode = key.Keycode;
+            return true;
+        }
+
+        keycode = Key.None;
+        return false;
+    }
+
+    /// <summary>
+    /// True when the event is a new Space key press. The check is on the key itself
+    /// rather than ui_accept so Enter and gamepad input never trigger the in-level
+    /// control.
     /// </summary>
     private static bool IsSpacePress(InputEvent @event) =>
-        @event is InputEventKey key &&
-        key.Pressed &&
-        !key.Echo &&
-        key.Keycode == Key.Space;
+        IsNewKeyPress(@event, out Key keycode) && keycode == Key.Space;
+
+    /// <summary>
+    /// True for a new top-row 1/2/3 key press, mapped to its tower type (1 Arrow,
+    /// 2 Cannon, 3 Laser — the same order as the sidebar cards). Only the main-row
+    /// digits match: numpad digits and every other key are unaffected.
+    /// </summary>
+    private static bool TryGetTowerHotkey(InputEvent @event, out TowerType type)
+    {
+        type = TowerType.Arrow;
+
+        if (!IsNewKeyPress(@event, out Key keycode))
+            return false;
+
+        switch (keycode)
+        {
+            case Key.Key1:
+                type = TowerType.Arrow;
+                return true;
+            case Key.Key2:
+                type = TowerType.Cannon;
+                return true;
+            case Key.Key3:
+                type = TowerType.Laser;
+                return true;
+            default:
+                return false;
+        }
+    }
 
     /// <summary>
     /// One context-sensitive action per Space press. Priority: a running wave toggles
@@ -577,6 +674,21 @@ public partial class Main : Node2D
         }
     }
 
+    /// <summary>
+    /// Redraw the placement preview at the most recently seen pointer position. Called
+    /// when a selection starts or switches so the ghost appears — or is redrawn for the
+    /// newly selected type — immediately instead of on the next mouse-motion event.
+    /// With no known position the preview stays hidden; an off-grid position hides it
+    /// through the normal preview path.
+    /// </summary>
+    private void RefreshTowerPlacementPreviewAtLastMouse()
+    {
+        if (_lastMouseViewportPosition is Vector2 viewportPoint)
+            UpdateTowerPlacementPreview(ToBattlefieldPoint(viewportPoint));
+        else
+            _gameManager?.Grid?.HidePlacementPreview();
+    }
+
     private void TryPlaceTowerAtMouse(Vector2 battlefieldPoint)
     {
         if (_gameManager?.Grid == null)
@@ -589,7 +701,7 @@ public partial class Main : Node2D
         if (placed)
         {
             // Exactly one tower per selection: GameManager consumed the placement type,
-            // so drop the preview, cursor, and Start Wave state to match.
+            // so drop the preview and Start Wave state to match.
             ExitTowerPlacementMode();
         }
         // A failed battlefield click (path or occupied cell) keeps the selection so the
@@ -598,10 +710,10 @@ public partial class Main : Node2D
 
     /// <summary>
     /// Leave tower placement mode: drop the selection, hide the preview ghost, and
-    /// restore the cursor and Start Wave button to normal play state. Idempotent and
-    /// null-safe, so it is safe to call when placement already ended — including
-    /// immediately after <see cref="GameManager.PlaceTower"/> consumed the selection,
-    /// and from game-over/victory handlers.
+    /// restore the Start Wave button to normal play state. Idempotent and null-safe, so
+    /// it is safe to call when placement already ended — including immediately after
+    /// <see cref="GameManager.PlaceTower"/> consumed the selection, and from
+    /// game-over/victory handlers.
     /// </summary>
     private void ExitTowerPlacementMode()
     {
@@ -609,7 +721,6 @@ public partial class Main : Node2D
             _gameManager.PlacingTowerType = null;
 
         _gameManager?.Grid?.HidePlacementPreview();
-        Input.SetDefaultCursorShape(Input.CursorShape.Arrow);
         UpdateStartWaveButtonState();
     }
 }
