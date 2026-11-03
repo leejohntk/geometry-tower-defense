@@ -11,10 +11,14 @@ metadata:
 Arrow/Cannon/Laser placement, gated by `GameState.Playing`, the level's tower permissions, and
 `Coins >= GameConstants.TowerCost(type)`. Same key cancels, an eligible different key switches
 type; mouse click still places. Spec: `.claude/specs/tower-hotkeys.md` (approved 2026-11-03).
-Branch: `feature/tower-hotkeys`. PR open. Gates: build 0 warnings / 0 errors; 557 tests;
-layout verifier PASS (344 assertions, 346 evaluated, 3 skipped, 0 findings); holdouts 12/12;
-review 0 CRITICAL / 2 WARNING / 4 INFO (warnings + test gaps fixed in one batch); simplify
-4 cleanups applied.
+Branch: `feature/tower-hotkeys`. PR #37 open. Gates: build 0 warnings / 0 errors; 560 tests;
+layout verifier PASS (344 assertions, 346 evaluated, 3 skipped, 0 findings); holdouts 11/11
+scenarios (13 checks); review 0 CRITICAL / 2 WARNING / 4 INFO (warnings + test gaps fixed in one
+batch); simplify 4 cleanups applied.
+
+**Playtest fix 1 (2026-11-03):** removed the crosshair cursor from placement and made the ghost
+appear immediately at the current pointer cell on hotkey/card selection, with the tracked pointer
+reset at each new level. Spec and holdouts updated; 560 tests and all holdouts re-verified.
 
 **Last feature:** space-bar-speedup — Space starts a ready wave; mid-wave Space toggles
 `Engine.TimeScale` 1.0 ↔ 1.5. Speed persists across waves and resets on game over, victory,
