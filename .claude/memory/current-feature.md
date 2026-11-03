@@ -7,14 +7,15 @@ metadata:
 
 # Current Feature
 
-**Active feature (awaiting playtest):** tower-hotkeys — top-row `1`/`2`/`3` select
+**Tower hotkeys (PR #37, merged 2026-11-03, squash `e60e774`):** top-row `1`/`2`/`3` select
 Arrow/Cannon/Laser placement, gated by `GameState.Playing`, the level's tower permissions, and
 `Coins >= GameConstants.TowerCost(type)`. Same key cancels, an eligible different key switches
-type; mouse click still places. Spec: `.claude/specs/tower-hotkeys.md` (approved 2026-11-03).
-Branch: `feature/tower-hotkeys`. PR #37 open. Gates: build 0 warnings / 0 errors; 560 tests;
-layout verifier PASS (344 assertions, 346 evaluated, 3 skipped, 0 findings); holdouts 11/11
-scenarios (13 checks); review 0 CRITICAL / 2 WARNING / 4 INFO (warnings + test gaps fixed in one
-batch); simplify 4 cleanups applied.
+type; mouse click still places. Spec: `.claude/specs/tower-hotkeys.md`.
+Gates at merge: build 0 warnings / 0 errors; 560 tests; layout verifier PASS (344 assertions,
+346 evaluated, 3 skipped, 0 findings); holdouts 11/11 scenarios (13 checks); review 0 CRITICAL /
+2 WARNING / 4 INFO (warnings + test gaps fixed in one batch); simplify 4 cleanups applied.
+Local and remote feature branches deleted; `state.json` removed; `main` re-verified (build clean,
+560 tests).
 
 **Playtest fix 1 (2026-11-03):** removed the crosshair cursor from placement and made the ghost
 appear immediately at the current pointer cell on hotkey/card selection, with the tracked pointer
@@ -204,8 +205,8 @@ Holdouts moved to `.claude/holdouts/regression/tower-skill-tree-mechanics/`.
 
 ## Recent Features
 
-- **Tower hotkeys** (PR open, 2026-11-03) — top-row `1`/`2`/`3` select Arrow/Cannon/Laser
-  placement during play, gated by level permission and current coins. Same key cancels,
+- **Tower hotkeys** (PR #37, merged 2026-11-03, squash `e60e774`) — top-row `1`/`2`/`3` select
+  Arrow/Cannon/Laser placement during play, gated by level permission and current coins. Same key cancels,
   another eligible key switches type, ineligible presses are no-ops, and digits are consumed
   during play. Click still places. Holdouts moved to
   `.claude/holdouts/regression/tower-hotkeys/`.

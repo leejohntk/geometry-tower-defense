@@ -59,3 +59,10 @@ mcp__godot__run_project(projectPath, scene?)
 → mcp__godot__get_debug_output()
 → mcp__godot__stop_project()
 ```
+
+### Headless Limitations
+
+- **Cursor shape is not observable.** The headless display server keeps
+  `Input.GetCurrentCursorShape()` at `Arrow`; `Input.SetDefaultCursorShape(...)` has no effect
+  there. Do not assert cursor shape in headless tests. Verify cursor behavior by code inspection,
+  and reuse the same cursor calls as the mouse path.
