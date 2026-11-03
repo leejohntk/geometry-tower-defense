@@ -7,18 +7,21 @@ metadata:
 
 # Current Feature
 
-**Global skill tree (PR #39, awaiting playtest, 2026-11-02):** fourth tower-independent skill
+**Global skill tree (PR #39, merged 2026-11-03, squash `5cdac41`):** fourth tower-independent skill
 branch sharing the existing SP pool. Four chained nodes: Fortified Core (+1 starting HP, max 5),
 War Chest (+2 starting gold, max 5), Master Blueprints (tower cost −1, max 3), Advanced Training
 (rank upgrade cost −1, max 3). Flat 10 SP per rank, sequential unlock at predecessor rank 1,
 discounts floor at 1 coin (unreachable), per-node max ranks, persistence in `user://skilltree.cfg`.
 Effective costs flow through placement, rank upgrades, archetype choice, HUD cards, hotkeys and
-deductions. Spec `.claude/specs/global-skill-tree.md`; branch `feature/global-skill-tree`.
-Gates: build 0 warnings; 608 tests; layout verifier PASS (382 assertions, 0 findings); holdouts
-12/12 (re-run after simplify); review 0 CRITICAL / 1 WARNING / 5 INFO (warning + 2 correctness
-INFO fixed; 3 performance INFO deferred); simplify 10 cleanups applied. Follow-ups: cache HUD card
-prices, drop unused placement-signal payload lookup, static glyph vertex arrays, single cost
-owner/branch-descriptor refactors.
+deductions. Spec `.claude/specs/global-skill-tree.md`; branch `feature/global-skill-tree` (merged,
+local + remote deleted).
+Gates at merge: build 0 warnings / 0 errors; 608 tests; layout verifier PASS (382 assertions, 0
+findings); holdouts 12/12 (re-run after simplify as 620 tests with the temporary harness); review
+0 CRITICAL / 1 WARNING / 5 INFO (warning + 2 correctness INFO fixed; 3 performance INFO
+deferred); simplify 10 cleanups applied. Human approved merge directly ("looks good merge it");
+no playtest fix batches. `state.json` removed; `main` re-verified (build clean, 608 tests).
+Follow-ups: cache HUD card prices, drop unused placement-signal payload lookup, static glyph
+vertex arrays, single cost owner/branch-descriptor refactors.
 
 **Tower hotkeys (PR #37, merged 2026-11-03, squash `e60e774`):** top-row `1`/`2`/`3` select
 Arrow/Cannon/Laser placement, gated by `GameState.Playing`, the level's tower permissions, and
@@ -218,6 +221,15 @@ Holdouts moved to `.claude/holdouts/regression/tower-skill-tree-mechanics/`.
 
 ## Recent Features
 
+- **Global skill tree** (PR #39, merged 2026-11-03, squash `5cdac41`) — fourth, tower-independent
+  skill branch sharing the existing SP pool: Fortified Core (+1 starting HP, max 5), War Chest
+  (+2 starting gold, max 5), Master Blueprints (tower cost −1, max 3), Advanced Training (rank
+  upgrade cost −1, max 3). Flat 10 SP per rank, sequential unlocks, 1-coin discount floor,
+  per-node max ranks, persistence in `user://skilltree.cfg`. Discounts apply to placement, rank
+  upgrades, archetype choice, HUD cards, hotkeys, and deductions. Build 0 warnings; 608 tests;
+  layout verifier PASS (382 assertions, 0 findings); holdouts 12/12 (re-run after simplify);
+  review 0 CRITICAL / 1 WARNING / 5 INFO; simplify 10 cleanups. Holdouts moved to
+  `.claude/holdouts/regression/global-skill-tree/`.
 - **Tower hotkeys** (PR #37, merged 2026-11-03, squash `e60e774`) — top-row `1`/`2`/`3` select
   Arrow/Cannon/Laser placement during play, gated by level permission and current coins. Same key cancels,
   another eligible key switches type, ineligible presses are no-ops, and digits are consumed
