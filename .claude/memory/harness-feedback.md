@@ -28,6 +28,8 @@ metadata:
 - **P13 holdout IDs did not leak (2026-11-01)** — 0 `H<n>` IDs or scenario names in the implementer prompt or any of the 9 fix messages, versus 4 leaked batches in run #8. Path-only prohibitions ("Do not read `.claude/holdouts`") remained, but the verification set's identity was not disclosed.
 - **P16 did not recur (2026-11-01)** — no API-422 forked-skill failures in the window; the implementer stayed alive across ~24 h of playtest batches.
 - **Merge Cleanup step 6 honored (2026-11-01)** — PR #31 merged 22:18:35Z; `/evolve-harness` was invoked 28 s later (22:19:03Z). Third consecutive merge to honor the check.
+- **Full feature run held P3/P5/P13/P18/P19 (2026-11-03)** — one implementer stayed live across four messages (feature, correctness fixes, simplify batch, playtest batch) with no respawns; `state.json` was written 6× with `Write`, 0 `Edit`; 0 holdout IDs or paths appeared in any `Agent`/`SendMessage` prompt and the implementer made 0 tool calls touching `.claude/`; the playtest fix updated the spec and holdouts and committed them on the feature branch; reviewers received the full diff inline (temp file for simplify), all 3 review lenses completed in 4–6 min and all 4 simplify lenses in 49 s–4m42s with no polling, `ListAgents`, `TaskStop`, or `sleep`; post-merge `dotnet build && dotnet test` ran on `main`; `/evolve-harness` ran 55 s after the squash.
+- **Small-diff review handoff (2026-11-03)** — security 33 calls / 5m, performance 44 calls / 4m, correctness 43 calls / 6m37s; correctness found 2 WARNING + 2 INFO, both warnings fixed in one batch. No lens stalled or was killed.
 
 ## What's Broken
 
@@ -38,6 +40,14 @@ metadata:
 - **Post-merge bookkeeping staleness recurred (P20)** — a `Status:` line was reintroduced into `current-feature.md` and still read "PR open" after the merge; the Recent Features entry said "PR pending"; the PR body kept the pre-playtest counts (499 tests / 214 assertions / 43 files) while final gates were 507 tests / 335 assertions / 47 files. The remote feature branch was not deleted and `main` was not re-verified after the squash. Medium.
 - **Holdout guard false positive on an exclusion glob (H7)** — the implementer's `find … -not -path "*/.claude/holdouts/*"` was denied because the hook matches the literal `.claude/holdouts` string anywhere in the command. The implementer lost one round trip while trying to list project files. High (hook change).
 - **Simplify triage volume is high (INFO, healthy)** — 4 lenses produced 57 raw findings; the orchestrator applied 24 and skipped 12 with reasons (21 were subsumed by those). All lenses finished in 4–6 min. Applying 24 late cleanups is at the high end of the useful range; the batch correctly protected review-mandated fixes and re-ran full gates.
+
+### Open 2026-11-03
+
+- **Holdout test code written into the implementer-accessible tree (P21/H8)** — three writes to `Tests/HoldoutTowerHotkeysTest.cs` (15,538 B, 02:56:40) and `Tests/HoldoutTowerHotkeysFinalTest.cs` (12,838 B, 03:04:44; 14,773 B, 03:17:10), each deleted 41–63 s later. The implementer was live and idle for the first two and made zero holdout-path tool calls, so no content leaked. The deny hook covers only `.claude/holdouts/`, not `Tests/Holdout*`; a `git status`, listing, or concurrent `dotnet test` could expose the file. Medium (skill/agent prompt), High for the deterministic guard.
+- **P20 recurred — post-merge memory and branch cleanup** — `current-feature.md` still said "Active feature (awaiting playtest)", "PR #37 open", and "Tower hotkeys (PR open)"; `gh pr merge --delete-branch` deleted the remote branch, then the skill's `git branch -d` failed and aborted the chain; `origin/feature/tower-hotkeys` remains as a stale tracking ref; old remote branches `feature/layout-verifier` and `chore/distillation-6` remain. Post-merge build/test did run. Medium.
+- **Spec status drift (P22)** — `.claude/specs/tower-hotkeys.md:3` says `draft` after merge; the implementer prompt said `approved`; acceptance boxes unchecked; five other merged specs also say `draft`. Medium.
+- **P10 recurred twice (declined)** — orchestrator and implementer each hit `(eval):1: no matches found: --include=*.cs`; both recovered in 3 s. No action per the 2026-10-26 decision.
+- **Headless cursor assertion** — first test run failed on `Input.GetCurrentCursorShape()` (headless stays `Arrow`); fixed by dropping the assertion and verifying via code inspection. Recorded in `memory/godot-mcp.md`. Low (memory applied).
 
 ### Open 2026-10-28
 
@@ -162,6 +172,15 @@ Window: PR #31 (visual-overhaul: full procedural visual pass) plus run #8's memo
 - **Merge hygiene:** squash `7cf39e1` on `main`; local branch deleted; `state.json` removed; distiller invoked 28 s after merge. Missing: remote branch deletion and post-merge re-verification.
 - **Scope change:** the human added title/result screens and skill-tree visuals after the initial spec draft and later expanded into the top bar. That is normal human iteration, but the Out of Scope list was not updated when the scope expanded (P18).
 
+### 2026-11-03 — Tenth Distillation
+
+Window: PR #37 tower-hotkeys (small input feature). Evidence: main `d890fb16-…` (59 Bash, 19 Edit, 17 Read, 14 Write, 8 Agent, 4 SendMessage, 3 Skill; 02:06–03:21Z) and 8 subagent transcripts (1 implementer, 3 lens reviewers, 4 simplify lenses).
+
+- **Highest-value finding:** holdout test code was written into `Tests/` while the implementer was live. No content leaked (0 holdout-path tool calls by the implementer), but the guard covers only `.claude/holdouts/`. P21/H8.
+- **P20 recurred for the third time** — both the memory file and merge cleanup drifted. The remote branch was actually deleted by `gh --delete-branch`, but the subsequent `git branch -d` failed and left a stale tracking ref. Revise the skill to one sequence and add `--prune`.
+- **Spec status is decorative** — says `draft` after shipping; the orchestrator passed `approved` only in the prompt. P22.
+- **Healthy:** one implementer across four messages; 0 holdout-ID leaks; 0 `.claude` accesses; 0 polling/TaskStop/sleep; reviewers all completed; 560 tests; holdouts 11/11 after the playtest fix; one glob abort each in orchestrator and implementer (P10, declined); no `.tscn`, MCP, or destructive git.
+
 **Queued proposals (await human approval — do not apply to skills/rules/CLAUDE.md without sign-off):**
 
 *(Run #4's P1 and P2 were approved and landed as PR #17 — closed. Run #5's P3/P5/P6/P7 landed as PR #21 — closed. H3 closed by PR #21.)*
@@ -246,12 +265,22 @@ The original proposal was: after spawning background agents, end the turn; rely 
 - `.claude/skills/implement-feature/SKILL.md` Phase 2 step 3: update `current-feature.md` with the feature name, branch, and spec only — never a `Status:`/phase line; `.claude/state.json` is the sole phase owner.
 - Merge Cleanup: after `state.json` is deleted, update `current-feature.md` to replace "PR open"/"PR pending" with the merge date, PR number, and squash SHA; run `git push origin --delete feature/{name}`; optionally run `dotnet build && dotnet test` on `main` once and record it.
 - Evidence: run #9 had to correct a `Status: awaiting playtest — PR open` line and a "PR pending" Recent Features entry after PR #31 merged; `origin/feature/visual-overhaul` and `origin/feature/layout-verifier` remain; no post-merge build/test ran after the squash. This does not re-propose P4: no post-merge PR, just a local memory edit that the immediately-following distillation PR carries.
+- **Run #10 (2026-11-03):** third recurrence. `current-feature.md` again contained an "Active feature (awaiting playtest)" line and "PR #37 open". `gh pr merge --delete-branch` did delete the remote branch, so the queued `git push origin --delete` is unnecessary — change step 1 to include `--delete-branch`, add `git fetch origin --prune`, and make step 3 conditional (it failed with "branch not found" and aborted the chain). Post-merge build/test did run this time.
 
 **H7 — QUEUED 2026-11-01 (HIGH — human only): make the holdout Bash guard exclusion-aware.**
 The PreToolUse hook denies any command containing the literal `.claude/holdouts` string. On 2026-10-30 the implementer's `find … -not -path "*/.claude/holdouts/*"` was denied even though it was only excluding the directory, costing one round trip. Allow the literal path when it appears solely in a negation/exclusion argument (`-not -path`, `! -path`, `--exclude`/`--exclude-dir`) and deny actual read/listing forms. P9 remains the prompt-level mitigation; H6 remains the prompt-leak guard.
 
 **H6 — QUEUED 2026-10-28 (HIGH — human only): deterministic guard against holdout IDs in orchestrator→implementer prompts.**
 Extend the PreToolUse hook to inspect `Agent` / `SendMessage` inputs addressed to the implementer and deny holdout paths or `H<n>_` tokens. False-positive caveat: legitimate "do NOT read `.claude/holdouts/`" prohibitions must remain allowed. Logged only; not implemented.
+
+**P21 — QUEUED 2026-11-03 (MEDIUM): never materialize holdout test code in the implementer-accessible workspace.**
+`.claude/skills/implement-feature/SKILL.md` Phase 5: "Holdout test artifacts must not be written into `Tests/` while the implementer is live. Use a scratch test project outside the repo, or write → run → delete in one tool call with the implementer stopped. Before the next implementer message, confirm `git status` contains no `Holdout*` file." Mirror in `.claude/agents/orchestrator.md` Holdout Verification and `.claude/memory/software-factory-patterns.md` Orchestrator → Implementer. Evidence: three writes totalling ~43 KB to `Tests/HoldoutTowerHotkeysTest.cs` and `Tests/HoldoutTowerHotkeysFinalTest.cs` while implementer `ad7fe195…` was live (02:56, 03:04, 03:17); the implementer made zero holdout-path tool calls, so no content leaked. The deny hook covers only `.claude/holdouts/`.
+
+**P22 — QUEUED 2026-11-03 (MEDIUM): stop the spec `Status:` line from going stale.**
+Preferred: remove `**Status:** draft | approved | implementing | done` from `.claude/templates/spec-template.md` (git/PR is the status; P4 precedent), or replace it with a static `**Approved:** {date}`. If kept: after human approval, edit the committed spec to `approved`; Merge Cleanup sets `done` and checks acceptance boxes. Evidence: `.claude/specs/tower-hotkeys.md:3` says `draft` after PR #37; the implementer prompt quoted `approved`; five other merged specs also say `draft`.
+
+**H8 — QUEUED 2026-11-03 (HIGH — human only): holdout-artifact deny for the implementer workspace.**
+Extend the implementer PreToolUse deny to a dedicated holdout-test path convention (`Tests/Holdout*` or `Tests/.holdout/**`) so holdout test names/content cannot be listed or read even if written into the shared tree. Use a dedicated prefix to avoid false positives. Evidence: three `Tests/Holdout*` writes during a live implementer session (P21).
 
 ## Harness Change Log
 
