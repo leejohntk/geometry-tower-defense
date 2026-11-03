@@ -1,3 +1,4 @@
+using System;
 using Godot;
 
 namespace GeometryTowerDefense;
@@ -12,12 +13,22 @@ public abstract partial class Tower : Node2D
     private Control? _rangeIndicator;
     private Control? _rankBadge;
 
-    // Lazily created upgrade-ready glow. One node for this tower's whole life; only its
-    // Modulate.A changes while the XP gate is filled. Visibility is derived from the
-    // live gate by SyncUpgradeReadyGlow; the glow is a child of this tower, so it can
-    // only be freed with the tower and needs no per-node validity check.
+    // Lazily created additive upgrade-ready glow. It is a child of the tower's body
+    // Control and re-invokes that body's own silhouette renderer, so it inherits the
+    // body's aim/recoil transform and matches every archetype exactly. Only its
+    // Modulate.A changes during the pulse; the silhouette is queued once on the
+    // hidden-to-shown edge, never per frame. Archetype changes always end at max rank
+    // and hide the cue, so they need no repaint.
     private Control? _upgradeReadyGlow;
+    private (Control Body, Action<CanvasItem> Draw)? _glowSource;
     private float _upgradeGlowPhase = 0f;
+
+    // One shared additive material for every overlay; the per-node Modulate.A drives
+    // the pulse, so the material itself never varies between towers.
+    private static readonly CanvasItemMaterial UpgradeGlowAdditiveMaterial = new()
+    {
+        BlendMode = CanvasItemMaterial.BlendModeEnum.Add
+    };
 
     // Aim/recoil presentation. The aim angle is purely visual: it is derived from the
     // live target and never feeds back into targeting, range checks, or damage. It is
@@ -550,12 +561,50 @@ public abstract partial class Tower : Node2D
     }
 
     /// <summary>
-    /// Reconciles the glow's visibility with the live XP gate. Called on every XP/rank
-    /// change (so the cue flips in the same frame the gate moves) and at the top of each
-    /// _Process. This writes visibility only: the hidden-to-shown edge shows the control
-    /// and resets the pulse phase, the shown-to-hidden edge hides it and resets the
-    /// phase, and an already-visible ready glow is left untouched so _Process owns the
-    /// alpha pulse. Readiness itself is always derived, so there is no state to desync.
+    /// Builds a tower's procedural body Control: one cell in size, centred on the tower
+    /// origin, rotating around the cell centre, click-through, and wired to the
+    /// variant's silhouette renderer. Registers it as the upgrade-ready glow source and
+    /// returns it. Variants assign the result to their own body field.
+    /// </summary>
+    protected Control CreateBody(string name, Action<CanvasItem> drawBody)
+    {
+        float cell = GameConstants.CellSize;
+        var body = new Control();
+        body.Name = name;
+        body.Size = new Vector2(cell, cell);
+        body.Position = new Vector2(-cell / 2f, -cell / 2f);
+        body.PivotOffset = new Vector2(cell / 2f, cell / 2f);
+        body.MouseFilter = Control.MouseFilterEnum.Ignore;
+        body.Draw += () => drawBody(body);
+        AddChild(body);
+
+        RegisterUpgradeGlowSource(body, drawBody);
+        return body;
+    }
+
+    /// <summary>
+    /// Registers the tower's body Control and its silhouette renderer. The additive
+    /// upgrade-ready glow is a child of this body and re-invokes the same renderer, so
+    /// it follows the body's aim/recoil transform and always matches its current shape.
+    /// Until this is called (the tower has not entered the tree) no overlay can exist;
+    /// the XP gate itself is unaffected and no fallback halo is drawn. Registration is
+    /// also a sync point, so a tower that earned its upgrade before entering the tree
+    /// gets the cue as soon as its body exists.
+    /// </summary>
+    protected void RegisterUpgradeGlowSource(Control body, Action<CanvasItem> drawBody)
+    {
+        _glowSource = (body, drawBody);
+        SyncUpgradeReadyGlow();
+    }
+
+    /// <summary>
+    /// The single sync authority for the overlay's visibility, called on XP and rank
+    /// changes and once when the body registers. Writes visibility only: the
+    /// hidden-to-shown edge seeds the additive opacity at the pulse trough, shows the
+    /// control, queues one redraw to populate the silhouette, and resets the pulse
+    /// phase; the shown-to-hidden edge hides it and resets the phase; an already-visible
+    /// ready glow is left untouched. The per-frame path never calls this — it only
+    /// pulses <c>Modulate.A</c>.
     /// </summary>
     private void SyncUpgradeReadyGlow()
     {
@@ -569,24 +618,36 @@ public abstract partial class Tower : Node2D
             return;
         }
 
-        var glow = GetOrCreateUpgradeReadyGlow();
-        if (glow.Visible)
+        // No registered body yet (the tower is not in the tree): there is nothing to
+        // overlay. Registration re-runs this sync.
+        if (_glowSource is null)
             return;
 
+        var glow = _upgradeReadyGlow;
+        if (glow == null)
+        {
+            glow = GetOrCreateUpgradeReadyGlow();
+        }
+        else if (glow.Visible)
+        {
+            return;
+        }
+
+        // Seed the trough so no full-alpha frame can flash before the first _Process.
+        glow.Modulate = new Color(1f, 1f, 1f, GameConstants.TowerUpgradeGlowAlphaMin);
         glow.Visible = true;
         _upgradeGlowPhase = 0f;
+        glow.QueueRedraw();
     }
 
     /// <summary>
-    /// Syncs visibility and, while the glow is showing, advances its opacity-only pulse
-    /// by <paramref name="delta"/> seconds. Called once per frame from
-    /// <see cref="Tower._Process"/>. The ready path is O(1) and allocation-free; when the
-    /// gate is closed the glow is hidden by the sync and the pulse is skipped.
+    /// Advances the overlay's opacity-only pulse by <paramref name="delta"/> seconds
+    /// while it is visible. Called once per frame from <see cref="Tower._Process"/>;
+    /// visibility is owned by <see cref="SyncUpgradeReadyGlow"/>, so this never toggles
+    /// the control. O(1) and allocation-free.
     /// </summary>
     private void UpdateUpgradeReadyGlow(float delta)
     {
-        SyncUpgradeReadyGlow();
-
         var glow = _upgradeReadyGlow;
         if (glow == null || !glow.Visible)
             return;
@@ -601,69 +662,32 @@ public abstract partial class Tower : Node2D
             GameConstants.TowerUpgradeGlowAlphaMax,
             wave);
 
-        // Opacity only: the glow's position, size, rotation, and scale never change.
+        // Opacity only: the overlay's position, size, rotation, and scale never change.
         glow.Modulate = new Color(1f, 1f, 1f, alpha);
     }
 
     /// <summary>
-    /// Returns the one upgrade-ready glow control, creating it on first need. It is a
-    /// cell-sized click-through wrapper centred on the tower origin and drawn below the
-    /// tower body, range indicator, and rank badge. The control is a child of this
-    /// tower, so its lifetime is the tower's.
+    /// Returns the one upgrade-ready glow control, creating it as a child of the
+    /// registered body on first need. It spans exactly the body rect at local origin,
+    /// is click-through, and uses the shared additive CanvasItemMaterial so the redrawn
+    /// silhouette brightens the body rather than replacing it.
     /// </summary>
     private Control GetOrCreateUpgradeReadyGlow()
     {
         if (_upgradeReadyGlow != null)
             return _upgradeReadyGlow;
 
-        float size = GameConstants.TowerUpgradeGlowNodeSize;
+        var body = _glowSource!.Value.Body;
         var glow = new Control();
         glow.Name = "UpgradeReadyGlow";
-        glow.Size = new Vector2(size, size);
-        // Tower origin is the cell centre, so the wrapper spans one cell around it.
-        glow.Position = new Vector2(-size / 2f, -size / 2f);
+        glow.Position = Vector2.Zero;
+        glow.Size = body.Size;
         glow.MouseFilter = Control.MouseFilterEnum.Ignore;
-        // Below the body (0), range indicator (0), and rank badge (1).
-        glow.ZIndex = -1;
-        glow.Visible = false;
-        glow.Draw += DrawUpgradeReadyGlow;
-        AddChild(glow);
+        glow.Material = UpgradeGlowAdditiveMaterial;
+        glow.Draw += () => _glowSource?.Draw(glow);
+        body.AddChild(glow);
         _upgradeReadyGlow = glow;
         return glow;
-    }
-
-    /// <summary>
-    /// Paints the glow once: two low-alpha pale-gold concentric halos plus a thin
-    /// antialiased ring at the outer radius. The pulse changes only Modulate.A, so this
-    /// never repaints per frame and allocates nothing.
-    /// </summary>
-    private void DrawUpgradeReadyGlow()
-    {
-        if (_upgradeReadyGlow == null)
-            return;
-
-        Vector2 center = _upgradeReadyGlow.Size / 2f;
-        Color color = GameConstants.TowerUpgradeGlowColor;
-
-        _upgradeReadyGlow.DrawCircle(
-            center,
-            GameConstants.TowerUpgradeGlowOuterRadius,
-            color with { A = GameConstants.TowerUpgradeGlowOuterAlpha },
-            antialiased: true);
-
-        _upgradeReadyGlow.DrawCircle(
-            center,
-            GameConstants.TowerUpgradeGlowInnerRadius,
-            color with { A = GameConstants.TowerUpgradeGlowInnerAlpha },
-            antialiased: true);
-
-        _upgradeReadyGlow.DrawCircle(
-            center,
-            GameConstants.TowerUpgradeGlowRingRadius,
-            color with { A = GameConstants.TowerUpgradeGlowRingAlpha },
-            filled: false,
-            width: GameConstants.TowerUpgradeGlowRingWidth,
-            antialiased: true);
     }
 
     public override void _Process(double delta)

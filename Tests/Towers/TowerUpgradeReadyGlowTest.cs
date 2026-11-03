@@ -6,17 +6,15 @@ using static GdUnit4.Assertions;
 namespace GeometryTowerDefense.Tests;
 
 /// <summary>
-/// Upgrade-ready glow: a subtle pulsing pale-gold halo on a placed tower exactly when
-/// the next upgrade's hidden XP gate is filled. Coins never affect it, it is
-/// opacity-only, click-through, and lives behind the tower body, range indicator, and
-/// rank badge. Rank badge behavior is purchase-driven and independent.
+/// Upgrade-ready glow: an additive overlay that redraws the tower's own body silhouette
+/// on top of it exactly when the next upgrade's hidden XP gate is filled. Coins never
+/// affect it, it is opacity-only, click-through, inherits the body's aim/recoil
+/// transform, and sits below the range indicator and rank badge. Rank badge behavior is
+/// purchase-driven and independent.
 /// </summary>
 [TestSuite]
 public class TowerUpgradeReadyGlowTest
 {
-    private static Control? Glow(Tower tower) =>
-        tower.GetNodeOrNull<Control>("UpgradeReadyGlow");
-
     private static Control? Body(Tower tower) => tower.GetNodeOrNull<Control>(
         tower.Type switch
         {
@@ -25,15 +23,22 @@ public class TowerUpgradeReadyGlowTest
             _ => "ArrowBody"
         });
 
-    private static int GlowNodeCount(Tower tower)
+    private static Control? Glow(Tower tower) =>
+        Body(tower)?.GetNodeOrNull<Control>("UpgradeReadyGlow");
+
+    private static int GlowNodeCount(Tower tower) =>
+        tower.FindChildren("UpgradeReadyGlow", "", recursive: true, owned: false).Count;
+
+    private static void AssertAdditiveOverlay(Control glow, Control body)
     {
-        int count = 0;
-        foreach (Node child in tower.GetChildren())
-        {
-            if (child.Name == "UpgradeReadyGlow")
-                count++;
-        }
-        return count;
+        // A child of the body draws after it, shares its transform, and spans its rect.
+        AssertThat(glow.GetParent() == body).IsTrue();
+        AssertThat(glow.Position).IsEqual(Vector2.Zero);
+        AssertThat(glow.Size).IsEqual(body.Size);
+        AssertThat(glow.MouseFilter).IsEqual(Control.MouseFilterEnum.Ignore);
+        AssertThat(glow.Material is CanvasItemMaterial).IsTrue();
+        AssertThat(((CanvasItemMaterial)glow.Material!).BlendMode)
+            .IsEqual(CanvasItemMaterial.BlendModeEnum.Add);
     }
 
     [TestCase]
@@ -102,7 +107,7 @@ public class TowerUpgradeReadyGlowTest
     }
 
     [TestCase]
-    public void ReadyTower_ShowsOneCellSizedClickThroughGlow_BehindTheBody()
+    public void ReadyTower_ShowsOneBodySizedAdditiveClickThroughOverlay_OnTheBody()
     {
         var tower = TestTowers.Create(TowerType.Arrow);
         NodeTestSupport.Attach(tower);
@@ -110,28 +115,20 @@ public class TowerUpgradeReadyGlowTest
         {
             tower.AddXp(GameConstants.TowerXpThresholdRank1);
 
+            var body = Body(tower);
             var glow = Glow(tower);
+            AssertThat(body).IsNotNull();
             AssertThat(glow).IsNotNull();
             AssertThat(GlowNodeCount(tower)).IsEqual(1);
             AssertThat(glow!.Visible).IsTrue();
             AssertThat(tower.IsUpgradeGlowVisible).IsTrue();
 
-            // One cell, centred on the tower origin (the cell centre).
+            // The overlay spans exactly the body rect and carries no halo/ring geometry
+            // of its own: the silhouette is the body renderer re-invoked additively.
+            AssertAdditiveOverlay(glow, body!);
             AssertThat(glow.Size).IsEqual(
                 new Vector2(GameConstants.CellSize, GameConstants.CellSize));
-            AssertThat(glow.Position).IsEqual(
-                new Vector2(-GameConstants.CellSize / 2f, -GameConstants.CellSize / 2f));
-
-            // Click-through and behind the body (which sits at z 0).
-            AssertThat(glow.MouseFilter).IsEqual(Control.MouseFilterEnum.Ignore);
-            var body = Body(tower);
-            AssertThat(body).IsNotNull();
-            AssertThat(glow.ZIndex).IsLess(0);
-            AssertThat(glow.ZIndex).IsLess(body!.ZIndex);
-
-            // Nominal halo is 60 px across: one cell minus the 2 px inset on each side.
-            AssertThat(GameConstants.TowerUpgradeGlowOuterRadius * 2f)
-                .IsEqualApprox(GameConstants.CellSize - 4f, 0.0001f);
+            AssertThat(glow.GetChildCount()).IsEqual(0);
         }
         finally
         {
@@ -144,66 +141,92 @@ public class TowerUpgradeReadyGlowTest
     {
         // Exactly at the rank-1 gate: after the purchase the next gate is closed.
         var tower = TestTowers.Create(TowerType.Cannon);
-        tower.AddXp(GameConstants.TowerXpThresholdRank1);
-        var glow = Glow(tower);
-        AssertThat(glow).IsNotNull();
-        AssertThat(glow!.Visible).IsTrue();
-
-        AssertThat(tower.ApplyRankUpgrade()).IsTrue();
-        AssertThat(tower.Rank).IsEqual(1);
-        AssertThat(tower.HasUpgradeReady).IsFalse();
-        AssertThat(Glow(tower) == glow).IsTrue(); // same node for the tower's whole life
-        AssertThat(glow.Visible).IsFalse();
-
-        // Surplus XP: every purchase still leaves the next gate filled.
         var surplus = TestTowers.Create(TowerType.Arrow);
-        surplus.AddXp(GameConstants.TowerXpThresholdRank3 + 10f);
-        var surplusGlow = Glow(surplus);
-        AssertThat(surplusGlow).IsNotNull();
-        AssertThat(surplusGlow!.Visible).IsTrue();
+        NodeTestSupport.Attach(tower);
+        NodeTestSupport.Attach(surplus);
+        try
+        {
+            tower.AddXp(GameConstants.TowerXpThresholdRank1);
+            var glow = Glow(tower);
+            AssertThat(glow).IsNotNull();
+            AssertThat(glow!.Visible).IsTrue();
 
-        AssertThat(surplus.ApplyRankUpgrade()).IsTrue(); // rank 1, 40 >= 15
-        AssertThat(surplusGlow.Visible).IsTrue();
-        AssertThat(surplus.ApplyRankUpgrade()).IsTrue(); // rank 2, 40 >= 30
-        AssertThat(surplusGlow.Visible).IsTrue();
-        AssertThat(Glow(surplus) == surplusGlow).IsTrue();
+            AssertThat(tower.ApplyRankUpgrade()).IsTrue();
+            AssertThat(tower.Rank).IsEqual(1);
+            AssertThat(tower.HasUpgradeReady).IsFalse();
+            AssertThat(Glow(tower) == glow).IsTrue(); // same node for the tower's whole life
+            AssertThat(glow.Visible).IsFalse();
+
+            // Crossing the next gate reveals the same node again, with no duplicate.
+            tower.AddXp(GameConstants.TowerXpThresholdRank2
+                        - GameConstants.TowerXpThresholdRank1);
+            AssertThat(tower.HasUpgradeReady).IsTrue();
+            AssertThat(Glow(tower) == glow).IsTrue();
+            AssertThat(glow.Visible).IsTrue();
+            AssertThat(GlowNodeCount(tower)).IsEqual(1);
+
+            // Surplus XP: every purchase still leaves the next gate filled.
+            surplus.AddXp(GameConstants.TowerXpThresholdRank3 + 10f);
+            var surplusGlow = Glow(surplus);
+            AssertThat(surplusGlow).IsNotNull();
+            AssertThat(surplusGlow!.Visible).IsTrue();
+
+            AssertThat(surplus.ApplyRankUpgrade()).IsTrue(); // rank 1, 40 >= 15
+            AssertThat(surplusGlow.Visible).IsTrue();
+            AssertThat(surplus.ApplyRankUpgrade()).IsTrue(); // rank 2, 40 >= 30
+            AssertThat(surplusGlow.Visible).IsTrue();
+            AssertThat(Glow(surplus) == surplusGlow).IsTrue();
+        }
+        finally
+        {
+            NodeTestSupport.Cleanup(tower);
+            NodeTestSupport.Cleanup(surplus);
+        }
     }
 
     [TestCase]
     public void ArchetypeStep_GlowsBeforeTheChoice_AndStopsAtMaxRank()
     {
         var tower = TestTowers.Create(TowerType.Arrow);
-        tower.AddXp(GameConstants.TowerXpThresholdRank3);
+        NodeTestSupport.Attach(tower);
+        try
+        {
+            tower.AddXp(GameConstants.TowerXpThresholdRank3);
 
-        AssertThat(tower.ApplyRankUpgrade()).IsTrue(); // rank 1 (surplus XP)
-        AssertThat(tower.ApplyRankUpgrade()).IsTrue(); // rank 2
-        AssertThat(tower.Rank).IsEqual(2);
+            AssertThat(tower.ApplyRankUpgrade()).IsTrue(); // rank 1 (surplus XP)
+            AssertThat(tower.ApplyRankUpgrade()).IsTrue(); // rank 2
+            AssertThat(tower.Rank).IsEqual(2);
 
-        // The archetype choice is the next upgrade, so the cue stays on until chosen.
-        AssertThat(tower.HasUpgradeReady).IsTrue();
-        var glow = Glow(tower);
-        AssertThat(glow).IsNotNull();
-        AssertThat(glow!.Visible).IsTrue();
+            // The archetype choice is the next upgrade, so the cue stays on until chosen.
+            AssertThat(tower.HasUpgradeReady).IsTrue();
+            var glow = Glow(tower);
+            AssertThat(glow).IsNotNull();
+            AssertThat(glow!.Visible).IsTrue();
 
-        AssertThat(tower.ApplyArchetype(TowerArchetype.Pierce)).IsTrue();
-        AssertThat(tower.Rank).IsEqual(GameConstants.TowerMaxRank);
-        AssertThat(tower.HasUpgradeReady).IsFalse();
-        AssertThat(glow.Visible).IsFalse();
+            AssertThat(tower.ApplyArchetype(TowerArchetype.Pierce)).IsTrue();
+            AssertThat(tower.Rank).IsEqual(GameConstants.TowerMaxRank);
+            AssertThat(tower.HasUpgradeReady).IsFalse();
+            AssertThat(glow.Visible).IsFalse();
 
-        // Permanently off for the rest of the tower's life.
-        tower.AddXp(1000f);
-        AssertThat(tower.HasUpgradeReady).IsFalse();
-        AssertThat(glow.Visible).IsFalse();
-        AssertThat(tower.IsUpgradeGlowVisible).IsFalse();
+            // Permanently off for the rest of the tower's life.
+            tower.AddXp(1000f);
+            AssertThat(tower.HasUpgradeReady).IsFalse();
+            AssertThat(glow.Visible).IsFalse();
+            AssertThat(tower.IsUpgradeGlowVisible).IsFalse();
+        }
+        finally
+        {
+            NodeTestSupport.Cleanup(tower);
+        }
     }
 
     [TestCase]
     public void Coins_NeverDriveTheGlow()
     {
-        var manager = new GameManager();
-        manager.Initialize(Levels.Level1);
+        var manager = NodeTestSupport.Attach(new GameManager());
         try
         {
+            manager.Initialize(Levels.Level1);
             manager.PlacingTowerType = TowerType.Arrow;
             AssertThat(manager.PlaceTower(0, 0)).IsTrue(); // all 10 starting coins spent
             var tower = manager.GetActiveTowers()[0];
@@ -232,7 +255,7 @@ public class TowerUpgradeReadyGlowTest
         }
         finally
         {
-            manager.Free();
+            NodeTestSupport.Cleanup(manager);
         }
     }
 
@@ -240,34 +263,49 @@ public class TowerUpgradeReadyGlowTest
     public void RankBadge_StaysPurchaseDriven_AndIndependentOfTheGlow()
     {
         var tower = TestTowers.Create(TowerType.Arrow);
-        tower.AddXp(GameConstants.TowerXpThresholdRank2); // 15 XP opens the rank-1 gate
+        NodeTestSupport.Attach(tower);
+        try
+        {
+            tower.AddXp(GameConstants.TowerXpThresholdRank2); // 15 XP opens the rank-1 gate
 
-        var glow = Glow(tower);
-        AssertThat(glow).IsNotNull();
-        AssertThat(glow!.Visible).IsTrue();
-        // Earning XP never creates the purchase-driven badge.
-        AssertThat(tower.GetNodeOrNull<Control>("RankBadge")).IsNull();
+            var glow = Glow(tower);
+            AssertThat(glow).IsNotNull();
+            AssertThat(glow!.Visible).IsTrue();
+            // Earning XP never creates the purchase-driven badge.
+            AssertThat(tower.GetNodeOrNull<Control>("RankBadge")).IsNull();
 
-        AssertThat(tower.ApplyRankUpgrade()).IsTrue(); // rank 1; 15 >= 15 so the glow stays
-        var badge = tower.GetNodeOrNull<Control>("RankBadge");
-        AssertThat(badge).IsNotNull();
-        AssertThat(badge!.Visible).IsTrue();
-        AssertThat(glow.Visible).IsTrue();
-        AssertThat(glow.ZIndex).IsLess(badge.ZIndex);
+            AssertThat(tower.ApplyRankUpgrade()).IsTrue(); // rank 1; 15 >= 15 so the glow stays
+            var badge = tower.GetNodeOrNull<Control>("RankBadge");
+            AssertThat(badge).IsNotNull();
+            AssertThat(badge!.Visible).IsTrue();
+            AssertThat(glow.Visible).IsTrue();
 
-        AssertThat(tower.ApplyRankUpgrade()).IsTrue(); // rank 2; next gate is 30 and closed
-        AssertThat(glow.Visible).IsFalse();
-        AssertThat(badge.Visible).IsTrue();
-        AssertThat(badge.Size).IsEqual(new Vector2(
-            GameConstants.TowerRankBadgeWidth,
-            GameConstants.TowerRankBadgeHeight));
+            // The badge is a sibling above the body, so it draws above the body and its
+            // child overlay.
+            var body = Body(tower);
+            AssertThat(body).IsNotNull();
+            AssertThat(glow.GetParent() == body).IsTrue();
+            AssertThat(badge.GetParent() == tower).IsTrue();
+            AssertThat(badge.ZIndex).IsGreater(body!.ZIndex);
 
-        // The glow hiding and showing never repaints or resizes the badge.
-        AssertThat(tower.ApplyArchetype(TowerArchetype.Pierce)).IsTrue();
-        AssertThat(badge.Visible).IsTrue();
-        AssertThat(badge.Size).IsEqual(new Vector2(
-            GameConstants.TowerRankBadgeWidth,
-            GameConstants.TowerRankBadgeHeight));
+            AssertThat(tower.ApplyRankUpgrade()).IsTrue(); // rank 2; next gate is 30 and closed
+            AssertThat(glow.Visible).IsFalse();
+            AssertThat(badge.Visible).IsTrue();
+            AssertThat(badge.Size).IsEqual(new Vector2(
+                GameConstants.TowerRankBadgeWidth,
+                GameConstants.TowerRankBadgeHeight));
+
+            // The glow hiding and showing never repaints or resizes the badge.
+            AssertThat(tower.ApplyArchetype(TowerArchetype.Pierce)).IsTrue();
+            AssertThat(badge.Visible).IsTrue();
+            AssertThat(badge.Size).IsEqual(new Vector2(
+                GameConstants.TowerRankBadgeWidth,
+                GameConstants.TowerRankBadgeHeight));
+        }
+        finally
+        {
+            NodeTestSupport.Cleanup(tower);
+        }
     }
 
     [TestCase]
@@ -279,12 +317,19 @@ public class TowerUpgradeReadyGlowTest
         {
             tower.AddXp(GameConstants.TowerXpThresholdRank1);
             var glow = Glow(tower);
+            var body = Body(tower);
             AssertThat(glow).IsNotNull();
+            AssertThat(body).IsNotNull();
 
             tower.ShowRange();
             var range = tower.GetNodeOrNull<Control>("RangeIndicator");
             AssertThat(range).IsNotNull();
-            AssertThat(glow!.ZIndex).IsLess(range!.ZIndex);
+
+            // The overlay is a child of the body; the range control is added later as a
+            // sibling, so it draws after the whole body subtree.
+            AssertThat(glow!.GetParent() == body).IsTrue();
+            AssertThat(range!.GetParent() == tower).IsTrue();
+            AssertThat(range.GetIndex()).IsGreater(body!.GetIndex());
             AssertThat(glow.Visible).IsTrue();
 
             // Selection geometry is untouched by the cue.
@@ -337,7 +382,17 @@ public class TowerUpgradeReadyGlowTest
             AssertThat(glow.Modulate.A)
                 .IsEqualApprox(GameConstants.TowerUpgradeGlowAlphaMax, 0.0001f);
 
-            // Opacity is the only thing that moved.
+            // Opacity is the only thing that moved. Every sampled frame stays inside the
+            // configured pulse range, derived from the constants (min must be < max).
+            float minAlpha = GameConstants.TowerUpgradeGlowAlphaMin;
+            float maxAlpha = GameConstants.TowerUpgradeGlowAlphaMax;
+            AssertThat(minAlpha).IsLess(maxAlpha);
+            for (int i = 0; i < 32; i++)
+            {
+                tower._Process(GameConstants.TowerUpgradeGlowPulsePeriod / 32f);
+                AssertThat(glow.Modulate.A).IsGreaterEqual(minAlpha - 0.0001f);
+                AssertThat(glow.Modulate.A).IsLessEqual(maxAlpha + 0.0001f);
+            }
             AssertThat(tower.Position).IsEqual(towerPosition);
             AssertThat(glow.Position).IsEqual(glowPosition);
             AssertThat(glow.Size).IsEqual(glowSize);
@@ -380,24 +435,29 @@ public class TowerUpgradeReadyGlowTest
         foreach (var type in new[] { TowerType.Arrow, TowerType.Cannon, TowerType.Laser })
         {
             var tower = TestTowers.Create(type);
-            Color themeColor = tower.TowerColor;
+            NodeTestSupport.Attach(tower);
+            try
+            {
+                Color themeColor = tower.TowerColor;
+                tower.AddXp(GameConstants.TowerXpThresholdRank1);
 
-            tower.AddXp(GameConstants.TowerXpThresholdRank1);
-            var glow = Glow(tower);
-            AssertThat(glow).IsNotNull();
-            AssertThat(glow!.Visible).IsTrue();
-            AssertThat(glow.MouseFilter).IsEqual(Control.MouseFilterEnum.Ignore);
-            AssertThat(glow.Size).IsEqual(new Vector2(
-                GameConstants.TowerUpgradeGlowNodeSize,
-                GameConstants.TowerUpgradeGlowNodeSize));
+                var body = Body(tower);
+                var glow = Glow(tower);
+                AssertThat(body).IsNotNull();
+                AssertThat(glow).IsNotNull();
+                AssertThat(glow!.Visible).IsTrue();
 
-            // Tower theme colors are unchanged by the cue.
-            AssertThat(tower.TowerColor).IsEqual(themeColor);
+                // Same additive body-silhouette treatment, not a per-type halo.
+                AssertAdditiveOverlay(glow, body!);
+
+                // Tower theme colors are unchanged by the cue.
+                AssertThat(tower.TowerColor).IsEqual(themeColor);
+            }
+            finally
+            {
+                NodeTestSupport.Cleanup(tower);
+            }
         }
-
-        // Shared pale-gold hue, not a per-type color.
-        AssertThat(GameConstants.TowerUpgradeGlowColor)
-            .IsEqual(new Color(1f, 0.93f, 0.55f));
     }
 
     [TestCase]
@@ -405,27 +465,36 @@ public class TowerUpgradeReadyGlowTest
     {
         var first = TestTowers.Create(TowerType.Arrow, 5, 5);
         var second = TestTowers.Create(TowerType.Cannon, 6, 6);
+        NodeTestSupport.Attach(first);
+        NodeTestSupport.Attach(second);
+        try
+        {
+            first.AddXp(GameConstants.TowerXpThresholdRank1);
+            second.AddXp(GameConstants.TowerXpThresholdRank1 - 0.25f);
 
-        first.AddXp(GameConstants.TowerXpThresholdRank1);
-        second.AddXp(GameConstants.TowerXpThresholdRank1 - 0.25f);
+            AssertThat(first.HasUpgradeReady).IsTrue();
+            AssertThat(second.HasUpgradeReady).IsFalse();
+            AssertThat(Glow(first)).IsNotNull();
+            AssertThat(Glow(second)).IsNull();
 
-        AssertThat(first.HasUpgradeReady).IsTrue();
-        AssertThat(second.HasUpgradeReady).IsFalse();
-        AssertThat(Glow(first)).IsNotNull();
-        AssertThat(Glow(second)).IsNull();
+            // Buying on one never changes the other.
+            AssertThat(first.ApplyRankUpgrade()).IsTrue();
+            AssertThat(Glow(first)!.Visible).IsFalse();
+            AssertThat(Glow(second)).IsNull();
 
-        // Buying on one never changes the other.
-        AssertThat(first.ApplyRankUpgrade()).IsTrue();
-        AssertThat(Glow(first)!.Visible).IsFalse();
-        AssertThat(Glow(second)).IsNull();
-
-        second.AddXp(0.25f);
-        AssertThat(second.HasUpgradeReady).IsTrue();
-        var secondGlow = Glow(second);
-        AssertThat(secondGlow).IsNotNull();
-        AssertThat(secondGlow!.Visible).IsTrue();
-        AssertThat(Glow(first)!.Visible).IsFalse();
-        AssertThat(Glow(first) == secondGlow).IsFalse();
+            second.AddXp(0.25f);
+            AssertThat(second.HasUpgradeReady).IsTrue();
+            var secondGlow = Glow(second);
+            AssertThat(secondGlow).IsNotNull();
+            AssertThat(secondGlow!.Visible).IsTrue();
+            AssertThat(Glow(first)!.Visible).IsFalse();
+            AssertThat(Glow(first) == secondGlow).IsFalse();
+        }
+        finally
+        {
+            NodeTestSupport.Cleanup(first);
+            NodeTestSupport.Cleanup(second);
+        }
     }
 
     [TestCase]
@@ -437,18 +506,120 @@ public class TowerUpgradeReadyGlowTest
         {
             tower.AddXp(GameConstants.TowerXpThresholdRank1);
             var glow = Glow(tower);
+            var body = Body(tower);
             AssertThat(glow).IsNotNull();
-            // No orphan: the glow lives under the tower, so its lifetime is the tower's.
-            AssertThat(glow!.GetParent() == tower).IsTrue();
+            AssertThat(body).IsNotNull();
+            // The overlay lives under the body, so its lifetime is the tower's.
+            AssertThat(glow!.GetParent() == body).IsTrue();
 
             tower.Free();
             AssertThat(GodotObject.IsInstanceValid(tower)).IsFalse();
+            AssertThat(GodotObject.IsInstanceValid(body)).IsFalse();
             AssertThat(GodotObject.IsInstanceValid(glow)).IsFalse();
         }
         finally
         {
             if (GodotObject.IsInstanceValid(tower))
                 NodeTestSupport.Cleanup(tower);
+        }
+    }
+
+    [TestCase]
+    public void ArchetypeChange_KeepsTheSameAttachedOverlay_HiddenAtMaxRank()
+    {
+        var tower = TestTowers.Create(TowerType.Arrow);
+        NodeTestSupport.Attach(tower);
+        try
+        {
+            tower.AddXp(GameConstants.TowerXpThresholdRank3);
+            var body = Body(tower);
+            var glow = Glow(tower);
+            AssertThat(body).IsNotNull();
+            AssertThat(glow).IsNotNull();
+            AssertThat(glow!.GetParent() == body).IsTrue();
+
+            AssertThat(tower.ApplyRankUpgrade()).IsTrue();
+            AssertThat(tower.ApplyRankUpgrade()).IsTrue();
+            AssertThat(tower.ApplyArchetype(TowerArchetype.Pierce)).IsTrue();
+
+            // The same overlay node stays attached to the body with the same rect; the
+            // rank-3 body renderer is archetype-aware if the cue ever shows again.
+            AssertThat(Glow(tower) == glow).IsTrue();
+            AssertAdditiveOverlay(glow, body!);
+
+            // Rank 3 has no next gate, so the cue stays hidden for the tower's life.
+            AssertThat(glow.Visible).IsFalse();
+            AssertThat(tower.HasUpgradeReady).IsFalse();
+        }
+        finally
+        {
+            NodeTestSupport.Cleanup(tower);
+        }
+    }
+
+    [TestCase]
+    public void Overlay_FollowsBodyAimAndRecoil_ThroughParenting()
+    {
+        var tower = TestTowers.Create(TowerType.Arrow);
+        NodeTestSupport.Attach(tower);
+        var enemy = new Enemy();
+        enemy.Configure(EnemyKind.Basic);
+        try
+        {
+            tower.AddXp(GameConstants.TowerXpThresholdRank1);
+            var body = Body(tower);
+            var glow = Glow(tower);
+            AssertThat(body).IsNotNull();
+            AssertThat(glow).IsNotNull();
+
+            // Resting arrow points up; a target to the right rotates the body toward +X.
+            Transform2D restingGlobal = body!.GetGlobalTransform();
+            enemy.Position = tower.Position + new Vector2(100f, 0f);
+            tower.SetTarget(enemy);
+            AssertThat(tower.TryFire(enemy, out _)).IsTrue();
+            tower._Process(0.05f);
+
+            Transform2D bodyGlobal = body.GetGlobalTransform();
+            Transform2D glowGlobal = glow!.GetGlobalTransform();
+
+            // The body actually moved (rotation toward the target + recoil kick).
+            AssertThat(bodyGlobal.IsEqualApprox(restingGlobal)).IsFalse();
+            // The overlay has no transform of its own, so it matches the body exactly.
+            // Reparenting it to the tower instead of the body breaks this assertion.
+            AssertThat(glowGlobal.IsEqualApprox(bodyGlobal)).IsTrue();
+        }
+        finally
+        {
+            NodeTestSupport.Cleanup(tower);
+            enemy.Free();
+        }
+    }
+
+    [TestCase]
+    public void XpBeforePlacement_CreatesTheOverlayWhenTheBodyRegisters()
+    {
+        var tower = TestTowers.Create(TowerType.Arrow);
+        tower.AddXp(GameConstants.TowerXpThresholdRank1);
+
+        // No body is registered until the tower enters the tree: no fallback halo,
+        // but the gate itself already reports ready.
+        AssertThat(tower.HasUpgradeReady).IsTrue();
+        AssertThat(Glow(tower)).IsNull();
+
+        NodeTestSupport.Attach(tower);
+        try
+        {
+            var body = Body(tower);
+            var glow = Glow(tower);
+            AssertThat(body).IsNotNull();
+            AssertThat(glow).IsNotNull();
+            AssertThat(glow!.GetParent() == body).IsTrue();
+            AssertThat(glow.Visible).IsTrue();
+            AssertThat(GlowNodeCount(tower)).IsEqual(1);
+        }
+        finally
+        {
+            NodeTestSupport.Cleanup(tower);
         }
     }
 }
