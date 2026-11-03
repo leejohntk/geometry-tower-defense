@@ -13,18 +13,6 @@ namespace GeometryTowerDefense.Tests;
 [TestSuite]
 public class TowerRankBadgeTest
 {
-    private static Tower MakeTower(TowerType type, int row = 5, int col = 10)
-    {
-        Tower tower = type switch
-        {
-            TowerType.Cannon => new CannonTower(),
-            TowerType.Laser => new LaserTower(),
-            _ => new ArrowTower()
-        };
-        tower.Initialize(row, col);
-        return tower;
-    }
-
     private static Control? Badge(Tower tower) => tower.GetNodeOrNull<Control>("RankBadge");
 
     private static Vector2 BadgeSize =>
@@ -33,7 +21,7 @@ public class TowerRankBadgeTest
     [TestCase]
     public void RankZero_HasNoBadge_EvenWhenTheXpGateOpens()
     {
-        var tower = MakeTower(TowerType.Arrow);
+        var tower = TestTowers.Create(TowerType.Arrow);
         AssertThat(Badge(tower)).IsNull();
 
         // The next rank's gate opening is not a purchase: still no badge.
@@ -48,7 +36,7 @@ public class TowerRankBadgeTest
     [TestCase]
     public void RankOnePurchase_ShowsAVisibleClickThroughBadge_AtTheCellTopRight_WithoutAPanel()
     {
-        var tower = MakeTower(TowerType.Arrow);
+        var tower = TestTowers.Create(TowerType.Arrow);
         AssertThat(tower.ApplyRankUpgrade()).IsTrue();
 
         var badge = Badge(tower);
@@ -71,7 +59,7 @@ public class TowerRankBadgeTest
     [TestCase]
     public void RankTwoPurchase_KeepsTheSameBadgeNodeAndFixedSize()
     {
-        var tower = MakeTower(TowerType.Cannon);
+        var tower = TestTowers.Create(TowerType.Cannon);
         AssertThat(tower.ApplyRankUpgrade()).IsTrue();
         var badge = Badge(tower);
         AssertThat(badge).IsNotNull();
@@ -91,7 +79,7 @@ public class TowerRankBadgeTest
     [TestCase]
     public void RankThree_ShowsTheArchetypeEmblemPath_AndStaysFixedSize()
     {
-        var tower = MakeTower(TowerType.Arrow);
+        var tower = TestTowers.Create(TowerType.Arrow);
         AssertThat(tower.ApplyRankUpgrade()).IsTrue();
         AssertThat(tower.ApplyRankUpgrade()).IsTrue();
         AssertThat(tower.ApplyArchetype(TowerArchetype.Pierce)).IsTrue();
@@ -116,7 +104,7 @@ public class TowerRankBadgeTest
     {
         foreach (var type in new[] { TowerType.Arrow, TowerType.Cannon, TowerType.Laser })
         {
-            var tower = MakeTower(type);
+            var tower = TestTowers.Create(type);
             AssertThat(tower.ApplyRankUpgrade()).IsTrue();
 
             var badge = Badge(tower);

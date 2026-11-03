@@ -49,6 +49,8 @@ A verifier failure never reads as a pass. Each of these produces exit `2` or a f
 - zero `ResultScreen` overlays resolve (the screen family silently vanishes otherwise)
 - `SkillTreeScreen` refuses verification mode, fails to install the isolated tree, or
   reports `IsVerificationStateActive() == false` when isolation is required
+- `Main` is missing `IsolateSkillTreeForVerification()` or refuses it (a debug build is
+  required), so HUD/panel costs could still be driven by the player's save
 - a required named group cannot be resolved (this is a finding, not a skip)
 - a required node resolves to the wrong class (finding plus fail-closed exit `2`)
 - zero layout assertions are evaluated (preconditions do not count)
@@ -112,6 +114,14 @@ The verifier fails closed if any step is missing, refused, or reports inactive *
 granting SP or pressing Buy. The hooks never flush, so a developer's
 `user://skilltree.cfg` is never modified. Without them, a local save with purchased ranks
 would silently remove every locked row from coverage.
+
+HUD and upgrade-panel costs are isolated separately: immediately after `Main.tscn`
+loads, the verifier calls `Main.IsolateSkillTreeForVerification()`. That debug-only hook
+installs one shared zero-rank in-memory tree on Main itself, `GameManager.SkillTree`,
+`GameHUD.SkillState`, and `TowerUpgradePanel.SkillState`, with a no-op save delegate.
+Card prices therefore measure the base spec values even when the developer's save has
+maxed Master Blueprints / Advanced Training ranks, and the real save is never written.
+The verifier fails closed if the hook is missing or returns `false`.
 
 Screens that require gameplay state (HUD mid-wave, victory with a real score) cannot be
 produced by instantiating `Main.tscn`. They are reported as **skipped with a reason**, never

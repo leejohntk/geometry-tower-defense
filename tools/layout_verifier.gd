@@ -298,6 +298,18 @@ func _run() -> void:
         _fail_closed("%s built no child nodes (C# assembly missing or scene script failed)" % MAIN_SCENE)
         return
 
+    # Deterministic HUD costs: Main isolates every cost surface (its own tree,
+    # GameManager, GameHUD, TowerUpgradePanel) behind an in-memory zero-rank tree whose
+    # save delegate is a no-op. A developer save with maxed Master Blueprints must never
+    # change the measured card prices, and the real save is never flushed or written.
+    # Debug-only and explicitly requested; fail closed before measuring anything.
+    if not _main.has_method("IsolateSkillTreeForVerification"):
+        _fail_closed("Main is missing IsolateSkillTreeForVerification(); cannot isolate cost surfaces from the player save")
+        return
+    if not bool(_main.call("IsolateSkillTreeForVerification")):
+        _fail_closed("Main refused skill-tree isolation (a debug build is required); refusing to measure progression-dependent costs")
+        return
+
     var title_screen := _find_by_script(_main, TITLE_SCRIPT)
     var skill_screen := _find_by_script(_main, SKILL_TREE_SCRIPT)
     var game_hud := _find_by_script(_main, GAME_HUD_SCRIPT)

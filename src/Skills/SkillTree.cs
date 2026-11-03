@@ -35,6 +35,13 @@ public sealed class SkillTree
     }
 
     /// <summary>
+    /// Creates a fresh zero-rank in-memory tree whose save delegate is a no-op. Nothing
+    /// created here can ever flush or write <c>user://skilltree.cfg</c>. Intended for
+    /// verification mode and tests that must never touch the player's progression.
+    /// </summary>
+    public static SkillTree CreateIsolated() => new(new SkillTreeState(), _ => true);
+
+    /// <summary>
     /// Awards Skill Points (ignores non-positive amounts). Marks the state dirty for
     /// a later coalesced flush; does not write immediately.
     /// </summary>

@@ -232,6 +232,26 @@ public static class GameConstants
     public const float TowerRankBadgeChevronHeight = 5f;
     public const float TowerRankBadgeChevronGap = 1f;
     public const float TowerRankBadgeStroke = 1.5f;
+
+    // Upgrade-ready glow: a subtle pulsing pale-gold halo shown on a placed tower
+    // whenever its next upgrade's hidden XP gate is filled. Coins never affect it, and
+    // it is presentation only: opacity pulses while geometry, position, and every stat
+    // stay untouched. Two low-alpha concentric halos plus a thin outer ring, all
+    // procedural and antialiased.
+    public const float TowerUpgradeGlowNodeSize = CellSize;    // one 64x64 cell
+    public const float TowerUpgradeGlowCellInset = 2f;         // px between halo edge and cell edge
+    public const float TowerUpgradeGlowOuterRadius = CellSize / 2f - TowerUpgradeGlowCellInset;
+    public const float TowerUpgradeGlowInnerRadius = 23f;
+    public const float TowerUpgradeGlowRingRadius = TowerUpgradeGlowOuterRadius;
+    public const float TowerUpgradeGlowRingWidth = 1.5f;
+    public const float TowerUpgradeGlowOuterAlpha = 0.10f;     // outer halo fill
+    public const float TowerUpgradeGlowInnerAlpha = 0.17f;     // inner halo fill
+    public const float TowerUpgradeGlowRingAlpha = 0.55f;      // thin ring
+    public const float TowerUpgradeGlowPulsePeriod = 1.6f;     // seconds per pulse cycle
+    public const float TowerUpgradeGlowAlphaMin = 0.55f;       // Modulate.A trough
+    public const float TowerUpgradeGlowAlphaMax = 1f;          // Modulate.A peak
+    public static readonly Color TowerUpgradeGlowColor = new Color(1f, 0.93f, 0.55f); // pale gold
+
     public static readonly Color TowerUpgradePanelBackgroundColor = new Color(0.05f, 0.05f, 0.1f, 0.92f);
     public static readonly Color TowerUpgradePanelDimColor = new Color(0.35f, 0.35f, 0.42f, 0.9f);
 

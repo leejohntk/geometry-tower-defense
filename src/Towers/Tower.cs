@@ -12,6 +12,13 @@ public abstract partial class Tower : Node2D
     private Control? _rangeIndicator;
     private Control? _rankBadge;
 
+    // Lazily created upgrade-ready glow. One node for this tower's whole life; only its
+    // Modulate.A changes while the XP gate is filled. Visibility is derived from the
+    // live gate by SyncUpgradeReadyGlow; the glow is a child of this tower, so it can
+    // only be freed with the tower and needs no per-node validity check.
+    private Control? _upgradeReadyGlow;
+    private float _upgradeGlowPhase = 0f;
+
     // Aim/recoil presentation. The aim angle is purely visual: it is derived from the
     // live target and never feeds back into targeting, range checks, or damage. It is
     // animated toward the desired angle at a capped angular speed (no snapping) and
@@ -71,6 +78,20 @@ public abstract partial class Tower : Node2D
     /// value is never rounded per hit and only gates the next upgrade's visibility.
     /// </summary>
     public float Xp { get; private set; }
+
+    /// <summary>
+    /// True when this tower's next upgrade is unlocked by kill XP: a generic rank at
+    /// rank 0/1, or the archetype choice at rank 2. This is exactly
+    /// <see cref="TowerUpgrades.IsUpgradeVisible"/> — the same hidden gate the upgrade
+    /// panel uses — so coins deliberately never affect it (an unaffordable upgrade
+    /// still reads as ready). Always false at max rank.
+    /// </summary>
+    public bool HasUpgradeReady => TowerUpgrades.IsUpgradeVisible(Rank, Xp);
+
+    /// <summary>
+    /// True while the upgrade-ready glow control is visible. Presentation only.
+    /// </summary>
+    public bool IsUpgradeGlowVisible => _upgradeReadyGlow?.Visible ?? false;
 
     /// <summary>
     /// Chosen archetype, or <see cref="TowerArchetype.None"/> before rank 3.
@@ -256,6 +277,8 @@ public abstract partial class Tower : Node2D
             return;
 
         Xp += amount;
+        // Reveal the cue the instant the threshold is crossed; no reselect or input.
+        SyncUpgradeReadyGlow();
     }
 
     /// <summary>
@@ -270,6 +293,8 @@ public abstract partial class Tower : Node2D
 
         Rank++;
         UpdateRankBadge();
+        // The purchase may leave the next XP gate closed; hide the cue immediately.
+        SyncUpgradeReadyGlow();
         return true;
     }
 
@@ -291,6 +316,8 @@ public abstract partial class Tower : Node2D
         Rank = GameConstants.TowerMaxRank;
         OnArchetypeChanged();
         UpdateRankBadge();
+        // Max rank has no next gate: the cue hides permanently.
+        SyncUpgradeReadyGlow();
         return true;
     }
 
@@ -522,6 +549,123 @@ public abstract partial class Tower : Node2D
             TowerColor);
     }
 
+    /// <summary>
+    /// Reconciles the glow's visibility with the live XP gate. Called on every XP/rank
+    /// change (so the cue flips in the same frame the gate moves) and at the top of each
+    /// _Process. This writes visibility only: the hidden-to-shown edge shows the control
+    /// and resets the pulse phase, the shown-to-hidden edge hides it and resets the
+    /// phase, and an already-visible ready glow is left untouched so _Process owns the
+    /// alpha pulse. Readiness itself is always derived, so there is no state to desync.
+    /// </summary>
+    private void SyncUpgradeReadyGlow()
+    {
+        if (!HasUpgradeReady)
+        {
+            if (_upgradeReadyGlow != null && _upgradeReadyGlow.Visible)
+            {
+                _upgradeReadyGlow.Visible = false;
+                _upgradeGlowPhase = 0f;
+            }
+            return;
+        }
+
+        var glow = GetOrCreateUpgradeReadyGlow();
+        if (glow.Visible)
+            return;
+
+        glow.Visible = true;
+        _upgradeGlowPhase = 0f;
+    }
+
+    /// <summary>
+    /// Syncs visibility and, while the glow is showing, advances its opacity-only pulse
+    /// by <paramref name="delta"/> seconds. Called once per frame from
+    /// <see cref="Tower._Process"/>. The ready path is O(1) and allocation-free; when the
+    /// gate is closed the glow is hidden by the sync and the pulse is skipped.
+    /// </summary>
+    private void UpdateUpgradeReadyGlow(float delta)
+    {
+        SyncUpgradeReadyGlow();
+
+        var glow = _upgradeReadyGlow;
+        if (glow == null || !glow.Visible)
+            return;
+
+        if (delta > 0f && float.IsFinite(delta))
+            _upgradeGlowPhase += delta;
+
+        float wave = 0.5f + 0.5f * Mathf.Sin(
+            _upgradeGlowPhase * Mathf.Tau / GameConstants.TowerUpgradeGlowPulsePeriod);
+        float alpha = Mathf.Lerp(
+            GameConstants.TowerUpgradeGlowAlphaMin,
+            GameConstants.TowerUpgradeGlowAlphaMax,
+            wave);
+
+        // Opacity only: the glow's position, size, rotation, and scale never change.
+        glow.Modulate = new Color(1f, 1f, 1f, alpha);
+    }
+
+    /// <summary>
+    /// Returns the one upgrade-ready glow control, creating it on first need. It is a
+    /// cell-sized click-through wrapper centred on the tower origin and drawn below the
+    /// tower body, range indicator, and rank badge. The control is a child of this
+    /// tower, so its lifetime is the tower's.
+    /// </summary>
+    private Control GetOrCreateUpgradeReadyGlow()
+    {
+        if (_upgradeReadyGlow != null)
+            return _upgradeReadyGlow;
+
+        float size = GameConstants.TowerUpgradeGlowNodeSize;
+        var glow = new Control();
+        glow.Name = "UpgradeReadyGlow";
+        glow.Size = new Vector2(size, size);
+        // Tower origin is the cell centre, so the wrapper spans one cell around it.
+        glow.Position = new Vector2(-size / 2f, -size / 2f);
+        glow.MouseFilter = Control.MouseFilterEnum.Ignore;
+        // Below the body (0), range indicator (0), and rank badge (1).
+        glow.ZIndex = -1;
+        glow.Visible = false;
+        glow.Draw += DrawUpgradeReadyGlow;
+        AddChild(glow);
+        _upgradeReadyGlow = glow;
+        return glow;
+    }
+
+    /// <summary>
+    /// Paints the glow once: two low-alpha pale-gold concentric halos plus a thin
+    /// antialiased ring at the outer radius. The pulse changes only Modulate.A, so this
+    /// never repaints per frame and allocates nothing.
+    /// </summary>
+    private void DrawUpgradeReadyGlow()
+    {
+        if (_upgradeReadyGlow == null)
+            return;
+
+        Vector2 center = _upgradeReadyGlow.Size / 2f;
+        Color color = GameConstants.TowerUpgradeGlowColor;
+
+        _upgradeReadyGlow.DrawCircle(
+            center,
+            GameConstants.TowerUpgradeGlowOuterRadius,
+            color with { A = GameConstants.TowerUpgradeGlowOuterAlpha },
+            antialiased: true);
+
+        _upgradeReadyGlow.DrawCircle(
+            center,
+            GameConstants.TowerUpgradeGlowInnerRadius,
+            color with { A = GameConstants.TowerUpgradeGlowInnerAlpha },
+            antialiased: true);
+
+        _upgradeReadyGlow.DrawCircle(
+            center,
+            GameConstants.TowerUpgradeGlowRingRadius,
+            color with { A = GameConstants.TowerUpgradeGlowRingAlpha },
+            filled: false,
+            width: GameConstants.TowerUpgradeGlowRingWidth,
+            antialiased: true);
+    }
+
     public override void _Process(double delta)
     {
         // Cooldown behavior is untouched: this is the only place it is advanced.
@@ -533,6 +677,7 @@ public abstract partial class Tower : Node2D
         }
 
         UpdateAim((float)delta);
+        UpdateUpgradeReadyGlow((float)delta);
     }
 
     /// <summary>
