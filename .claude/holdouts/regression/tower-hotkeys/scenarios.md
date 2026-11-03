@@ -12,32 +12,36 @@ Arrow cost is 10.
 
 **Steps:**
 1. Read coins, tower count, Start Wave enabled state, placement type.
-2. Push a `Key.Key1` key-down (not echo).
-3. Read the same values, plus cursor-mode intent and preview state after a mouse-motion event
-   over a valid cell.
-4. Push `1` again.
+2. Push mouse motion to a valid non-path cell but do not press any mouse button.
+3. Push a `Key.Key1` key-down (not echo).
+4. Read the same values plus the preview state, with no further mouse-motion event.
+5. Push `1` again.
 
 **Expected:**
 - Before: coins 10, no towers, Start Wave enabled, not placing.
 - After first press: Arrow placement type, `IsPlacingTower` true, coins still 10, zero towers,
   Start Wave disabled.
-- Mouse motion over a valid non-path cell shows the placement ghost/highlight and a range ring.
+- The placement ghost/highlight and range ring are visible immediately at the pointer cell
+  without any post-key mouse motion.
+- The normal pointer cursor is never replaced by a crosshair; verify by code inspection, because
+  the headless display server cannot report cursor shape.
 - The second press exits placement: type null, Start Wave enabled again, ghost hidden, no tower
   placed, coins still 10.
 - No wave starts on either press.
 
 ## H2 — Mouse click after hotkey places exactly one tower
 
-**Setup:** Level 1, Arrow selected via `1`; choose an in-bounds non-path, unoccupied cell.
+**Setup:** Level 1, pointer already over an in-bounds non-path, unoccupied cell; Arrow selected
+via `1`.
 
 **Steps:**
-1. Push mouse motion to the chosen cell, then a left mouse-button press at the same viewport
-   position.
+1. Push a left mouse-button press at the current pointer position without any further mouse
+   motion.
 2. Read towers, coin balance, placement state, Start Wave state.
 3. Push `1` again with the new balance.
 
 **Expected:**
-- Exactly one Arrow tower exists at the chosen cell; coins decrease by exactly the Arrow cost.
+- Exactly one Arrow tower exists at the pointer cell; coins decrease by exactly the Arrow cost.
 - Placement mode exits automatically; preview hidden; Start Wave button returns to its normal
   state for the current wave activity.
 - With 0 coins, the follow-up `1` is a no-op: no placement mode, no tower, coins unchanged.
@@ -62,19 +66,22 @@ Arrow cost is 10.
 
 ## H4 — Toggle and switch semantics
 
-**Setup:** A level that allows all three tower types (Level 3 or later) with at least 10 coins.
+**Setup:** A level that allows all three tower types (Level 3 or later) with at least 10 coins,
+pointer over a valid battlefield cell.
 
 **Steps:**
-1. Push `1`; read type.
-2. Push `2`; read type, coins, placement active.
+1. Push `1`; read type and preview state.
+2. Push `2`; read type, coins, placement active, preview state with no further mouse motion.
 3. Push `2` again; read type.
-4. Push `3`; read type.
+4. Push `3`; read type and preview state.
 5. Push `1` while placing Laser; read type.
 6. Push `4`, then `5`, then `Enter`; read type and coins each time.
 
 **Expected:**
-- `1` → Arrow; `2` → Cannon while remaining in placement mode and spending nothing; second `2`
-  cancels placement; `3` → Laser; `1` while Laser → Arrow (switch).
+- `1` → Arrow; preview appears immediately at the pointer cell.
+- `2` → Cannon while remaining in placement mode and spending nothing; the preview is redrawn
+  for Cannon at the same cell without a mouse-motion event; second `2` cancels placement;
+  `3` → Laser; `1` while Laser → Arrow (switch).
 - `4`, `5`, and `Enter` change nothing.
 - No click ever occurs, so no tower is placed and coins never change.
 
@@ -167,3 +174,24 @@ read type, cancel if active. Compare with the visibility/enabled state of `Place
   mapping.
 - Keypad digits are not required to map; they must not crash or select an unintended type.
 - Each mapping spends no coins until a cell click.
+
+## H11 — Pointer outside the battlefield at selection
+
+**Setup:** Level 1, pointer last moved over the sidebar or HUD (outside the grid).
+
+**Steps:**
+1. Push `1` and read placement/preview state with no subsequent mouse motion.
+2. Move the pointer over a valid battlefield cell.
+3. Read the preview state.
+4. Press `1` to cancel, then repeat with the pointer never moved since app start where the
+   harness allows it.
+5. Return to title, start another level, press a digit before any mouse motion in that level.
+
+**Expected:**
+- The hotkey still enters placement mode, but no preview is drawn while the pointer is off the
+  battlefield or no pointer position is known.
+- Moving over a valid cell shows the ghost/highlight/range immediately.
+- Placement never guesses a cell on its own, and the normal pointer cursor is unchanged.
+- The previous level's pointer position never leaks into the new level; no preview until the
+  pointer moves during that level.
+

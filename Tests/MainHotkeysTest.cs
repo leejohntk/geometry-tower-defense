@@ -157,8 +157,7 @@ public class MainHotkeysTest
             var startWave = GetStartWaveButton(main);
 
             // Card route: the shared transition sets the type, disables Start Wave,
-            // and spends nothing. (The cross cursor is set by the same shared call the
-            // hotkey uses; headless display servers do not report cursor changes.)
+            // and spends nothing.
             GetCard(main, "PlaceArrow").EmitSignal(Button.SignalName.Pressed);
             AssertThat(manager.PlacingTowerType).IsEqual(TowerType.Arrow);
             AssertThat(startWave.Disabled).IsTrue();
@@ -174,6 +173,31 @@ public class MainHotkeysTest
             AssertThat(manager.PlacingTowerType).IsEqual(TowerType.Arrow);
             AssertThat(startWave.Disabled).IsTrue();
             AssertThat(manager.Coins).IsEqual(GameConstants.StartingCoins);
+        }
+        finally
+        {
+            Cleanup(main);
+        }
+    }
+
+    [TestCase]
+    public void CardSelection_ShowsThePreviewImmediatelyAtTheLastPointerPosition()
+    {
+        var main = CreateStartedGame(1);
+        try
+        {
+            var manager = GetManager(main);
+            var grid = manager.Grid!;
+
+            PushMouseMotion(main, ValidCell);
+            AssertThat(grid.IsPlacementPreviewVisible).IsFalse();
+
+            // No motion between the card press and the assertion: the ghost must be
+            // drawn from the already-known pointer position.
+            GetCard(main, "PlaceArrow").EmitSignal(Button.SignalName.Pressed);
+
+            AssertThat(manager.PlacingTowerType).IsEqual(TowerType.Arrow);
+            AssertThat(grid.IsPlacementPreviewVisible).IsTrue();
         }
         finally
         {
@@ -309,8 +333,10 @@ public class MainHotkeysTest
             var manager = GetManager(main);
             var grid = manager.Grid!;
 
-            PushKey(main, Key.Key1);
+            // The pointer is already over a valid cell when the shortcut is pressed:
+            // the ghost appears immediately, with no further motion event.
             PushMouseMotion(main, ValidCell);
+            PushKey(main, Key.Key1);
             AssertThat(manager.IsPlacingTower).IsTrue();
             AssertThat(grid.IsPlacementPreviewVisible).IsTrue();
 
@@ -324,6 +350,32 @@ public class MainHotkeysTest
             AssertThat(manager.Coins).IsEqual(GameConstants.StartingCoins);
             AssertThat(grid.IsPlacementPreviewVisible).IsFalse();
             AssertThat(GetStartWaveButton(main).Disabled).IsFalse();
+        }
+        finally
+        {
+            Cleanup(main);
+        }
+    }
+
+    [TestCase]
+    public void HotkeySelection_WithThePointerOffGrid_WaitsForAValidCell()
+    {
+        var main = CreateStartedGame(1);
+        try
+        {
+            var manager = GetManager(main);
+            var grid = manager.Grid!;
+
+            // The last pointer position is over the sidebar, outside the battlefield.
+            PushMouseMotion(main, GetCard(main, "PlaceArrow").GetGlobalRect().GetCenter());
+            PushKey(main, Key.Key1);
+
+            AssertThat(manager.PlacingTowerType).IsEqual(TowerType.Arrow);
+            AssertThat(grid.IsPlacementPreviewVisible).IsFalse();
+
+            // Once the pointer moves onto a valid cell, the preview appears normally.
+            PushMouseMotion(main, ValidCell);
+            AssertThat(grid.IsPlacementPreviewVisible).IsTrue();
         }
         finally
         {
@@ -350,16 +402,16 @@ public class MainHotkeysTest
             PushKey(main, Key.Key2);
 
             // Switching stays in placement, spends nothing, and never places by itself.
-            // The preview drawn for the previous type is dropped immediately rather
-            // than lingering until the next mouse motion.
+            // The preview is redrawn for the new type at the same pointer cell instead
+            // of lingering as the old ghost or disappearing until the next motion.
             AssertThat(manager.PlacingTowerType).IsEqual(TowerType.Cannon);
             AssertThat(manager.IsPlacingTower).IsTrue();
-            AssertThat(grid.IsPlacementPreviewVisible).IsFalse();
+            AssertThat(grid.IsPlacementPreviewVisible).IsTrue();
             AssertThat(manager.Coins).IsEqual(GameConstants.StartingCoins);
             AssertThat(manager.GetActiveTowers().Count).IsEqual(0);
             AssertThat(GetStartWaveButton(main).Disabled).IsTrue();
 
-            PushMouseMotion(main, ValidCell);
+            // No motion between the switch and the click: the pointer cell is unchanged.
             PushLeftClick(main, ValidCell);
 
             AssertThat(manager.GetActiveTowers().Count).IsEqual(1);
@@ -593,6 +645,44 @@ public class MainHotkeysTest
 
             PushKey(main, Key.Key1);
             AssertThat(manager.IsPlacingTower).IsFalse();
+        }
+        finally
+        {
+            Cleanup(main);
+        }
+    }
+
+    [TestCase]
+    public void StartingANewLevel_ForgetsThePreviousLevelsPointerPosition()
+    {
+        var main = CreateStartedGame(1);
+        try
+        {
+            var manager = GetManager(main);
+            var title = main.GetChildren().OfType<TitleScreen>().Single();
+
+            // Track a valid cell while Level 1 is running.
+            PushMouseMotion(main, ValidCell);
+
+            // End the run and return to the title through the real button.
+            manager.EmitSignal(GameManager.SignalName.GameOver);
+            main.GetNode<Button>("GameOverScreen/ReturnToTitle")
+                .EmitSignal(Button.SignalName.Pressed);
+            AssertThat(title.Visible).IsTrue();
+
+            // Start Level 3 and select a type without moving the mouse: the previous
+            // level's pointer cell must not seed a ghost in the new level.
+            title.GetNode<Button>("Block_LevelMenu/Level3")
+                .EmitSignal(Button.SignalName.Pressed);
+
+            PushKey(main, Key.Key3);
+
+            AssertThat(manager.PlacingTowerType).IsEqual(TowerType.Laser);
+            AssertThat(manager.Grid!.IsPlacementPreviewVisible).IsFalse();
+
+            // The new level's own motion establishes a fresh pointer cell.
+            PushMouseMotion(main, ValidCell);
+            AssertThat(manager.Grid!.IsPlacementPreviewVisible).IsTrue();
         }
         finally
         {

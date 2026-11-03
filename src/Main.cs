@@ -19,6 +19,11 @@ public partial class Main : Node2D
     private Tower? _selectedTower = null;
     private LevelDefinition? _selectedLevel = null;
 
+    // Latest pointer position seen during active play, in viewport space. Lets a
+    // placement selection draw its ghost immediately instead of waiting for the next
+    // mouse-motion event. Null until the pointer first moves during play.
+    private Vector2? _lastMouseViewportPosition = null;
+
     public override void _Ready()
     {
         // Load the persistent skill tree before any screen or game object needs it.
@@ -126,6 +131,10 @@ public partial class Main : Node2D
         if (_selectedLevel == null)
             return;
 
+        // A new level starts with no known pointer position: a stale cell from the
+        // previous level must not seed a placement ghost before the mouse moves here.
+        _lastMouseViewportPosition = null;
+
         // Hide title
         if (_titleScreen != null)
             _titleScreen.Visible = false;
@@ -220,13 +229,12 @@ public partial class Main : Node2D
             return;
 
         // Enter placement mode for the requested type. A switch keeps the mode but
-        // replaces the pending type; drop any preview drawn for the previous type so
-        // it cannot linger until the next mouse motion (a click would place the new
-        // type while the stale ghost still described the old one).
+        // replaces the pending type. Either way, redraw the ghost at the last known
+        // pointer position immediately: the player should not have to nudge the mouse
+        // before the newly chosen type's preview appears.
         _gameManager.PlacingTowerType = type;
-        _gameManager.Grid?.HidePlacementPreview();
+        RefreshTowerPlacementPreviewAtLastMouse();
         UpdateStartWaveButtonState();
-        Input.SetDefaultCursorShape(Input.CursorShape.Cross);
 
         // Placement wins over the upgrade panel: close it and drop the selection
         // (hiding any range that was showing).
@@ -258,8 +266,7 @@ public partial class Main : Node2D
     private void OnGameOverTriggered()
     {
         // The run can end while the player is aiming. Leave placement mode first so
-        // the ghost/range preview and the Cross cursor cannot linger under the
-        // result overlay.
+        // the ghost/range preview cannot linger under the result overlay.
         ExitTowerPlacementMode();
 
         // The upgrade panel must never linger over a result screen.
@@ -327,6 +334,11 @@ public partial class Main : Node2D
     {
         if (!_gameRunning || _gameManager == null)
             return;
+
+        // Track the pointer while play is active so a placement selection can draw its
+        // ghost at the current cell immediately, without a fresh motion event.
+        if (@event is InputEventMouseMotion latestMotion)
+            _lastMouseViewportPosition = latestMotion.Position;
 
         // Space is the context-sensitive in-level control: while a wave runs it
         // toggles the whole-game clock, otherwise it starts the ready wave. Checked
@@ -662,6 +674,21 @@ public partial class Main : Node2D
         }
     }
 
+    /// <summary>
+    /// Redraw the placement preview at the most recently seen pointer position. Called
+    /// when a selection starts or switches so the ghost appears — or is redrawn for the
+    /// newly selected type — immediately instead of on the next mouse-motion event.
+    /// With no known position the preview stays hidden; an off-grid position hides it
+    /// through the normal preview path.
+    /// </summary>
+    private void RefreshTowerPlacementPreviewAtLastMouse()
+    {
+        if (_lastMouseViewportPosition is Vector2 viewportPoint)
+            UpdateTowerPlacementPreview(ToBattlefieldPoint(viewportPoint));
+        else
+            _gameManager?.Grid?.HidePlacementPreview();
+    }
+
     private void TryPlaceTowerAtMouse(Vector2 battlefieldPoint)
     {
         if (_gameManager?.Grid == null)
@@ -674,7 +701,7 @@ public partial class Main : Node2D
         if (placed)
         {
             // Exactly one tower per selection: GameManager consumed the placement type,
-            // so drop the preview, cursor, and Start Wave state to match.
+            // so drop the preview and Start Wave state to match.
             ExitTowerPlacementMode();
         }
         // A failed battlefield click (path or occupied cell) keeps the selection so the
@@ -683,10 +710,10 @@ public partial class Main : Node2D
 
     /// <summary>
     /// Leave tower placement mode: drop the selection, hide the preview ghost, and
-    /// restore the cursor and Start Wave button to normal play state. Idempotent and
-    /// null-safe, so it is safe to call when placement already ended — including
-    /// immediately after <see cref="GameManager.PlaceTower"/> consumed the selection,
-    /// and from game-over/victory handlers.
+    /// restore the Start Wave button to normal play state. Idempotent and null-safe, so
+    /// it is safe to call when placement already ended — including immediately after
+    /// <see cref="GameManager.PlaceTower"/> consumed the selection, and from
+    /// game-over/victory handlers.
     /// </summary>
     private void ExitTowerPlacementMode()
     {
@@ -694,7 +721,6 @@ public partial class Main : Node2D
             _gameManager.PlacingTowerType = null;
 
         _gameManager?.Grid?.HidePlacementPreview();
-        Input.SetDefaultCursorShape(Input.CursorShape.Arrow);
         UpdateStartWaveButtonState();
     }
 }
