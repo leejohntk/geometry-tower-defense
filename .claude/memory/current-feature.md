@@ -7,6 +7,12 @@ metadata:
 
 # Current Feature
 
+**Upgrade-ready glow (spec approved 2026-11-02, phase spec_approved):** placed towers show a
+subtle pale-gold pulsing halo when `TowerUpgrades.IsUpgradeVisible(Rank, Xp)` is true, regardless
+of coins. Includes the rank 2→3 archetype step; hidden when the gate is closed or at rank 3.
+Opacity-only animation, click-through, behind the tower body. Spec
+`.claude/specs/upgrade-ready-glow.md`; branch `feature/upgrade-ready-glow`.
+
 **Global skill tree (PR #39, merged 2026-11-03, squash `5cdac41`):** fourth tower-independent skill
 branch sharing the existing SP pool. Four chained nodes: Fortified Core (+1 starting HP, max 5),
 War Chest (+2 starting gold, max 5), Master Blueprints (tower cost −1, max 3), Advanced Training
