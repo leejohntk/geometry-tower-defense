@@ -7,7 +7,7 @@ metadata:
 
 # Current Feature
 
-**Upgrade-ready glow (PR #41, awaiting playtest after fix 1, 2026-11-03):** placed towers show a
+**Upgrade-ready glow (PR #41, merged 2026-11-03, squash `4848757`):** placed towers show a
 subtle additive glow over their own body silhouette when `TowerUpgrades.IsUpgradeVisible(Rank, Xp)`
 is true, regardless of coins. The overlay is a child of the tower body, redraws the variant's own
 procedural body renderer on top through a shared additive `CanvasItemMaterial`, and pulses alpha
@@ -16,9 +16,12 @@ Covers rank 1, rank 2 and the rank 2→3 archetype step; hidden when the gate is
 Playtest fix 1 replaced the original behind-tower gold halo with this shape-conforming overlay.
 Also adds a debug-only `Main.IsolateSkillTreeForVerification()` so the layout verifier no longer
 reads player save ranks. Spec `.claude/specs/upgrade-ready-glow.md`; branch
-`feature/upgrade-ready-glow`. Gates after fix 1: build 0 warnings; 625 tests; layout PASS (382
-assertions, 0 findings with maxed save); holdouts 9/9 (634 tests with the temp harness); fix review
-0 CRITICAL / 1 WARNING / 6 INFO (warning + actionable INFO fixed); simplify 4-lens pass applied.
+`feature/upgrade-ready-glow` (merged, local + remote deleted). Gates at merge: build 0 warnings;
+625 tests on `main` after the squash; layout PASS (382 assertions, 384 evaluated, 3 skipped,
+0 findings with maxed save); holdouts 9/9 (634 tests with the temp harness, re-run after the final
+simplify batch); review passes: initial 0 CRITICAL / 0 WARNING / 2 INFO, fix review 0 CRITICAL /
+1 WARNING / 8 INFO (warning + actionable INFO fixed); simplify 4-lens passes applied. `state.json`
+removed; post-merge `main` re-verified (build clean, 625 tests).
 
 **Global skill tree (PR #39, merged 2026-11-03, squash `5cdac41`):** fourth tower-independent skill
 branch sharing the existing SP pool. Four chained nodes: Fortified Core (+1 starting HP, max 5),
@@ -201,6 +204,10 @@ Holdouts moved to `.claude/holdouts/regression/tower-skill-tree-mechanics/`.
 - **Main input test harness duplication (2026-11-03)** — `MainTest`, `MainSpeedupTest`, and
   `MainHotkeysTest` each carry their own Main bootstrap, node lookups, and viewport input
   helpers. Extract a shared Main harness into `Tests/Support/` on the next input feature.
+- **Upgrade glow redraw allocations (2026-11-03)** — the additive overlay re-invokes each variant's
+  `DrawBody`, allocating a body polygon and scratch vertex arrays on every redraw. Redraws are
+  edge-triggered (show edge / archetype change), not per-frame; cache the polygon in a static field
+  and reuse scratch arrays only if profiling shows it matters (performance INFO, deferred).
 - **Visual-overhaul spec drift (2026-11-01)** — nine playtest fix batches changed pinned values
   but the spec still pins 22×22 node icons (shipped 46×46), a `15$` cost format (shipped plain
   number), and lists the top-bar redesign as Out of Scope (shipped in fix 6). The regression
@@ -234,6 +241,14 @@ Holdouts moved to `.claude/holdouts/regression/tower-skill-tree-mechanics/`.
 
 ## Recent Features
 
+- **Upgrade-ready glow** (PR #41, merged 2026-11-03, squash `4848757`) — placed towers show an
+  additive overlay that redraws their own body silhouette whenever the next rank's hidden XP gate
+  is filled, regardless of coins; alpha-only pulse, follows aim/recoil by parenting, hidden at
+  rank 3. Playtest fix 1 replaced the initial behind-tower halo. Adds debug-only skill-tree save
+  isolation for the layout verifier. Build 0 warnings; 625 tests; layout PASS (382 assertions,
+  0 findings); holdouts 9/9 (634 with the temp harness); review 0 CRITICAL / 1 WARNING / 10 INFO
+  across both passes; simplify applied. Holdouts moved to
+  `.claude/holdouts/regression/upgrade-ready-glow/`.
 - **Global skill tree** (PR #39, merged 2026-11-03, squash `5cdac41`) — fourth, tower-independent
   skill branch sharing the existing SP pool: Fortified Core (+1 starting HP, max 5), War Chest
   (+2 starting gold, max 5), Master Blueprints (tower cost −1, max 3), Advanced Training (rank
