@@ -42,7 +42,9 @@ its alpha, or recreates the node. The upgrade panel's affordability styling stil
 
 **Expected:**
 - Rect, position, rotation and scale are constant; tower `Position` is constant.
-- Alpha varies smoothly within the configured range and period; never outside the range.
+- Alpha varies smoothly within the configured additive range and period; never outside the range.
+- The additive overlay's geometry calls are the body's existing draws; changing archetype changes
+  the glow silhouette with no separate shape code.
 - No draw-call/vertex churn is required to animate (opacity on a pre-drawn control).
 - When not ready, the node is hidden and adds no per-frame glow work.
 
@@ -50,9 +52,12 @@ its alpha, or recreates the node. The upgrade panel's affordability styling stil
 
 **Steps:** Place Arrow, Cannon and Laser towers; bring each to a ready gate one at a time.
 
-**Expected:** Each shows its own `UpgradeReadyGlow`; toggling one never toggles another. Names,
-size, click-through and behind-body ordering are identical across types; tower theme colors are
-unchanged.
+**Expected:**
+- Additive overlay redraws the tower's own body shapes on top; the silhouette matches each type
+  (arrow triangle, cannon circle+barrel, laser diamond/emitter) and each archetype variant.
+- Each shows its own `UpgradeReadyGlow`; toggling one never toggles another.
+- The glow Control is a child of that tower's body, same rect as the body, click-through, and
+  draws above the body art. Tower base theme colors are unchanged.
 
 ## H5 — Purchase transitions
 
@@ -78,7 +83,7 @@ unchanged.
 **Expected:**
 - Badge still appears only from purchases, keeps its size/position, and is not changed by the
   glow.
-- Range indicator geometry and color are unchanged; glow sits behind it.
+- Range indicator geometry and color are unchanged; it draws above the body glow.
 - Mouse input reaches the tower/grid normally; glow never consumes a click.
 
 ## H7 — Click-through and node contract
@@ -87,7 +92,10 @@ unchanged.
 
 **Expected:**
 - Exactly one node named `UpgradeReadyGlow`, a `Control` with `MouseFilter = Ignore`.
-- Size 64×64, centered on the tower origin, `ZIndex` below the body and badge.
+- It is a child of the tower's body Control, local position zero, same size as the body, with a
+  `CanvasItemMaterial` whose blend mode is Add; it draws above the body and below the badge.
+- It reuses the body's draw shapes (no separate halo/ring/circle) and inherits body rotation,
+  recoil offset and aim.
 - Freed with the tower at level end; no orphan node remains.
 - Layout verifier passes with zero findings.
 
