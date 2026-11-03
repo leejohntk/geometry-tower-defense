@@ -125,8 +125,29 @@ public static class GameConstants
     public const int SkillPointVictoryMultiplier = 2;
     public const int SkillPointLossDivisor = 2;
     public const int SkillNodeRankCost = 10;        // flat SP cost per rank
-    public const int SkillMaxRanks = 5;
+    public const int SkillMaxRanks = 5;             // default max for tower nodes
     public const int SkillUnlockRank = 1;           // rank a prerequisite must reach to unlock its children
+
+    // Global (tower-independent) skill branch — permanent bonuses for every run. These
+    // nodes spend the same SP as the tower trees and chain sequentially.
+    public const int GlobalStartingHpMaxRanks = 5;
+    public const int GlobalStartingGoldMaxRanks = 5;
+    public const int GlobalTowerDiscountMaxRanks = 3;
+    public const int GlobalUpgradeDiscountMaxRanks = 3;
+
+    // Per-rank effects of the global nodes.
+    public const int GlobalStartingHpPerRank = 1;    // +1 starting HP
+    public const int GlobalStartingGoldPerRank = 2;  // +2 starting coins
+    public const int GlobalTowerDiscountPerRank = 1; // -1 coin per tower placement
+    public const int GlobalUpgradeDiscountPerRank = 1; // -1 coin per rank upgrade
+
+    // Defensive floor for discounted prices. With at most three discount ranks and the
+    // cheapest base cost of 5, normal play never reaches it.
+    public const int MinimumEffectiveCost = 1;
+
+    // Global branch accent — cyan, distinct from Arrow blue, Cannon green, and Laser
+    // magenta. Shared by the tree tab, node halos, spine glow, and sidebar glyph.
+    public static readonly Color SkillGlobalAccentColor = new Color(0.35f, 0.85f, 0.92f);
 
     // Arrow stat nodes
     public const int SkillArrowDamagePerRank = 2;

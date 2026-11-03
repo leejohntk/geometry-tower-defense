@@ -27,6 +27,11 @@ public class MainHotkeysTest
         NodeTestSupport.ApplyProjectViewportSize();
         var main = NodeTestSupport.Attach(new Main());
 
+        // Enter with a deterministic zero-rank skill tree: saved global ranks would
+        // otherwise change starting coins and tower costs. The in-memory tree's save
+        // delegate is a no-op, so the player's real save is never written.
+        NodeTestSupport.IsolateSkillTree(main);
+
         // Start the requested level through the real title-screen button signal.
         main.GetChildren().OfType<TitleScreen>().Single()
             .GetNode<Button>($"Block_LevelMenu/Level{levelId}")
@@ -743,6 +748,58 @@ public class MainHotkeysTest
             AssertThat(manager.IsPlacingTower).IsFalse();
             AssertThat(grid.IsPlacementPreviewVisible).IsFalse();
             AssertThat(GetStartWaveButton(main).Disabled).IsFalse();
+        }
+        finally
+        {
+            Cleanup(main);
+        }
+    }
+
+    [TestCase]
+    public void HotkeyEligibility_UsesTheDiscountedTowerCost()
+    {
+        NodeTestSupport.ApplyProjectViewportSize();
+        var main = NodeTestSupport.Attach(new Main());
+        try
+        {
+            var manager = GetManager(main);
+
+            // Start from a known progression before the level begins (the skill screen
+            // is only reachable from the title). The isolated in-memory tree's save
+            // delegate is a no-op, so the real save is never written.
+            var tree = NodeTestSupport.IsolateSkillTree(main);
+            tree.State.SetRank(SkillTreeCatalog.GlobalTowerDiscount, 3);
+
+            main.GetChildren().OfType<TitleScreen>().Single()
+                .GetNode<Button>("Block_LevelMenu/Level3")
+                .EmitSignal(Button.SignalName.Pressed);
+
+            AssertThat(manager.Coins).IsEqual(GameConstants.StartingCoins);
+            AssertThat(GetCard(main, "PlaceArrow").GetNode<Label>("Cost").Text).IsEqual("7");
+
+            // Spend down to 7 coins: below the base 10, exactly the discounted price.
+            manager.PlacingTowerType = TowerType.Arrow;
+            AssertThat(manager.PlaceTower(0, 0)).IsTrue(); // -7 -> 3
+            manager.AddCoinsForTesting(4);
+            AssertThat(manager.Coins).IsEqual(7);
+
+            PushKey(main, Key.Key2);
+            AssertThat(manager.PlacingTowerType).IsEqual(TowerType.Cannon);
+            AssertThat(GetStartWaveButton(main).Disabled).IsTrue();
+
+            // Placing deducts exactly the displayed discounted price.
+            PushLeftClick(main, CellCenter(1, 0));
+            AssertThat(manager.Coins).IsEqual(0);
+            AssertThat(manager.GetActiveTowers().Count).IsEqual(2);
+
+            // One coin below the discounted price is still a no-op.
+            manager.AddCoinsForTesting(6);
+            AssertThat(manager.Coins).IsEqual(6);
+            PushKey(main, Key.Key2);
+
+            AssertThat(manager.IsPlacingTower).IsFalse();
+            AssertThat(manager.Coins).IsEqual(6);
+            AssertThat(main.GetViewport().IsInputHandled()).IsTrue();
         }
         finally
         {

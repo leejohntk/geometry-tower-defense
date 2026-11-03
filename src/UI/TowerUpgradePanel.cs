@@ -47,6 +47,31 @@ public partial class TowerUpgradePanel : Control
     private TowerArchetype _leftArchetype = TowerArchetype.None;
     private TowerArchetype _rightArchetype = TowerArchetype.None;
 
+    // Effective cost for the bound tower's next target rank. Recomputed only when the
+    // tower or its rank changes, so the per-frame ComputeState path never re-runs the
+    // skill-tree lookup.
+    private SkillTreeState? _skillState;
+    private Tower? _cachedCostTower;
+    private int _cachedCostRank = -1;
+    private int _cachedUpgradeCost;
+
+    /// <summary>
+    /// Persistent skill-tree state used to resolve effective upgrade costs (global
+    /// Advanced Training discount). Null means base prices. Set by Main before any
+    /// tower is selected; tests that do not care leave it null. Changing it invalidates
+    /// the cached effective cost.
+    /// </summary>
+    public SkillTreeState? SkillState
+    {
+        get => _skillState;
+        set
+        {
+            _skillState = value;
+            _cachedCostTower = null;
+            _cachedCostRank = -1;
+        }
+    }
+
     /// <summary>
     /// The tower currently tracked, or null when the panel is closed. The panel may be
     /// tracking a selected tower while hidden (no upgrade available yet).
@@ -184,8 +209,7 @@ public partial class TowerUpgradePanel : Control
 
         // Only affordability matters to the rendered state, so a kill that raises the
         // coin balance without crossing a cost never triggers a repaint.
-        int targetRank = tower.Rank + 1;
-        bool affordable = _coins >= TowerUpgrades.CostToReachRank(targetRank);
+        bool affordable = _coins >= UpgradeCostFor(tower);
 
         return (
             tower.Rank,
@@ -193,6 +217,24 @@ public partial class TowerUpgradePanel : Control
             affordable,
             !maxRank && tower.Rank < GameConstants.TowerMaxRank - 1 && gateOpen,
             tower.Rank == GameConstants.TowerMaxRank - 1 && gateOpen);
+    }
+
+    /// <summary>
+    /// Effective cost for the tower's next target rank, cached so the per-frame
+    /// ComputeState path is a single int comparison when nothing changed. The cache is
+    /// keyed by the tower reference and its current rank.
+    /// </summary>
+    private int UpgradeCostFor(Tower tower)
+    {
+        int targetRank = tower.Rank + 1;
+        if (!ReferenceEquals(_cachedCostTower, tower) || _cachedCostRank != targetRank)
+        {
+            _cachedUpgradeCost = SkillStats.EffectiveUpgradeCost(targetRank, _skillState);
+            _cachedCostTower = tower;
+            _cachedCostRank = targetRank;
+        }
+
+        return _cachedUpgradeCost;
     }
 
     // === Build ===
@@ -339,7 +381,7 @@ public partial class TowerUpgradePanel : Control
         if (!upgradeVisible)
             return;
 
-        int cost = TowerUpgrades.CostToReachRank(tower.Rank + 1);
+        int cost = UpgradeCostFor(tower);
         bool canAfford = _coins >= cost;
 
         _buyButton.Text = $"Upgrade {cost}";
@@ -364,9 +406,9 @@ public partial class TowerUpgradePanel : Control
         _leftArchetype = options[0];
         _rightArchetype = options[1];
 
-        bool canAfford = _coins >= GameConstants.TowerUpgradeCostRank3;
-        UpdateCard(leftCard, _leftIcon, _leftName, _leftCost, _leftArchetype, color, canAfford);
-        UpdateCard(rightCard, _rightIcon, _rightName, _rightCost, _rightArchetype, color, canAfford);
+        int cost = UpgradeCostFor(tower);
+        UpdateCard(leftCard, _leftIcon, _leftName, _leftCost, _leftArchetype, color, cost);
+        UpdateCard(rightCard, _rightIcon, _rightName, _rightCost, _rightArchetype, color, cost);
     }
 
     private void UpdateCard(
@@ -376,8 +418,9 @@ public partial class TowerUpgradePanel : Control
         Label? costLabel,
         TowerArchetype archetype,
         Color color,
-        bool canAfford)
+        int cost)
     {
+        bool canAfford = _coins >= cost;
         card.Name = $"Card_{TowerArchetypes.NodeKey(archetype)}";
         card.Disabled = !canAfford;
         card.Text = TowerArchetypes.DisplayName(archetype);
@@ -391,7 +434,7 @@ public partial class TowerUpgradePanel : Control
         }
 
         if (costLabel != null)
-            costLabel.Text = $"{GameConstants.TowerUpgradeCostRank3}$";
+            costLabel.Text = $"{cost}$";
 
         icon?.QueueRedraw();
     }

@@ -25,6 +25,7 @@ public partial class GameHUD : CanvasLayer
     private Button? _placeLaserButton;
     private SpeedupCue? _speedupCue;
     private GameManager? _gameManager;
+    private SkillTreeState? _skillState;
     private bool _allowCannon = false;
     private bool _allowLaser = false;
     private int _totalWaves = 0;
@@ -32,8 +33,25 @@ public partial class GameHUD : CanvasLayer
     // Placement cards: the Button stays at its historical path and keeps emitting the
     // same signal; the Icon/Name/Cost children carry the card content. Dimming is
     // applied to the children so a disabled card reads as unavailable while its labels
-    // stay legible.
-    private readonly List<(Button Button, Control Icon, Label Name, Label Cost)> _placementCards = new();
+    // stay legible. The tower type is kept with the card so every cost surface can be
+    // recomputed from the effective (discounted) price.
+    private readonly List<(Button Button, TowerType Type, Control Icon, Label Name, Label Cost)> _placementCards = new();
+
+    /// <summary>
+    /// Persistent skill-tree state used to resolve effective tower costs. Null means
+    /// base prices. Setting it refreshes the visible card labels and enabled states, so
+    /// a card never shows a base price the player is not actually charged.
+    /// </summary>
+    public SkillTreeState? SkillState
+    {
+        get => _skillState;
+        set
+        {
+            _skillState = value;
+            RefreshCostLabels();
+            UpdateTowerButtonStates();
+        }
+    }
 
     // Top-bar stat layout (local to Block_TopBar). A 28x28 icon, a small uppercase
     // caption, and the value sit side by side in one 128-wide group; groups start at
@@ -167,6 +185,10 @@ public partial class GameHUD : CanvasLayer
             sidebarBlock, "PlaceLaser", TowerType.Laser, "Laser",
             new Vector2(sidebarButtonX, GameConstants.SidebarCardTop + cardPitch * 2f));
         _placeLaserButton.Visible = false;
+
+        // Apply discounted prices once the cards exist (SkillState may have been set
+        // before this node entered the tree).
+        RefreshCostLabels();
 
         // Start Wave button — below the full card stack.
         float startWaveY = GameConstants.SidebarCardTop + cardPitch * 3f
@@ -342,7 +364,9 @@ public partial class GameHUD : CanvasLayer
 
         var costLabel = new Label();
         costLabel.Name = "Cost";
-        costLabel.Text = GameConstants.TowerCost(type).ToString();
+        // The single price-label rule lives in RefreshCostLabels(), which runs for the
+        // whole card stack at build time and whenever SkillState changes.
+        costLabel.Text = string.Empty;
         costLabel.Position = new Vector2(GameConstants.SidebarCardTextX, 40);
         costLabel.Size = new Vector2(96, 22);
         costLabel.AddThemeFontSizeOverride("font_size", 14);
@@ -352,8 +376,23 @@ public partial class GameHUD : CanvasLayer
 
         GeometricButtonStyle.ApplyCard(button, accent);
 
-        _placementCards.Add((button, icon, nameLabel, costLabel));
+        _placementCards.Add((button, type, icon, nameLabel, costLabel));
         return button;
+    }
+
+    /// <summary>
+    /// Rewrites every placement card's price label from the effective (discounted)
+    /// cost. Called when the skill state is attached and once at build time.
+    /// </summary>
+    private void RefreshCostLabels()
+    {
+        foreach (var card in _placementCards)
+        {
+            if (card.Cost == null || !IsInstanceValid(card.Cost))
+                continue;
+
+            card.Cost.Text = SkillStats.EffectiveTowerCost(card.Type, _skillState).ToString();
+        }
     }
 
     /// <summary>
@@ -420,11 +459,14 @@ public partial class GameHUD : CanvasLayer
         gm.TowerPlacementStateChanged += OnTowerPlacementStateChanged;
         gm.SpeedupChanged += OnSpeedupChanged;
 
-        // Sync initial state so HUD reflects current GameManager state
+        // Sync initial state so HUD reflects current GameManager state. Costs are
+        // recomputed too: global ranks may have been bought on the title-screen skill
+        // tree after this HUD was built.
+        RefreshCostLabels();
         OnCoinsChanged(gm.Coins);
         OnHpChanged(gm.HP);
         OnWaveChanged(0);
-        OnTowerPlacementStateChanged(gm.Coins >= GameConstants.ArrowTowerCost);
+        UpdateTowerButtonStates();
         OnSpeedupChanged(gm.IsSpeedupActive);
     }
 
@@ -493,19 +535,21 @@ public partial class GameHUD : CanvasLayer
         if (_placeArrowButton != null)
         {
             _placeArrowButton.Disabled =
-                playEnded || coins < GameConstants.ArrowTowerCost;
+                playEnded || coins < SkillStats.EffectiveTowerCost(TowerType.Arrow, _skillState);
         }
 
         if (_placeCannonButton != null)
         {
             _placeCannonButton.Disabled =
-                playEnded || !_allowCannon || coins < GameConstants.CannonTowerCost;
+                playEnded || !_allowCannon ||
+                coins < SkillStats.EffectiveTowerCost(TowerType.Cannon, _skillState);
         }
 
         if (_placeLaserButton != null)
         {
             _placeLaserButton.Disabled =
-                playEnded || !_allowLaser || coins < GameConstants.LaserTowerCost;
+                playEnded || !_allowLaser ||
+                coins < SkillStats.EffectiveTowerCost(TowerType.Laser, _skillState);
         }
 
         UpdateCardDims();

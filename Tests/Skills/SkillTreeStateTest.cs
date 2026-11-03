@@ -252,4 +252,154 @@ public class SkillTreeStateTest
         AssertThat(state.IsUnlocked(SkillTreeCatalog.ArrowPierce)).IsTrue();
         AssertThat(state.IsUnlocked(SkillTreeCatalog.ArrowCritChance)).IsTrue();
     }
+
+    // === Global (tower-independent) branch ===
+
+    [TestCase]
+    public void IsUnlocked_GlobalChain_FirstNodeOnlyFromFreshState()
+    {
+        var state = new SkillTreeState();
+
+        AssertThat(state.IsUnlocked(SkillTreeCatalog.GlobalStartingHp)).IsTrue();
+        AssertThat(state.IsUnlocked(SkillTreeCatalog.GlobalStartingGold)).IsFalse();
+        AssertThat(state.IsUnlocked(SkillTreeCatalog.GlobalTowerDiscount)).IsFalse();
+        AssertThat(state.IsUnlocked(SkillTreeCatalog.GlobalUpgradeDiscount)).IsFalse();
+    }
+
+    [TestCase]
+    public void BuyGlobalRank_SpendsExactlyTenAndIncrementsOneRank()
+    {
+        var state = new SkillTreeState();
+        state.SetSkillPoints(GameConstants.SkillNodeRankCost + 5);
+
+        AssertThat(state.BuyRank(SkillTreeCatalog.GlobalStartingHp)).IsTrue();
+
+        AssertThat(state.GetRank(SkillTreeCatalog.GlobalStartingHp)).IsEqual(1);
+        AssertThat(state.SkillPoints).IsEqual(5);
+    }
+
+    [TestCase]
+    public void BuyGlobalRank_ExactlyTenSpLeavesZero_AndNineBuysNothing()
+    {
+        var exactlyEnough = new SkillTreeState();
+        exactlyEnough.SetSkillPoints(GameConstants.SkillNodeRankCost);
+        AssertThat(exactlyEnough.BuyRank(SkillTreeCatalog.GlobalStartingHp)).IsTrue();
+        AssertThat(exactlyEnough.SkillPoints).IsEqual(0);
+
+        var oneShort = new SkillTreeState();
+        oneShort.SetSkillPoints(GameConstants.SkillNodeRankCost - 1);
+        AssertThat(oneShort.BuyRank(SkillTreeCatalog.GlobalStartingHp)).IsFalse();
+        AssertThat(oneShort.GetRank(SkillTreeCatalog.GlobalStartingHp)).IsEqual(0);
+        AssertThat(oneShort.SkillPoints).IsEqual(GameConstants.SkillNodeRankCost - 1);
+    }
+
+    [TestCase]
+    public void BuyGlobalRank_LockedNode_IsRejectedAndSpendsNothing()
+    {
+        var state = new SkillTreeState();
+        state.SetSkillPoints(100);
+
+        AssertThat(state.IsUnlocked(SkillTreeCatalog.GlobalStartingGold)).IsFalse();
+        AssertThat(state.CanBuyRank(SkillTreeCatalog.GlobalStartingGold)).IsFalse();
+        AssertThat(state.BuyRank(SkillTreeCatalog.GlobalStartingGold)).IsFalse();
+        AssertThat(state.GetRank(SkillTreeCatalog.GlobalStartingGold)).IsEqual(0);
+        AssertThat(state.SkillPoints).IsEqual(100);
+    }
+
+    [TestCase]
+    public void BuyGlobalRank_EachPurchaseUnlocksTheNext_WithoutLeavingTheState()
+    {
+        var state = new SkillTreeState();
+        state.SetSkillPoints(100);
+
+        AssertThat(state.BuyRank(SkillTreeCatalog.GlobalStartingHp)).IsTrue();
+        AssertThat(state.IsUnlocked(SkillTreeCatalog.GlobalStartingGold)).IsTrue();
+
+        AssertThat(state.BuyRank(SkillTreeCatalog.GlobalStartingGold)).IsTrue();
+        AssertThat(state.IsUnlocked(SkillTreeCatalog.GlobalTowerDiscount)).IsTrue();
+
+        AssertThat(state.BuyRank(SkillTreeCatalog.GlobalTowerDiscount)).IsTrue();
+        AssertThat(state.IsUnlocked(SkillTreeCatalog.GlobalUpgradeDiscount)).IsTrue();
+
+        AssertThat(state.BuyRank(SkillTreeCatalog.GlobalUpgradeDiscount)).IsTrue();
+        AssertThat(state.SkillPoints).IsEqual(60);
+    }
+
+    [TestCase]
+    public void BuyGlobalRank_CapsAtEachNodesOwnMaxRank()
+    {
+        var cases = new (string Id, int MaxRank)[]
+        {
+            (SkillTreeCatalog.GlobalStartingHp, GameConstants.GlobalStartingHpMaxRanks),
+            (SkillTreeCatalog.GlobalStartingGold, GameConstants.GlobalStartingGoldMaxRanks),
+            (SkillTreeCatalog.GlobalTowerDiscount, GameConstants.GlobalTowerDiscountMaxRanks),
+            (SkillTreeCatalog.GlobalUpgradeDiscount, GameConstants.GlobalUpgradeDiscountMaxRanks),
+        };
+
+        foreach (var (id, maxRank) in cases)
+        {
+            var state = new SkillTreeState();
+            state.SetSkillPoints(GameConstants.SkillNodeRankCost * 30);
+            UnlockGlobalChain(state, id);
+
+            for (int i = 0; i < maxRank; i++)
+                AssertThat(state.BuyRank(id)).IsTrue();
+
+            AssertThat(state.GetRank(id)).IsEqual(maxRank);
+
+            int spBefore = state.SkillPoints;
+            AssertThat(state.CanBuyRank(id)).IsFalse();
+            AssertThat(state.BuyRank(id)).IsFalse();
+            AssertThat(state.GetRank(id)).IsEqual(maxRank);
+            AssertThat(state.SkillPoints).IsEqual(spBefore);
+        }
+    }
+
+    [TestCase]
+    public void SetRank_ClampsEachGlobalNodeToItsOwnMax()
+    {
+        var state = new SkillTreeState();
+
+        state.SetRank(SkillTreeCatalog.GlobalStartingHp, 9);
+        AssertThat(state.GetRank(SkillTreeCatalog.GlobalStartingHp)).IsEqual(5);
+
+        state.SetRank(SkillTreeCatalog.GlobalStartingGold, 9);
+        AssertThat(state.GetRank(SkillTreeCatalog.GlobalStartingGold)).IsEqual(5);
+
+        state.SetRank(SkillTreeCatalog.GlobalTowerDiscount, 9);
+        AssertThat(state.GetRank(SkillTreeCatalog.GlobalTowerDiscount)).IsEqual(3);
+
+        state.SetRank(SkillTreeCatalog.GlobalUpgradeDiscount, 9);
+        AssertThat(state.GetRank(SkillTreeCatalog.GlobalUpgradeDiscount)).IsEqual(3);
+
+        state.SetRank(SkillTreeCatalog.GlobalTowerDiscount, -4);
+        AssertThat(state.GetRank(SkillTreeCatalog.GlobalTowerDiscount)).IsEqual(0);
+    }
+
+    [TestCase]
+    public void GlobalNodes_DoNotAffectTowerNodeUnlocks()
+    {
+        var state = new SkillTreeState();
+        state.SetRank(SkillTreeCatalog.GlobalUpgradeDiscount, 3);
+
+        // Global ranks unlock only global nodes; the tower trees keep their own chains.
+        AssertThat(state.IsUnlocked(SkillTreeCatalog.ArrowAttackSpeed)).IsFalse();
+        AssertThat(state.IsUnlocked(SkillTreeCatalog.CannonAttackSpeed)).IsFalse();
+        AssertThat(state.IsUnlocked(SkillTreeCatalog.LaserRange)).IsFalse();
+    }
+
+    /// <summary>
+    /// Buys the global chain up to (and including) rank 1 of the node before
+    /// <paramref name="nodeId"/>, so the target node is unlocked.
+    /// </summary>
+    private static void UnlockGlobalChain(SkillTreeState state, string nodeId)
+    {
+        foreach (var node in SkillTreeCatalog.GlobalNodes)
+        {
+            if (node.Id == nodeId)
+                return;
+
+            AssertThat(state.BuyRank(node.Id)).IsTrue();
+        }
+    }
 }

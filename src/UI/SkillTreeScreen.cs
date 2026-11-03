@@ -6,16 +6,18 @@ namespace GeometryTowerDefense;
 
 /// <summary>
 /// Title-screen skill tree. Shows the persistent Skill Point balance, a right-hand
-/// tower selector sidebar, and the selected tower's tree — trunk nodes on a vertical
-/// spine with seed nodes branching left/right off the bottom trunk. All 15 nodes are
-/// enabled as of Part 2: nodes show a buy button when unlocked, or render fully greyed
-/// (icon, name, and connecting line) when still locked behind a prerequisite. Built
-/// programmatically to match the rest of the codebase's UI (no .tscn).
+/// branch selector sidebar (Arrow, Cannon, Laser, Global), and the selected branch's
+/// tree — tower trunk nodes on a vertical spine with seed nodes branching left/right
+/// off the bottom trunk, or the four tower-independent global nodes chained down the
+/// spine. All nodes are enabled: nodes show a buy button when unlocked, or render fully
+/// greyed (icon, name, and connecting line) when still locked behind a prerequisite.
+/// Built programmatically to match the rest of the codebase's UI (no .tscn).
 ///
-/// Presentation: a procedural backdrop lattice with a tower-colored spine glow, two-layer
-/// branch lines, distinct per-node glyphs with halos/locked/max styling, a row hover
-/// highlight, styled Buy buttons, and a fixed bottom info band that describes the hovered
-/// skill. All decorations are click-through; rows own the hover signals.
+/// Presentation: a procedural backdrop lattice with a branch-colored spine glow,
+/// two-layer branch lines, distinct per-node glyphs with halos/locked/max styling, a row
+/// hover highlight, styled Buy buttons, and a fixed bottom info band that describes the
+/// hovered skill. The Global branch uses its own cyan accent. All decorations are
+/// click-through; rows own the hover signals.
 /// </summary>
 public partial class SkillTreeScreen : Control
 {
@@ -71,14 +73,16 @@ public partial class SkillTreeScreen : Control
     private string? _rowHoveredNodeId;
     private string? _buyHoveredNodeId;
     private float _pulseTime = 0f;
-    private readonly Dictionary<string, (Label RankLabel, Button BuyButton)> _rows = new();
+    private readonly Dictionary<string, (Label RankLabel, Button BuyButton, int MaxRanks)> _rows = new();
     // Built-time icon state so the per-frame halo pulse never re-walks the catalog
     // (SkillTreeCatalog lookups allocate); a purchase or tab switch rebuilds the rows.
     private readonly Dictionary<string, (Control Icon, bool Unlocked)> _rowIcons = new();
     private readonly Dictionary<string, Control> _rowWrappers = new();
     private readonly Dictionary<string, Vector2> _nodeAnchors = new();
-    private readonly Dictionary<TowerType, (Button Button, Label Label, Control Icon)> _sidebarButtons = new();
-    private TowerType _selectedTower = TowerType.Arrow;
+    // Sidebar selection: a tower type, or null for the tower-independent Global tab.
+    // Each entry keeps its own branch so the selected style is a direct comparison.
+    private readonly List<(Button Button, Label Label, Control Icon, TowerType? Branch)> _sidebarButtons = new();
+    private TowerType? _selectedTower = TowerType.Arrow;
 
     public SkillTreeScreen(SkillTree skillTree)
     {
@@ -103,12 +107,12 @@ public partial class SkillTreeScreen : Control
 
         _spLabel.Text = $"Skill Points: {_skillTree.State.SkillPoints}";
 
-        Color accent = TowerColor(_selectedTower);
+        Color accent = BranchColor(_selectedTower);
         foreach (var (nodeId, row) in _rows)
         {
             int rank = _skillTree.State.GetRank(nodeId);
-            bool maxed = rank >= GameConstants.SkillMaxRanks;
-            row.RankLabel.Text = $"{rank}/{GameConstants.SkillMaxRanks}";
+            bool maxed = rank >= row.MaxRanks;
+            row.RankLabel.Text = $"{rank}/{row.MaxRanks}";
             row.BuyButton.Disabled = !_skillTree.State.CanBuyRank(nodeId);
             row.BuyButton.Text = maxed
                 ? "MAX"
@@ -208,7 +212,7 @@ public partial class SkillTreeScreen : Control
 
         int rank = _skillTree.State.GetRank(nodeId);
         _infoName.Text = node.DisplayName;
-        _infoRank.Text = $"{rank}/{GameConstants.SkillMaxRanks}";
+        _infoRank.Text = $"{rank}/{node.MaxRanks}";
 
         string text = node.Description;
         if (!_skillTree.State.IsUnlocked(nodeId))
@@ -518,7 +522,7 @@ public partial class SkillTreeScreen : Control
 
         float spineX = 10f + _treeArea.Size.X / 2f;
         float width = GameConstants.SkillTreeBackdropSpineGlowWidth;
-        Color color = TowerColor(_selectedTower);
+        Color color = BranchColor(_selectedTower);
         for (int i = 3; i >= 1; i--)
         {
             float bandWidth = width / i;
@@ -529,22 +533,34 @@ public partial class SkillTreeScreen : Control
     }
 
     /// <summary>
-    /// Builds the right-hand sidebar with one toggle button per tower. Each button
-    /// carries a geometric glyph matching the tower's in-game shape; the selected
-    /// button glows and unselected ones are dimmed.
+    /// Builds the right-hand sidebar with one toggle button per tower plus the
+    /// tower-independent Global tab directly below the three tower entries. Each button
+    /// carries a geometric glyph; the selected button glows and unselected ones are
+    /// dimmed. The Global button is named <c>Tab_Global</c>; the three tower buttons
+    /// keep their historical <c>Sidebar_*</c> names.
     /// </summary>
     private void BuildSidebar(float x, float top, float width)
     {
         const float buttonHeight = 60f;
         const float buttonGap = 16f;
 
-        // Sidebar group: panel + tower buttons. The wrapper's origin is the panel's
+        var branches = new TowerType?[]
+        {
+            TowerType.Arrow,
+            TowerType.Cannon,
+            TowerType.Laser,
+            null, // Global
+        };
+
+        // Sidebar group: panel + branch buttons. The wrapper's origin is the panel's
         // top-left; children keep their global positions because their local offsets
         // are expressed relative to that origin.
         var sidebarBlock = new Control();
         sidebarBlock.Name = "Block_Sidebar";
         sidebarBlock.Position = new Vector2(x - 10f, top - 10f);
-        sidebarBlock.Size = new Vector2(width + 20f, 3 * buttonHeight + 2 * buttonGap + 20f);
+        sidebarBlock.Size = new Vector2(
+            width + 20f,
+            branches.Length * buttonHeight + (branches.Length - 1) * buttonGap + 20f);
         sidebarBlock.MouseFilter = MouseFilterEnum.Ignore;
         AddChild(sidebarBlock);
 
@@ -555,33 +571,32 @@ public partial class SkillTreeScreen : Control
         panel.Color = new Color(0.08f, 0.08f, 0.16f, 0.9f);
         sidebarBlock.AddChild(panel);
 
-        var towers = new[] { TowerType.Arrow, TowerType.Cannon, TowerType.Laser };
-        for (int i = 0; i < towers.Length; i++)
+        for (int i = 0; i < branches.Length; i++)
         {
-            var type = towers[i];
-            var color = TowerColor(type);
+            var branch = branches[i];
+            var color = BranchColor(branch);
 
             var button = new Button();
-            button.Name = $"Sidebar_{TowerKey(type)}";
+            button.Name = branch.HasValue ? $"Sidebar_{TowerKey(branch.Value)}" : "Tab_Global";
             button.Size = new Vector2(width, buttonHeight);
             button.Position = new Vector2(10f, 10f + i * (buttonHeight + buttonGap));
-            button.Pressed += () => SelectTower(type);
+            button.Pressed += () => SelectBranch(branch);
 
-            var icon = CreateTowerIcon(type, color);
+            var icon = CreateTowerIcon(branch, color);
             icon.Name = "Icon";
             icon.Position = new Vector2(10f, (buttonHeight - 22f) / 2f);
             button.AddChild(icon);
 
             var label = new Label();
             label.Name = "Label";
-            label.Text = TowerName(type);
+            label.Text = branch.HasValue ? TowerName(branch.Value) : "Global";
             label.Position = new Vector2(40f, (buttonHeight - 24f) / 2f);
             label.Size = new Vector2(width - 60f, 24f);
             label.AddThemeFontSizeOverride("font_size", 14);
             label.MouseFilter = MouseFilterEnum.Ignore;
             button.AddChild(label);
 
-            _sidebarButtons[type] = (button, label, icon);
+            _sidebarButtons.Add((button, label, icon, branch));
             sidebarBlock.AddChild(button);
         }
 
@@ -589,16 +604,16 @@ public partial class SkillTreeScreen : Control
     }
 
     /// <summary>
-    /// Tints the sidebar buttons so the selected tower is highlighted and the others are
-    /// dimmed. The icon repaints only on selection change (its halo reads the live
+    /// Tints the sidebar buttons so the selected branch is highlighted and the others
+    /// are dimmed. The icon repaints only on selection change (its halo reads the live
     /// selection), never per frame.
     /// </summary>
     private void UpdateSidebarStyles()
     {
-        foreach (var (type, entry) in _sidebarButtons)
+        foreach (var entry in _sidebarButtons)
         {
-            bool selected = type == _selectedTower;
-            var color = TowerColor(type);
+            bool selected = entry.Branch == _selectedTower;
+            var color = BranchColor(entry.Branch);
             ApplySidebarStyle(entry.Button, selected, color);
             entry.Label.AddThemeColorOverride(
                 "font_color",
@@ -632,21 +647,22 @@ public partial class SkillTreeScreen : Control
         button.AddThemeStyleboxOverride("focus", normal);
     }
 
-    private void SelectTower(TowerType type)
+    private void SelectBranch(TowerType? branch)
     {
         if (_treeArea == null)
             return;
 
-        _selectedTower = type;
+        _selectedTower = branch;
         UpdateSidebarStyles();
         RenderTree();
     }
 
     /// <summary>
-    /// Rebuilds the main area for the currently-selected tower: a header, a line layer
+    /// Rebuilds the main area for the currently-selected branch: a header, a line layer
     /// drawing the trunk spine + seed branches, a hover-highlight decoration, and one
-    /// node row per catalog entry. Ends by resetting the info band and repopulating rank
-    /// labels and buy-button state, so every rebuild (initial load, tower switch,
+    /// node row per catalog entry. The Global tab renders the tower-independent chain
+    /// on the same vertical spine. Ends by resetting the info band and repopulating rank
+    /// labels and buy-button state, so every rebuild (initial load, tab switch,
     /// purchase) is self-consistent and no caller has to remember a follow-up refresh.
     /// </summary>
     private void RenderTree()
@@ -656,11 +672,13 @@ public partial class SkillTreeScreen : Control
 
         ClearTreeArea();
 
-        var color = TowerColor(_selectedTower);
-        var nodes = SkillTreeCatalog.ForTower(_selectedTower).ToList();
+        var color = BranchColor(_selectedTower);
+        IReadOnlyList<SkillNodeDefinition> nodes = _selectedTower.HasValue
+            ? SkillTreeCatalog.ForTower(_selectedTower.Value).ToList()
+            : SkillTreeCatalog.GlobalNodes;
         ComputeNodeAnchors(nodes, _treeArea.Size.X);
 
-        // Backdrop glow color follows the selected tower; repaint only on rebuild.
+        // Backdrop glow color follows the selected branch; repaint only on rebuild.
         _treeBackdrop?.QueueRedraw();
 
         // Connection lines first so node rows render on top of them.
@@ -682,8 +700,8 @@ public partial class SkillTreeScreen : Control
         _rowHighlight.Draw += () => DrawRowHighlight(_rowHighlight);
         _treeArea.AddChild(_rowHighlight);
 
-        // Tower header above the tree, wrapped as a named visual group.
-        var (name, specs) = TowerInfo(_selectedTower);
+        // Branch header above the tree, wrapped as a named visual group.
+        var (name, specs) = BranchInfo(_selectedTower);
         var headerBlock = new Control();
         headerBlock.Name = "Block_TreeHeader";
         headerBlock.Position = new Vector2(0, 10);
@@ -691,7 +709,7 @@ public partial class SkillTreeScreen : Control
         headerBlock.MouseFilter = MouseFilterEnum.Ignore;
         _treeArea.AddChild(headerBlock);
 
-        var selectedType = _selectedTower;
+        var selectedBranch = _selectedTower;
         var emblem = new Control();
         emblem.Name = "Emblem";
         emblem.Position = new Vector2(10f, 10f);
@@ -700,7 +718,10 @@ public partial class SkillTreeScreen : Control
         emblem.Draw += () =>
         {
             if (!IsInstanceValid(emblem)) return;
-            TowerGlyphs.Draw(emblem, selectedType, new Vector2(12f, 12f), 10f, color);
+            if (selectedBranch.HasValue)
+                TowerGlyphs.Draw(emblem, selectedBranch.Value, new Vector2(12f, 12f), 10f, color);
+            else
+                SkillGlyphs.DrawGlobalBranch(emblem, new Vector2(12f, 12f), 10f, color);
         };
         headerBlock.AddChild(emblem);
 
@@ -873,7 +894,7 @@ public partial class SkillTreeScreen : Control
         bool locked = node.Enabled && !_skillTree.State.IsUnlocked(node.Id);
         bool active = node.Enabled && !locked;
         int rank = _skillTree.State.GetRank(node.Id);
-        bool maxed = rank >= GameConstants.SkillMaxRanks;
+        bool maxed = rank >= node.MaxRanks;
 
         // Row wrapper: fixed span from the icon edge on the branch side to the buy
         // column edge on the content side. Its origin is the row's top-left, and every
@@ -919,7 +940,7 @@ public partial class SkillTreeScreen : Control
 
         var rankLabel = new Label();
         rankLabel.Name = "Rank";
-        rankLabel.Text = "0/5";
+        rankLabel.Text = $"0/{node.MaxRanks}";
         rankLabel.Position = new Vector2(ContentX(anchor.X, RankOffset, RankWidth, contentOnLeft), anchor.Y - 10f) - rowOrigin;
         rankLabel.Size = new Vector2(RankWidth, 20f);
         rankLabel.AddThemeFontSizeOverride("font_size", 14);
@@ -955,7 +976,7 @@ public partial class SkillTreeScreen : Control
                 OnBuyMouseExited(node.Id);
             };
             row.AddChild(buyButton);
-            _rows[node.Id] = (rankLabel, buyButton);
+            _rows[node.Id] = (rankLabel, buyButton, node.MaxRanks);
         }
 
         // Hover surface: the row wrapper owns the signals; the icon (Ignore) is inside
@@ -1093,11 +1114,11 @@ public partial class SkillTreeScreen : Control
     }
 
     /// <summary>
-    /// Small geometric tower icon used in the sidebar, matching each tower's in-game
-    /// shape: arrow = triangle, cannon = circle with barrel, laser = diamond/emitter.
-    /// A selected tower gains a soft glow halo (repainted on selection change only).
+    /// Small geometric 22x22 sidebar icon. A tower type draws its in-game shape; a
+    /// null type draws the Global branch glyph. The selected branch gains a soft glow
+    /// halo (repainted on selection change only).
     /// </summary>
-    private Control CreateTowerIcon(TowerType type, Color color)
+    private Control CreateTowerIcon(TowerType? type, Color color)
     {
         var icon = new Control();
         icon.Size = new Vector2(22f, 22f);
@@ -1112,7 +1133,11 @@ public partial class SkillTreeScreen : Control
                 icon.DrawCircle(center, 10f, color with { A = 0.3f });
                 icon.DrawCircle(center, 10f, color, false, 1.5f);
             }
-            TowerGlyphs.Draw(icon, type, center, 7.5f, color);
+
+            if (type.HasValue)
+                TowerGlyphs.Draw(icon, type.Value, center, 7.5f, color);
+            else
+                SkillGlyphs.DrawGlobalBranch(icon, center, 7.5f, color);
         };
         return icon;
     }
@@ -1131,14 +1156,18 @@ public partial class SkillTreeScreen : Control
         _ => "arrow"
     };
 
-    private static (string Name, string Specializations) TowerInfo(TowerType type) => type switch
+    private static (string Name, string Specializations) BranchInfo(TowerType? type) => type switch
     {
         TowerType.Cannon => ("CANNON TOWER", "Bombardier | Concussive"),
         TowerType.Laser => ("LASER TOWER", "Arc/Chain | Melter"),
-        _ => ("ARROW TOWER", "Sharpshooter | Barrage")
+        TowerType.Arrow => ("ARROW TOWER", "Sharpshooter | Barrage"),
+        null => ("GLOBAL SKILLS", "Every Tower, Every Run"),
+        _ => throw new System.ArgumentOutOfRangeException(
+            nameof(type), type, "Unknown tower type.")
     };
 
-    private static Color TowerColor(TowerType type) => TowerGlyphs.ColorFor(type);
+    private static Color BranchColor(TowerType? type) =>
+        type.HasValue ? TowerGlyphs.ColorFor(type.Value) : GameConstants.SkillGlobalAccentColor;
 
     /// <summary>
     /// Stops the halo-pulse processing entirely while the screen is hidden (matching

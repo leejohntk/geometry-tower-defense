@@ -17,7 +17,11 @@ public enum SkillGlyphKind
     Beam,
     BeamCapped,
     Flame,
-    Seed
+    Seed,
+    FortifiedCore,
+    WarChest,
+    MasterBlueprints,
+    AdvancedTraining
 }
 
 /// <summary>
@@ -42,6 +46,10 @@ public static class SkillGlyphs
         SkillTreeCatalog.LaserDps => SkillGlyphKind.Beam,
         SkillTreeCatalog.LaserRange => SkillGlyphKind.BeamCapped,
         SkillTreeCatalog.LaserIgnite => SkillGlyphKind.Flame,
+        SkillTreeCatalog.GlobalStartingHp => SkillGlyphKind.FortifiedCore,
+        SkillTreeCatalog.GlobalStartingGold => SkillGlyphKind.WarChest,
+        SkillTreeCatalog.GlobalTowerDiscount => SkillGlyphKind.MasterBlueprints,
+        SkillTreeCatalog.GlobalUpgradeDiscount => SkillGlyphKind.AdvancedTraining,
         _ => SkillGlyphKind.Seed
     };
 
@@ -119,6 +127,49 @@ public static class SkillGlyphs
             case SkillGlyphKind.Flame:
                 DrawFlame(target, center, radius, color);
                 break;
+
+            case SkillGlyphKind.FortifiedCore:
+                DrawFortifiedCore(target, center, radius, color);
+                break;
+
+            case SkillGlyphKind.WarChest:
+                DrawWarChest(target, center, radius, color);
+                break;
+
+            case SkillGlyphKind.MasterBlueprints:
+                DrawMasterBlueprints(target, center, radius, color);
+                break;
+
+            case SkillGlyphKind.AdvancedTraining:
+                DrawAdvancedTraining(target, center, radius, color);
+                break;
+        }
+    }
+
+    /// <summary>
+    /// Sidebar glyph for the tower-independent global branch: a hollow circle with four
+    /// square nodes at the compass points, distinct from the three tower icons.
+    /// </summary>
+    public static void DrawGlobalBranch(CanvasItem target, Vector2 center, float radius, Color color)
+    {
+        if (target == null || !GodotObject.IsInstanceValid(target) || !(radius > 0f))
+            return;
+
+        target.DrawCircle(center, radius * 0.62f, color, false, 1.6f, antialiased: true);
+
+        float nodeSize = radius * 0.3f;
+        float half = nodeSize / 2f;
+        float distance = radius * 0.92f;
+        foreach (var direction in new[] { Vector2.Up, Vector2.Down, Vector2.Left, Vector2.Right })
+        {
+            var nodeCenter = center + direction * distance;
+            target.DrawRect(
+                new Rect2(
+                    nodeCenter.X - half,
+                    nodeCenter.Y - half,
+                    nodeSize,
+                    nodeSize),
+                color);
         }
     }
 
@@ -285,6 +336,139 @@ public static class SkillGlyphs
         };
         target.DrawColoredPolygon(points, color);
         OutlinePolygon(target, points, color);
+    }
+
+    /// <summary>Fortified Core: a hexagonal shield outline with an inner vertical bar.</summary>
+    private static void DrawFortifiedCore(CanvasItem target, Vector2 center, float radius, Color color)
+    {
+        var points = new Vector2[6];
+        for (int i = 0; i < points.Length; i++)
+        {
+            float angle = -Mathf.Pi / 2f + Mathf.Tau * i / points.Length;
+            points[i] = center + new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * (radius * 0.92f);
+        }
+        OutlinePolygon(target, points, color);
+
+        target.DrawLine(
+            new Vector2(center.X, center.Y - radius * 0.45f),
+            new Vector2(center.X, center.Y + radius * 0.45f),
+            color,
+            1.8f,
+            antialiased: true);
+    }
+
+    /// <summary>
+    /// War Chest: two offset coin circles with a square centre cutout, reading as a
+    /// purse/chest of coins rather than one flat circle.
+    /// </summary>
+    private static void DrawWarChest(CanvasItem target, Vector2 center, float radius, Color color)
+    {
+        float coinRadius = radius * 0.5f;
+        var upperLeft = center + new Vector2(-radius * 0.24f, -radius * 0.2f);
+        var lowerRight = center + new Vector2(radius * 0.24f, radius * 0.2f);
+
+        target.DrawCircle(upperLeft, coinRadius, color, false, 1.5f, antialiased: true);
+        target.DrawCircle(lowerRight, coinRadius, color, false, 1.5f, antialiased: true);
+
+        float square = radius * 0.5f;
+        target.DrawRect(
+            new Rect2(
+                center.X - square / 2f,
+                center.Y - square / 2f,
+                square,
+                square),
+            color,
+            filled: false,
+            width: 1.5f);
+    }
+
+    /// <summary>
+    /// Master Blueprints: a rectangular sheet with internal grid lines and a downward
+    /// chevron beneath it, reading as a discounted build plan.
+    /// </summary>
+    private static void DrawMasterBlueprints(CanvasItem target, Vector2 center, float radius, Color color)
+    {
+        var sheet = new Rect2(
+            center.X - radius * 0.82f,
+            center.Y - radius * 0.82f,
+            radius * 1.64f,
+            radius * 1.18f);
+        target.DrawRect(sheet, color, filled: false, width: 1.5f);
+
+        // Two vertical and two horizontal grid lines inside the sheet.
+        float left = sheet.Position.X;
+        float right = sheet.End.X;
+        float top = sheet.Position.Y;
+        float bottom = sheet.End.Y;
+        target.DrawLine(
+            new Vector2(center.X - radius * 0.3f, top),
+            new Vector2(center.X - radius * 0.3f, bottom),
+            color,
+            1f,
+            antialiased: true);
+        target.DrawLine(
+            new Vector2(center.X + radius * 0.3f, top),
+            new Vector2(center.X + radius * 0.3f, bottom),
+            color,
+            1f,
+            antialiased: true);
+        target.DrawLine(
+            new Vector2(left, center.Y - radius * 0.3f),
+            new Vector2(right, center.Y - radius * 0.3f),
+            color,
+            1f,
+            antialiased: true);
+        target.DrawLine(
+            new Vector2(left, center.Y + radius * 0.12f),
+            new Vector2(right, center.Y + radius * 0.12f),
+            color,
+            1f,
+            antialiased: true);
+
+        // Downward chevron: the "discount" mark below the sheet.
+        target.DrawPolyline(
+            new[]
+            {
+                new Vector2(center.X - radius * 0.36f, center.Y + radius * 0.55f),
+                new Vector2(center.X, center.Y + radius * 0.85f),
+                new Vector2(center.X + radius * 0.36f, center.Y + radius * 0.55f),
+            },
+            color,
+            1.5f,
+            antialiased: true);
+    }
+
+    /// <summary>
+    /// Advanced Training: three stacked upward chevrons with a downward notch beneath
+    /// them, visually echoing the in-level rank chevrons.
+    /// </summary>
+    private static void DrawAdvancedTraining(CanvasItem target, Vector2 center, float radius, Color color)
+    {
+        for (int i = 0; i < 3; i++)
+        {
+            float baseY = center.Y + radius * 0.4f - i * radius * 0.42f;
+            target.DrawPolyline(
+                new[]
+                {
+                    new Vector2(center.X - radius * 0.5f, baseY),
+                    new Vector2(center.X, baseY - radius * 0.32f),
+                    new Vector2(center.X + radius * 0.5f, baseY),
+                },
+                color,
+                1.5f,
+                antialiased: true);
+        }
+
+        target.DrawPolyline(
+            new[]
+            {
+                new Vector2(center.X - radius * 0.28f, center.Y + radius * 0.62f),
+                new Vector2(center.X, center.Y + radius * 0.85f),
+                new Vector2(center.X + radius * 0.28f, center.Y + radius * 0.62f),
+            },
+            color,
+            1.5f,
+            antialiased: true);
     }
 
     /// <summary>

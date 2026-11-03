@@ -17,8 +17,8 @@ public class SkillDescriptionsTest
     public void EveryNode_HasANonEmptyDescription()
     {
         // Player-facing text describes each node's own effect; identical wording (e.g.
-        // "+10% attack speed per rank.") is fine across different towers.
-        AssertThat(SkillTreeCatalog.All.Count).IsEqual(15);
+        // "+10% attack speed per rank.") is fine across different towers and branches.
+        AssertThat(SkillTreeCatalog.All.Count).IsEqual(19);
         foreach (var node in SkillTreeCatalog.All)
             AssertThat(node.Description.Length).IsGreater(0);
     }
@@ -36,7 +36,7 @@ public class SkillDescriptionsTest
     public void NoDescription_ContainsParentheticalInternals()
     {
         // Player-facing text never exposes internal calculation/window values.
-        AssertThat(SkillTreeCatalog.All.Count).IsEqual(15);
+        AssertThat(SkillTreeCatalog.All.Count).IsEqual(19);
         foreach (var node in SkillTreeCatalog.All)
         {
             AssertThat(node.Description.Contains('(')).IsFalse();
@@ -187,6 +187,47 @@ public class SkillDescriptionsTest
         AssertThat(SkillGlyphs.SeedArchetype(SkillTreeCatalog.LaserRampUp)).IsEqual(TowerArchetype.RampUp);
 
         AssertThat(SkillGlyphs.SeedArchetype(SkillTreeCatalog.ArrowDamage)).IsNull();
+    }
+
+    [TestCase]
+    public void GlobalDescriptions_MatchTheTuningNumbers()
+    {
+        string hp = SkillTreeCatalog.Description(SkillTreeCatalog.GlobalStartingHp);
+        AssertThat(hp.Contains("+1")).IsTrue();
+        AssertThat(hp.Contains("HP")).IsTrue();
+
+        string gold = SkillTreeCatalog.Description(SkillTreeCatalog.GlobalStartingGold);
+        AssertThat(gold.Contains("+2")).IsTrue();
+        AssertThat(gold.Contains("gold")).IsTrue();
+
+        string towerDiscount = SkillTreeCatalog.Description(SkillTreeCatalog.GlobalTowerDiscount);
+        AssertThat(towerDiscount.Contains("placement")).IsTrue();
+        AssertThat(towerDiscount.Contains("1 less coin")).IsTrue();
+
+        string upgradeDiscount = SkillTreeCatalog.Description(SkillTreeCatalog.GlobalUpgradeDiscount);
+        AssertThat(upgradeDiscount.Contains("upgrade")).IsTrue();
+        AssertThat(upgradeDiscount.Contains("1 less coin")).IsTrue();
+    }
+
+    [TestCase]
+    public void GlobalGlyphs_AreDistinctFromTheTowerAndSeedGlyphs()
+    {
+        var kinds = new HashSet<SkillGlyphKind>();
+        foreach (var node in SkillTreeCatalog.GlobalNodes)
+        {
+            var kind = SkillGlyphs.For(node.Id);
+            AssertThat(kind).IsNotEqual(SkillGlyphKind.Seed);
+            AssertThat(kinds.Add(kind)).IsTrue();
+        }
+
+        AssertThat(SkillGlyphs.For(SkillTreeCatalog.GlobalStartingHp))
+            .IsEqual(SkillGlyphKind.FortifiedCore);
+        AssertThat(SkillGlyphs.For(SkillTreeCatalog.GlobalStartingGold))
+            .IsEqual(SkillGlyphKind.WarChest);
+        AssertThat(SkillGlyphs.For(SkillTreeCatalog.GlobalTowerDiscount))
+            .IsEqual(SkillGlyphKind.MasterBlueprints);
+        AssertThat(SkillGlyphs.For(SkillTreeCatalog.GlobalUpgradeDiscount))
+            .IsEqual(SkillGlyphKind.AdvancedTraining);
     }
 
     [TestCase]

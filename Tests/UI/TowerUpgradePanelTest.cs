@@ -73,6 +73,70 @@ public class TowerUpgradePanelTest
     // === Standalone panel: structure, hidden gate, single action ===
 
     [TestCase]
+    public void DiscountedUpgrade_ShowsEffectivePrice_AndAffordability()
+    {
+        var state = new SkillTreeState();
+        state.SetRank(SkillTreeCatalog.GlobalUpgradeDiscount, 3);
+        var tower = MakeTower(TowerType.Arrow, 5, 10);
+        tower.AddXp(5f);
+
+        var panel = new TowerUpgradePanel();
+        ((SceneTree)Engine.GetMainLoop()).Root.AddChild(panel);
+        try
+        {
+            panel.SkillState = state;
+            panel.ShowFor(tower, 2); // base rank-1 cost is 5, discounted is 2
+
+            var buy = panel.GetNode<Button>("Block_Upgrade/Buy");
+            AssertThat(buy.Text).IsEqual("Upgrade 2");
+            AssertThat(buy.Disabled).IsFalse();
+
+            panel.UpdateCoins(1);
+            AssertThat(buy.Disabled).IsTrue();
+
+            panel.UpdateCoins(2);
+            AssertThat(buy.Disabled).IsFalse();
+        }
+        finally
+        {
+            Free(panel);
+        }
+    }
+
+    [TestCase]
+    public void DiscountedArchetypeCards_ShowEffectivePrice_AndAffordability()
+    {
+        var state = new SkillTreeState();
+        state.SetRank(SkillTreeCatalog.GlobalUpgradeDiscount, 3);
+        var tower = MakeTower(TowerType.Arrow, 5, 10);
+        tower.AddXp(30f);
+        RaiseToRank2(tower);
+
+        var panel = new TowerUpgradePanel();
+        ((SceneTree)Engine.GetMainLoop()).Root.AddChild(panel);
+        try
+        {
+            panel.SkillState = state;
+            panel.ShowFor(tower, 12); // base rank-3 cost is 15, discounted is 12
+
+            var left = panel.GetNode<Button>("Block_ArchetypeChoice/Card_Pierce");
+            var right = panel.GetNode<Button>("Block_ArchetypeChoice/Card_Crit");
+            AssertThat(left.Disabled).IsFalse();
+            AssertThat(right.Disabled).IsFalse();
+            AssertThat(left.GetNode<Label>("Cost").Text).IsEqual("12$");
+            AssertThat(right.GetNode<Label>("Cost").Text).IsEqual("12$");
+
+            panel.UpdateCoins(11);
+            AssertThat(left.Disabled).IsTrue();
+            AssertThat(right.Disabled).IsTrue();
+        }
+        finally
+        {
+            Free(panel);
+        }
+    }
+
+    [TestCase]
     public void Panel_HasOnlyActionGroups_NoHeader_AndConsumesMouseInput()
     {
         var tower = MakeTower(TowerType.Arrow, 5, 10);
@@ -592,6 +656,11 @@ public class TowerUpgradePanelTest
 
         var main = new Main();
         ((SceneTree)Engine.GetMainLoop()).Root.AddChild(main);
+
+        // Enter with a deterministic zero-rank skill tree: saved global upgrade
+        // discounts would otherwise change the panel's displayed prices and coin
+        // deductions. The in-memory tree never writes to the real save.
+        NodeTestSupport.IsolateSkillTree(main);
 
         main.GetChildren().OfType<TitleScreen>().Single()
             .GetNode<Button>("Block_LevelMenu/Level1")

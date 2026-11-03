@@ -6,32 +6,36 @@ using static GdUnit4.Assertions;
 namespace GeometryTowerDefense.Tests;
 
 /// <summary>
-/// Catalog integrity tests: exactly 15 nodes, all enabled as of Part 2 (8 stat nodes
-/// + 7 mechanic nodes), 5 per tower (3 trunk + 2 seed), and unique ids.
+/// Catalog integrity tests: exactly 19 nodes (15 tower + 4 global), all enabled,
+/// 5 per tower (3 trunk + 2 seed), 4 tower-independent global nodes in unlock order,
+/// and unique ids.
 /// </summary>
 [TestSuite]
 public class SkillTreeCatalogTest
 {
     [TestCase]
-    public void Catalog_ContainsExactlyFifteenNodes()
+    public void Catalog_ContainsExactlyNineteenNodes()
     {
-        AssertThat(SkillTreeCatalog.All.Count).IsEqual(15);
+        AssertThat(SkillTreeCatalog.All.Count).IsEqual(19);
     }
 
     [TestCase]
-    public void Catalog_AllFifteenNodes_AreEnabled()
+    public void Catalog_AllNineteenNodes_AreEnabled()
     {
         int enabled = CountNodes(n => n.Enabled);
-        AssertThat(enabled).IsEqual(15);
+        AssertThat(enabled).IsEqual(19);
     }
 
     [TestCase]
-    public void Catalog_HasEightStatAndSevenMechanicNodes()
+    public void Catalog_HasEightStatAndSevenMechanicTowerNodes()
     {
         int stat = 0;
         int mechanic = 0;
         foreach (var node in SkillTreeCatalog.All)
         {
+            if (node.TowerType == null)
+                continue;
+
             if (IsMechanicNode(node.Id)) mechanic++;
             else stat++;
         }
@@ -64,7 +68,86 @@ public class SkillTreeCatalogTest
         foreach (var type in new[] { TowerType.Arrow, TowerType.Cannon, TowerType.Laser })
         {
             AssertThat(CountTowerNodes(type)).IsEqual(5);
+            foreach (var node in SkillTreeCatalog.ForTower(type))
+            {
+                // Tower tabs never leak the tower-independent global nodes.
+                AssertThat(node.TowerType.HasValue).IsTrue();
+                AssertThat(node.TowerType!.Value).IsEqual(type);
+                AssertThat(node.IsGlobal).IsFalse();
+            }
         }
+    }
+
+    [TestCase]
+    public void Catalog_GlobalNodes_HaveTheSpecifiedIdsNamesAndMaxRanks()
+    {
+        var expected = new (string Id, string Name, int MaxRanks)[]
+        {
+            (SkillTreeCatalog.GlobalStartingHp, "Fortified Core", 5),
+            (SkillTreeCatalog.GlobalStartingGold, "War Chest", 5),
+            (SkillTreeCatalog.GlobalTowerDiscount, "Master Blueprints", 3),
+            (SkillTreeCatalog.GlobalUpgradeDiscount, "Advanced Training", 3),
+        };
+
+        AssertThat(SkillTreeCatalog.GlobalNodes.Count).IsEqual(4);
+        for (int i = 0; i < expected.Length; i++)
+        {
+            var node = SkillTreeCatalog.GlobalNodes[i];
+            AssertThat(node.Id).IsEqual(expected[i].Id);
+            AssertThat(node.DisplayName).IsEqual(expected[i].Name);
+            AssertThat(node.MaxRanks).IsEqual(expected[i].MaxRanks);
+            AssertThat(node.TowerType.HasValue).IsFalse();
+            AssertThat(node.IsGlobal).IsTrue();
+            AssertThat(node.Enabled).IsTrue();
+        }
+
+        // All includes the same four global nodes alongside the 15 tower nodes.
+        foreach (var global in SkillTreeCatalog.GlobalNodes)
+        {
+            bool found = false;
+            foreach (var node in SkillTreeCatalog.All)
+            {
+                if (ReferenceEquals(node, global))
+                    found = true;
+            }
+            AssertThat(found).IsTrue();
+        }
+    }
+
+    [TestCase]
+    public void Catalog_TowerNodes_DefaultToFiveMaxRanks()
+    {
+        foreach (var node in SkillTreeCatalog.All)
+        {
+            if (node.TowerType == null)
+                continue;
+
+            AssertThat(node.MaxRanks).IsEqual(GameConstants.SkillMaxRanks);
+        }
+    }
+
+    [TestCase]
+    public void GetPrerequisite_GlobalNodes_ChainInUnlockOrder()
+    {
+        AssertThat(SkillTreeCatalog.GetPrerequisite(SkillTreeCatalog.GlobalStartingHp)).IsNull();
+        AssertThat(SkillTreeCatalog.GetPrerequisite(SkillTreeCatalog.GlobalStartingGold))
+            .IsEqual(SkillTreeCatalog.GlobalStartingHp);
+        AssertThat(SkillTreeCatalog.GetPrerequisite(SkillTreeCatalog.GlobalTowerDiscount))
+            .IsEqual(SkillTreeCatalog.GlobalStartingGold);
+        AssertThat(SkillTreeCatalog.GetPrerequisite(SkillTreeCatalog.GlobalUpgradeDiscount))
+            .IsEqual(SkillTreeCatalog.GlobalTowerDiscount);
+    }
+
+    [TestCase]
+    public void UnlockHint_NamesThePreviousGlobalNode()
+    {
+        AssertThat(SkillTreeCatalog.UnlockHint(SkillTreeCatalog.GlobalStartingHp)).IsNull();
+        AssertThat(SkillTreeCatalog.UnlockHint(SkillTreeCatalog.GlobalStartingGold))
+            .IsEqual("Unlocks after Fortified Core reaches rank 1.");
+        AssertThat(SkillTreeCatalog.UnlockHint(SkillTreeCatalog.GlobalTowerDiscount))
+            .IsEqual("Unlocks after War Chest reaches rank 1.");
+        AssertThat(SkillTreeCatalog.UnlockHint(SkillTreeCatalog.GlobalUpgradeDiscount))
+            .IsEqual("Unlocks after Master Blueprints reaches rank 1.");
     }
 
     [TestCase]
