@@ -172,6 +172,49 @@ public class GameHudPlacementCardTest
     }
 
     [TestCase]
+    public void PlacementCards_ShowEffectivePrices_AndUseThemForAffordability()
+    {
+        var hud = BuildHud();
+        var manager = new GameManager();
+        var state = new SkillTreeState();
+        state.SetRank(SkillTreeCatalog.GlobalTowerDiscount, 3);
+        manager.SkillTree = new SkillTree(state, _ => true);
+        try
+        {
+            manager.Initialize(Levels.Level3); // all three towers allowed, 10 coins
+            hud.ConfigureForLevel(Levels.Level3);
+            hud.SkillState = state;
+            hud.ConnectToGameManager(manager);
+
+            // Every card shows the discounted 7, not the base 10.
+            foreach (var name in new[] { "PlaceArrow", "PlaceCannon", "PlaceLaser" })
+            {
+                var card = hud.GetNode<Button>($"Block_Sidebar/{name}");
+                AssertThat(card.GetNode<Label>("Cost").Text).IsEqual("7");
+                AssertThat(card.Disabled).IsFalse();
+            }
+
+            // 10 -> 3 after one discounted placement: all cards become unaffordable.
+            manager.PlacingTowerType = TowerType.Arrow;
+            AssertThat(manager.PlaceTower(0, 0)).IsTrue();
+            AssertThat(manager.Coins).IsEqual(3);
+            foreach (var name in new[] { "PlaceArrow", "PlaceCannon", "PlaceLaser" })
+                AssertThat(hud.GetNode<Button>($"Block_Sidebar/{name}").Disabled).IsTrue();
+
+            // Exactly the discounted price is enough again.
+            manager.AddCoinsForTesting(4);
+            AssertThat(hud.GetNode<Button>("Block_Sidebar/PlaceCannon").Disabled).IsFalse();
+            AssertThat(hud.GetNode<Button>("Block_Sidebar/PlaceLaser").Disabled).IsFalse();
+            AssertThat(hud.GetNode<Button>("Block_Sidebar/PlaceArrow").Disabled).IsFalse();
+        }
+        finally
+        {
+            manager.QueueFree();
+            NodeTestSupport.Cleanup(hud);
+        }
+    }
+
+    [TestCase]
     public void StartWaveButton_KeepsItsPathAndEmits()
     {
         var hud = BuildHud();

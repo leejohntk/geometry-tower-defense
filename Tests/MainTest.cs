@@ -71,6 +71,11 @@ public class MainTest
         var main = new Main();
         ((SceneTree)Engine.GetMainLoop()).Root.AddChild(main);
 
+        // Enter with a deterministic zero-rank skill tree: the player's real save may
+        // contain global starting-stat or discount ranks, and these tests assert the
+        // base economy. The in-memory tree never writes to the real save.
+        NodeTestSupport.IsolateSkillTree(main);
+
         // Start Level 1 through the real title-screen button signal.
         var title = main.GetChildren().OfType<TitleScreen>().Single();
         title.GetNode<Button>("Block_LevelMenu/Level1")

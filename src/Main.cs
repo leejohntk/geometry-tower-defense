@@ -60,6 +60,7 @@ public partial class Main : Node2D
         // Create HUD (hidden initially)
         _gameHUD = new GameHUD();
         _gameHUD.Name = "GameHUD";
+        _gameHUD.SkillState = _skillTree?.State;
         _gameHUD.StartWavePressed += OnStartWavePressed;
         _gameHUD.PlaceTowerPressed += OnPlaceTowerPressed;
         _gameHUD.Visible = false;
@@ -69,6 +70,7 @@ public partial class Main : Node2D
         // Added before the result screens so those overlays always draw on top; the
         // panel is also explicitly closed before a result screen is shown.
         _upgradePanel = new TowerUpgradePanel();
+        _upgradePanel.SkillState = _skillTree?.State;
         _upgradePanel.UpgradeRequested += OnTowerUpgradeRequested;
         _upgradePanel.ArchetypeChosen += OnTowerArchetypeChosen;
         _gameManager.CoinsChanged += OnCoinsChangedForUpgradePanel;
@@ -243,10 +245,10 @@ public partial class Main : Node2D
 
     /// <summary>
     /// True when play is active, the selected level allows the tower type, and the
-    /// current balance covers its full cost. This is the shared eligibility rule for
-    /// sidebar-card clicks and number-key shortcut presses; it mirrors the HUD's card
-    /// disabled state so keyboard and mouse always agree. Affordability uses
-    /// <see cref="GameConstants.TowerCost"/>; availability uses the selected level.
+    /// current balance covers its effective cost (after the global Master Blueprints
+    /// discount). This is the shared eligibility rule for sidebar-card clicks and
+    /// number-key shortcut presses; it mirrors the HUD's card disabled state so
+    /// keyboard and mouse always agree.
     /// </summary>
     private bool CanSelectTowerForPlacement(TowerType type)
     {
@@ -260,7 +262,7 @@ public partial class Main : Node2D
             _ => true
         };
 
-        return allowedByLevel && _gameManager.Coins >= GameConstants.TowerCost(type);
+        return allowedByLevel && _gameManager.Coins >= _gameManager.EffectiveTowerCost(type);
     }
 
     private void OnGameOverTriggered()
@@ -663,7 +665,7 @@ public partial class Main : Node2D
 
         if (_gameManager.Grid.IsInBounds(row, col))
         {
-            bool enoughCoins = _gameManager.Coins >= GameConstants.TowerCost(type);
+            bool enoughCoins = _gameManager.Coins >= _gameManager.EffectiveTowerCost(type);
             bool canPlace = enoughCoins && _gameManager.Grid.CanPlaceTower(row, col);
             float rangeCells = SkillStats.RangeCells(type, _skillTree?.State);
             _gameManager.Grid.ShowPlacementPreview(row, col, canPlace, type, rangeCells);

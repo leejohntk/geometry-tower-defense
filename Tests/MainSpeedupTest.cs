@@ -24,6 +24,11 @@ public class MainSpeedupTest
         NodeTestSupport.ApplyProjectViewportSize();
         var main = NodeTestSupport.Attach(new Main());
 
+        // Enter with a deterministic zero-rank skill tree: saved global ranks would
+        // otherwise change starting HP/coins and tower costs. The in-memory tree's
+        // save delegate is a no-op, so the player's real save is never written.
+        NodeTestSupport.IsolateSkillTree(main);
+
         // Start Level 1 through the real title-screen button signal.
         var title = main.GetChildren().OfType<TitleScreen>().Single();
         title.GetNode<Button>("Block_LevelMenu/Level1")
@@ -406,10 +411,6 @@ public class MainSpeedupTest
         {
             var manager = GetManager(main);
 
-            // Victory awards SP and flushes it. Isolate the persistent skill tree so
-            // the test never writes to the player's real save (Main loaded it at ready).
-            manager.SkillTree = new SkillTree(new SkillTreeState(), _ => true);
-
             var cue = GetCue(main);
 
             PushKey(main, Key.Space); // start wave 1
@@ -451,10 +452,6 @@ public class MainSpeedupTest
         try
         {
             var manager = GetManager(main);
-
-            // Defeat awards SP and flushes it. Isolate the persistent skill tree so
-            // the test never writes to the player's real save (Main loaded it at ready).
-            manager.SkillTree = new SkillTree(new SkillTreeState(), _ => true);
 
             var cue = GetCue(main);
 

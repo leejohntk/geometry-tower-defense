@@ -44,21 +44,37 @@ public static class TowerUpgrades
         !IsMaxRank(rank) && xp >= XpThresholdToReachRank(rank + 1);
 
     /// <summary>
-    /// True when the generic chevron upgrade may be bought right now. Rank 2 has no
-    /// generic third rank — that step is the archetype choice instead.
+    /// True when the generic chevron upgrade may be bought right now at the base
+    /// cost. Rank 2 has no generic third rank — that step is the archetype choice.
     /// </summary>
     public static bool CanBuyNextRank(int rank, float xp, int coins) =>
-        rank < GameConstants.TowerMaxRank - 1 &&
-        xp >= XpThresholdToReachRank(rank + 1) &&
-        coins >= CostToReachRank(rank + 1);
+        CanBuyNextRank(rank, xp, coins, CostToReachRank(rank + 1));
 
     /// <summary>
-    /// True when the rank 2 -> 3 archetype choice may be bought right now.
+    /// Same gate as <see cref="CanBuyNextRank(int, float, int)"/> with an explicit
+    /// (skill-discounted) coin cost. This type stays the base-cost source; callers
+    /// pass the effective cost from <see cref="SkillStats.EffectiveUpgradeCost"/>.
+    /// </summary>
+    public static bool CanBuyNextRank(int rank, float xp, int coins, int cost) =>
+        rank < GameConstants.TowerMaxRank - 1 &&
+        xp >= XpThresholdToReachRank(rank + 1) &&
+        coins >= cost;
+
+    /// <summary>
+    /// True when the rank 2 -> 3 archetype choice may be bought right now at the
+    /// base cost.
     /// </summary>
     public static bool CanBuyArchetype(int rank, float xp, int coins) =>
+        CanBuyArchetype(rank, xp, coins, CostToReachRank(GameConstants.TowerMaxRank));
+
+    /// <summary>
+    /// Same gate as <see cref="CanBuyArchetype(int, float, int)"/> with an explicit
+    /// (skill-discounted) coin cost.
+    /// </summary>
+    public static bool CanBuyArchetype(int rank, float xp, int coins, int cost) =>
         rank == GameConstants.TowerMaxRank - 1 &&
         xp >= XpThresholdToReachRank(GameConstants.TowerMaxRank) &&
-        coins >= CostToReachRank(GameConstants.TowerMaxRank);
+        coins >= cost;
 
     // === Rank stat layering ===
 

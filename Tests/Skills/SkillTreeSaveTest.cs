@@ -92,6 +92,84 @@ public class SkillTreeSaveTest
     }
 
     [TestCase]
+    public void RoundTrip_PreservesGlobalRanks()
+    {
+        var state = new SkillTreeState();
+        state.SetSkillPoints(12);
+        state.SetRank(SkillTreeCatalog.GlobalStartingHp, 5);
+        state.SetRank(SkillTreeCatalog.GlobalStartingGold, 4);
+        state.SetRank(SkillTreeCatalog.GlobalTowerDiscount, 3);
+        state.SetRank(SkillTreeCatalog.GlobalUpgradeDiscount, 2);
+
+        var loaded = SkillTreeSave.FromConfigFile(SkillTreeSave.ToConfigFile(state));
+
+        AssertThat(loaded.SkillPoints).IsEqual(12);
+        AssertThat(loaded.GetRank(SkillTreeCatalog.GlobalStartingHp)).IsEqual(5);
+        AssertThat(loaded.GetRank(SkillTreeCatalog.GlobalStartingGold)).IsEqual(4);
+        AssertThat(loaded.GetRank(SkillTreeCatalog.GlobalTowerDiscount)).IsEqual(3);
+        AssertThat(loaded.GetRank(SkillTreeCatalog.GlobalUpgradeDiscount)).IsEqual(2);
+    }
+
+    [TestCase]
+    public void FromConfig_ClampsGlobalRanksToEachNodesOwnMax()
+    {
+        var config = new ConfigFile();
+        config.SetValue("skilltree", SkillTreeCatalog.GlobalStartingHp, 9);       // max 5
+        config.SetValue("skilltree", SkillTreeCatalog.GlobalTowerDiscount, 9);    // max 3
+        config.SetValue("skilltree", SkillTreeCatalog.GlobalUpgradeDiscount, -4); // clamps to 0
+
+        var loaded = SkillTreeSave.FromConfigFile(config);
+
+        AssertThat(loaded.GetRank(SkillTreeCatalog.GlobalStartingHp)).IsEqual(5);
+        AssertThat(loaded.GetRank(SkillTreeCatalog.GlobalTowerDiscount)).IsEqual(3);
+        AssertThat(loaded.GetRank(SkillTreeCatalog.GlobalUpgradeDiscount)).IsEqual(0);
+    }
+
+    [TestCase]
+    public void FromConfig_OldSaveWithoutGlobalKeys_LoadsGlobalsAtZero()
+    {
+        // A pre-global save only contains SP and the 15 tower node keys.
+        var config = new ConfigFile();
+        config.SetValue("skilltree", "sp", 55);
+        config.SetValue("skilltree", SkillTreeCatalog.ArrowDamage, 3);
+        config.SetValue("skilltree", SkillTreeCatalog.CannonPowderCharge, 2);
+        config.SetValue("skilltree", SkillTreeCatalog.LaserDps, 1);
+
+        var loaded = SkillTreeSave.FromConfigFile(config);
+
+        AssertThat(loaded.SkillPoints).IsEqual(55);
+        AssertThat(loaded.GetRank(SkillTreeCatalog.ArrowDamage)).IsEqual(3);
+        AssertThat(loaded.GetRank(SkillTreeCatalog.CannonPowderCharge)).IsEqual(2);
+        AssertThat(loaded.GetRank(SkillTreeCatalog.LaserDps)).IsEqual(1);
+        foreach (var node in SkillTreeCatalog.GlobalNodes)
+            AssertThat(loaded.GetRank(node.Id)).IsEqual(0);
+    }
+
+    [TestCase]
+    public void FromConfig_RejectsUnknownGlobalIds()
+    {
+        var config = new ConfigFile();
+        config.SetValue("skilltree", "global.does_not_exist", 4);
+
+        var loaded = SkillTreeSave.FromConfigFile(config);
+
+        AssertThat(loaded.GetRank("global.does_not_exist")).IsEqual(0);
+    }
+
+    [TestCase]
+    public void SetRank_RejectsUnknownGlobalIdWithoutStoringIt()
+    {
+        // Direct state-level assertion: FromConfigFile only iterates known catalog
+        // ids, so this is the path that actually exercises the rejection.
+        var state = new SkillTreeState();
+
+        state.SetRank("global.does_not_exist", 4);
+
+        AssertThat(state.GetRank("global.does_not_exist")).IsEqual(0);
+        AssertThat(state.Ranks.ContainsKey("global.does_not_exist")).IsFalse();
+    }
+
+    [TestCase]
     public void SaveLoad_FileRoundTrip_PersistsToDisk()
     {
         // Unique per run so concurrent `dotnet test` processes never race on the

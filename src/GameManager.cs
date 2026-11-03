@@ -165,6 +165,37 @@ public partial class GameManager : Node2D
     public SkillTree? SkillTree { get; set; }
 
     /// <summary>
+    /// The persistent skill-tree state attached to this run, or null for tests that
+    /// only exercise the in-level economy. Every price surface (placement, upgrades,
+    /// archetypes) reads its effective cost through <see cref="SkillStats"/>.
+    /// </summary>
+    public SkillTreeState? SkillState => SkillTree?.State;
+
+    /// <summary>
+    /// Effective coin cost to place the given tower type for this run, after the
+    /// global Master Blueprints discount.
+    /// </summary>
+    public int EffectiveTowerCost(TowerType type) =>
+        SkillStats.EffectiveTowerCost(type, SkillState);
+
+    /// <summary>
+    /// Effective coin cost to reach the given tower rank for this run, after the
+    /// global Advanced Training discount.
+    /// </summary>
+    public int EffectiveUpgradeCost(int targetRank) =>
+        SkillStats.EffectiveUpgradeCost(targetRank, SkillState);
+
+    /// <summary>
+    /// Emits the placement-affordability refresh with the effective Arrow cost. The
+    /// HUD uses the signal only as a "re-evaluate cards" cue; every card recomputes its
+    /// own type's effective price.
+    /// </summary>
+    private void EmitTowerPlacementState() =>
+        EmitSignal(
+            SignalName.TowerPlacementStateChanged,
+            _coins >= EffectiveTowerCost(TowerType.Arrow));
+
+    /// <summary>
     /// Injectable, seeded roll source for Progenitor summon composition. Production
     /// uses the shared seeded default; tests assign a scripted source to force exact
     /// summon squads.
@@ -198,8 +229,8 @@ public partial class GameManager : Node2D
         _initialized = true;
         _level = level;
 
-        _hp = GameConstants.StartingHP;
-        _coins = GameConstants.StartingCoins;
+        _hp = SkillStats.StartingHp(SkillState);
+        _coins = SkillStats.StartingCoins(SkillState);
         _state = GameState.Playing;
         PlacingTowerType = null;
         _activeBoss = null;
@@ -238,7 +269,7 @@ public partial class GameManager : Node2D
         EmitSignal(SignalName.CoinsChanged, _coins);
         EmitSignal(SignalName.HpChanged, _hp);
         EmitSignal(SignalName.WaveChanged, 0);
-        EmitSignal(SignalName.TowerPlacementStateChanged, _coins >= GameConstants.ArrowTowerCost);
+        EmitTowerPlacementState();
     }
 
     /// <summary>
@@ -745,7 +776,7 @@ public partial class GameManager : Node2D
         _coins += enemy.CoinDrop;
 
         EmitSignal(SignalName.CoinsChanged, _coins);
-        EmitSignal(SignalName.TowerPlacementStateChanged, _coins >= GameConstants.ArrowTowerCost);
+        EmitTowerPlacementState();
 
         // Notify wave manager
         _waveManager?.NotifyEnemyDestroyed();
@@ -1023,7 +1054,7 @@ public partial class GameManager : Node2D
             return false;
 
         var type = PlacingTowerType.Value;
-        int cost = GameConstants.TowerCost(type);
+        int cost = EffectiveTowerCost(type);
 
         if (_coins < cost)
             return false;
@@ -1034,7 +1065,7 @@ public partial class GameManager : Node2D
         // Deduct coins
         _coins -= cost;
         EmitSignal(SignalName.CoinsChanged, _coins);
-        EmitSignal(SignalName.TowerPlacementStateChanged, _coins >= GameConstants.ArrowTowerCost);
+        EmitTowerPlacementState();
 
         // Place on grid
         _gridManager.PlaceTower(row, col);
@@ -1082,16 +1113,16 @@ public partial class GameManager : Node2D
             return false;
 
         var target = tower!;
-        if (!TowerUpgrades.CanBuyNextRank(target.Rank, target.Xp, _coins))
+        int cost = EffectiveUpgradeCost(target.Rank + 1);
+        if (!TowerUpgrades.CanBuyNextRank(target.Rank, target.Xp, _coins, cost))
             return false;
 
-        int cost = TowerUpgrades.CostToReachRank(target.Rank + 1);
         if (!target.ApplyRankUpgrade())
             return false;
 
         _coins -= cost;
         EmitSignal(SignalName.CoinsChanged, _coins);
-        EmitSignal(SignalName.TowerPlacementStateChanged, _coins >= GameConstants.ArrowTowerCost);
+        EmitTowerPlacementState();
         return true;
     }
 
@@ -1111,7 +1142,8 @@ public partial class GameManager : Node2D
             return false;
 
         var target = tower!;
-        if (!TowerUpgrades.CanBuyArchetype(target.Rank, target.Xp, _coins))
+        int cost = EffectiveUpgradeCost(GameConstants.TowerMaxRank);
+        if (!TowerUpgrades.CanBuyArchetype(target.Rank, target.Xp, _coins, cost))
             return false;
 
         if (!TowerArchetypes.IsValidFor(target.Type, archetype))
@@ -1120,9 +1152,9 @@ public partial class GameManager : Node2D
         if (!target.ApplyArchetype(archetype))
             return false;
 
-        _coins -= TowerUpgrades.CostToReachRank(GameConstants.TowerMaxRank);
+        _coins -= cost;
         EmitSignal(SignalName.CoinsChanged, _coins);
-        EmitSignal(SignalName.TowerPlacementStateChanged, _coins >= GameConstants.ArrowTowerCost);
+        EmitTowerPlacementState();
         return true;
     }
 
@@ -1139,7 +1171,7 @@ public partial class GameManager : Node2D
 
         _coins += amount;
         EmitSignal(SignalName.CoinsChanged, _coins);
-        EmitSignal(SignalName.TowerPlacementStateChanged, _coins >= GameConstants.ArrowTowerCost);
+        EmitTowerPlacementState();
     }
 
     /// <summary>

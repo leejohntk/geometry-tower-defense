@@ -23,7 +23,7 @@ public sealed class SkillTreeState
     public IReadOnlyDictionary<string, int> Ranks => _ranks;
 
     /// <summary>
-    /// Current rank of a node (0..SkillMaxRanks). Unknown ids return 0.
+    /// Current rank of a node (0..its own max). Unknown ids return 0.
     /// </summary>
     public int GetRank(string nodeId) => _ranks.TryGetValue(nodeId, out var rank) ? rank : 0;
 
@@ -39,10 +39,10 @@ public sealed class SkillTreeState
     }
 
     /// <summary>
-    /// True if the node has no prerequisite (the first trunk node, or a seed on a
-    /// trunk-less tower, or an unknown id) or its prerequisite has reached the unlock
-    /// rank. This is a structural buy-time gate; it does not care whether the node
-    /// itself is enabled.
+    /// True if the node has no prerequisite (the first trunk node, the first global
+    /// node, or a seed on a trunk-less tower, or an unknown id) or its prerequisite has
+    /// reached the unlock rank. This is a structural buy-time gate; it does not care
+    /// whether the node itself is enabled.
     /// </summary>
     public bool IsUnlocked(string nodeId)
     {
@@ -53,12 +53,12 @@ public sealed class SkillTreeState
     }
 
     /// <summary>
-    /// True if the node exists, is enabled, is unlocked, is below max rank, and is
-    /// affordable.
+    /// True if the node exists, is enabled, is unlocked, is below its own max rank, and
+    /// is affordable.
     ///
-    /// The enabled check is currently unreachable (all 15 catalog nodes are enabled
-    /// as of Part 2); it is retained deliberately so a node that ships disabled again
-    /// can never be bought or save-loaded with a non-zero rank.
+    /// The enabled check is currently unreachable (all catalog nodes are enabled); it
+    /// is retained deliberately so a node that ships disabled again can never be
+    /// bought or save-loaded with a non-zero rank.
     /// </summary>
     public bool CanBuyRank(string nodeId)
     {
@@ -67,7 +67,7 @@ public sealed class SkillTreeState
             return false;
         if (!IsUnlocked(nodeId))
             return false;
-        if (GetRank(nodeId) >= GameConstants.SkillMaxRanks)
+        if (GetRank(nodeId) >= def.MaxRanks)
             return false;
         if (SkillPoints < GameConstants.SkillNodeRankCost)
             return false;
@@ -91,10 +91,10 @@ public sealed class SkillTreeState
     /// <summary>
     /// Sets a node's rank directly (used by save loading). Unknown node ids and any
     /// non-enabled node are rejected and zeroed so the UI can never render a rank for
-    /// a node it can't buy. Valid ranks clamp to 0..SkillMaxRanks.
+    /// a node it can't buy. Valid ranks clamp to 0..the node's own max rank.
     ///
-    /// The enabled gate is currently unreachable (all 15 nodes are enabled as of
-    /// Part 2); it is retained deliberately for future nodes that ship disabled.
+    /// The enabled gate is currently unreachable (all catalog nodes are enabled); it is
+    /// retained deliberately for future nodes that ship disabled.
     /// </summary>
     public void SetRank(string nodeId, int rank)
     {
@@ -107,7 +107,7 @@ public sealed class SkillTreeState
             return;
         }
 
-        _ranks[nodeId] = Math.Clamp(rank, 0, GameConstants.SkillMaxRanks);
+        _ranks[nodeId] = Math.Clamp(rank, 0, def.MaxRanks);
     }
 
     /// <summary>

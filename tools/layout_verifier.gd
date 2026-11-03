@@ -68,7 +68,7 @@ const SKTREE_PANEL_INSET := 10.0
 const SKTREE_MAIN_TOP := 130.0
 const SKTREE_SIDEBAR_BUTTON_HEIGHT := 60.0
 const SKTREE_SIDEBAR_BUTTON_GAP := 16.0
-const SKTREE_SIDEBAR_BUTTONS := 3
+const SKTREE_SIDEBAR_BUTTONS := 4
 
 ## Row content column, expressed from the independently measured icon centre rather
 ## than from the row wrapper. A Buy child shifted inside a correctly sized wrapper
@@ -176,6 +176,17 @@ const TOWERS := [
         ],
     },
 ]
+
+## Tower-independent global branch, in sequential unlock order. Max ranks come from
+## the spec table (5/5/3/3); the measured side is the instantiated C# UI.
+const GLOBAL_NODES := [
+    {"id": "global.starting_hp", "name": "Fortified Core", "max_ranks": 5},
+    {"id": "global.starting_gold", "name": "War Chest", "max_ranks": 5},
+    {"id": "global.tower_discount", "name": "Master Blueprints", "max_ranks": 3},
+    {"id": "global.upgrade_discount", "name": "Advanced Training", "max_ranks": 3},
+]
+
+const GLOBAL_ACCENT := Color(0.35, 0.85, 0.92)
 
 var _evaluated: Array = []
 var _skipped: Array = []
@@ -1419,6 +1430,8 @@ func _evaluate_skill_tree_screen(skill_screen: Node) -> void:
             await process_frame
         _evaluate_tower_tree(key, tower["nodes"], tree_area)
 
+    await _evaluate_global_tree(skill_screen, sidebar_block, tree_area)
+
     # Leave the screen on Arrow, then drive a real purchase through the Buy button.
     # This exercises the signal -> BuyRank -> RenderTree -> ClearTreeArea path, including
     # freeing the button that is currently emitting, without persisting anything.
@@ -1427,6 +1440,241 @@ func _evaluate_skill_tree_screen(skill_screen: Node) -> void:
     await process_frame
     await _evaluate_skill_info_band(skill_screen, tree_area)
     await _evaluate_purchase_rebuild(skill_screen, tree_area, sp_label)
+
+
+## The fourth sidebar entry (Global) and the four-node tower-independent chain: same
+## size/spacing as the tower tabs, sequential rows in the shared tree area, per-node
+## max ranks, first-node-only Buy at the zero state, and the cyan accent.
+func _evaluate_global_tree(skill_screen: Node, sidebar_block: Control, tree_area: Control) -> void:
+    var tab := _require_button(
+        sidebar_block, "Tab_Global", "SkillTreeScreen/Block_Sidebar", SKILL_TREE_SOURCE
+    )
+    var laser := _require_button(
+        sidebar_block, "Sidebar_laser", "SkillTreeScreen/Block_Sidebar", SKILL_TREE_SOURCE
+    )
+    if tab == null or laser == null:
+        return
+
+    var tab_group := "SkillTreeScreen/Block_Sidebar/Tab_Global"
+    var tab_label := _require_label(tab, "Label", tab_group, SKILL_TREE_SOURCE)
+    if tab_label != null:
+        _check(
+            "skilltree.sidebar.global.label",
+            "%s/Label" % tab_group,
+            "text=%s" % String(tab_label.text),
+            "text=Global",
+            String(tab_label.text) == "Global",
+            "Label the fourth sidebar entry Global.",
+            SKILL_TREE_SOURCE
+        )
+
+    var tab_rect: Rect2 = tab.get_global_rect()
+    var laser_rect: Rect2 = laser.get_global_rect()
+    _check(
+        "skilltree.sidebar.global.size",
+        tab_group,
+        str(tab_rect.size),
+        "same size as Sidebar_laser %s" % str(laser_rect.size),
+        _approx(tab_rect.size.x, laser_rect.size.x)
+            and _approx(tab_rect.size.y, laser_rect.size.y),
+        "Give the Global tab the same size as the tower tabs.",
+        SKILL_TREE_SOURCE
+    )
+    _check(
+        "skilltree.sidebar.global.column",
+        tab_group,
+        "x=%.2f" % tab_rect.position.x,
+        "x=%.2f (aligned with the tower tabs)" % laser_rect.position.x,
+        _approx(tab_rect.position.x, laser_rect.position.x),
+        "Keep the Global tab in the same sidebar column.",
+        SKILL_TREE_SOURCE
+    )
+    _check_stack_gap(
+        "skilltree.sidebar.global.stack", tab_group, tab_rect, laser_rect,
+        "Place the Global tab directly below the Laser tab with the same pitch.",
+        SKILL_TREE_SOURCE
+    )
+
+    tab.emit_signal("pressed")
+    await process_frame
+    await process_frame
+
+    var expected_rows := []
+    for node in GLOBAL_NODES:
+        expected_rows.append(_row_name(node["id"]))
+    expected_rows.sort()
+
+    var actual_rows := _row_names(tree_area)
+    _check(
+        "tree.global.rows",
+        "SkillTreeScreen/TreeArea",
+        "rows=%s" % str(actual_rows),
+        "rows=%s" % str(expected_rows),
+        actual_rows == expected_rows,
+        "Render exactly the four global rows, in unlock order, on the Global tab.",
+        SKILL_TREE_SOURCE
+    )
+
+    var tree_rect: Rect2 = tree_area.get_global_rect()
+    var spine_x: float = tree_rect.get_center().x
+    var previous_y := -1.0e20
+    for i in range(GLOBAL_NODES.size()):
+        var node: Dictionary = GLOBAL_NODES[i]
+        var row := _require(
+            tree_area, _row_name(node["id"]), "SkillTreeScreen/TreeArea", SKILL_TREE_SOURCE
+        )
+        if row == null:
+            continue
+
+        var row_path := "SkillTreeScreen/TreeArea/%s" % String(row.name)
+        var expected_children := ["Icon", "Name", "Rank"]
+        if i == 0:
+            expected_children.append("Buy")
+        expected_children.sort()
+        _check(
+            "tree.global.%s.children" % node["id"],
+            row_path,
+            "children=%s" % str(_child_names(row)),
+            "children=%s" % str(expected_children),
+            _child_names(row) == expected_children,
+            "Keep each global row to Icon/Name/Rank plus Buy only on the first unlocked node.",
+            SKILL_TREE_SOURCE
+        )
+
+        var name_label := _require_label(row, "Name", row_path, SKILL_TREE_SOURCE)
+        var rank_label := _require_label(row, "Rank", row_path, SKILL_TREE_SOURCE)
+        if name_label != null and rank_label != null:
+            _check(
+                "tree.global.%s.labels" % node["id"],
+                row_path,
+                "name='%s' rank='%s'" % [String(name_label.text), String(rank_label.text)],
+                "name='%s' rank='0/%d'" % [String(node["name"]), int(node["max_ranks"])],
+                String(name_label.text) == String(node["name"])
+                    and String(rank_label.text) == "0/%d" % int(node["max_ranks"]),
+                "Render the catalog name and the live rank against the node's own max.",
+                SKILL_TREE_SOURCE
+            )
+
+        var buy_node := row.get_node_or_null("Buy")
+        _check(
+            "tree.global.%s.gating" % node["id"],
+            row_path,
+            "buy_button=%s" % str(buy_node != null),
+            "buy_button=%s (zero state: first global node only)" % str(i == 0),
+            (buy_node != null) == (i == 0),
+            "Gate the global buy button on the previous global node reaching rank 1.",
+            SKILL_TREE_SOURCE
+        )
+
+        if i == 0 and buy_node != null:
+            _check(
+                "tree.global.first_buy_disabled",
+                "%s/Buy" % row_path,
+                "disabled=%s" % str(buy_node.disabled),
+                "disabled=true (0 SP in the isolated state)",
+                buy_node.disabled,
+                "Disable the Buy action when the player cannot afford a rank.",
+                SKILL_TREE_SOURCE
+            )
+
+        var icon := _require(row, "Icon", row_path, SKILL_TREE_SOURCE)
+        if icon != null:
+            var icon_rect: Rect2 = icon.get_global_rect()
+            _check(
+                "tree.global.%s.icon_size" % node["id"],
+                "%s/Icon" % row_path,
+                str(icon_rect.size),
+                "size=(%.1f, %.1f)" % [TREE_ICON_SIZE, TREE_ICON_SIZE],
+                _approx(icon_rect.size.x, TREE_ICON_SIZE)
+                    and _approx(icon_rect.size.y, TREE_ICON_SIZE),
+                "Render each global node icon at the shared 46x46 size.",
+                SKILL_TREE_SOURCE, "WARNING"
+            )
+            _check(
+                "tree.global.%s.centered" % node["id"],
+                "%s/Icon" % row_path,
+                "icon center.x=%.2f" % icon_rect.get_center().x,
+                "tree center.x=%.2f" % spine_x,
+                _approx(icon_rect.get_center().x, spine_x),
+                "Keep the global chain on the shared vertical trunk spine.",
+                SKILL_TREE_SOURCE
+            )
+
+        var row_rect: Rect2 = row.get_global_rect()
+        _check_inside(
+            "tree.global.%s.row_inside_tree" % node["id"], row_path, row_rect, tree_rect,
+            "Keep each global row inside the tree area.",
+            SKILL_TREE_SOURCE, "WARNING"
+        )
+        _check(
+            "tree.global.%s.order" % node["id"],
+            row_path,
+            "row.top=%.2f" % row_rect.position.y,
+            "below the previous global row (top > %.2f)" % previous_y,
+            row_rect.position.y > previous_y,
+            "Stack the global rows top-to-bottom in unlock order.",
+            SKILL_TREE_SOURCE
+        )
+        previous_y = row_rect.position.y
+
+    var tower_row := tree_area.get_node_or_null("Row_arrow_damage")
+    _check(
+        "tree.global.no_tower_rows",
+        "SkillTreeScreen/TreeArea",
+        "arrow_row_present=%s" % str(tower_row != null),
+        "false (tower rows never render on the Global tab)",
+        tower_row == null,
+        "Render only global nodes when the Global tab is selected.",
+        SKILL_TREE_SOURCE
+    )
+
+    var header_block := _require(
+        tree_area, "Block_TreeHeader", "SkillTreeScreen/TreeArea", SKILL_TREE_SOURCE
+    )
+    if header_block != null:
+        var header := _require_label(
+            header_block, "Title", "SkillTreeScreen/TreeArea/Block_TreeHeader", SKILL_TREE_SOURCE
+        )
+        if header != null:
+            _check(
+                "skilltree.global.header_title",
+                "SkillTreeScreen/TreeArea/Block_TreeHeader/Title",
+                "text='%s'" % String(header.text),
+                "text contains GLOBAL",
+                String(header.text).to_upper().contains("GLOBAL"),
+                "Title the global tab's tree header.",
+                SKILL_TREE_SOURCE, "WARNING"
+            )
+            var accent: Color = header.get_theme_color("font_color")
+            _check(
+                "skilltree.global.header_accent",
+                "SkillTreeScreen/TreeArea/Block_TreeHeader/Title",
+                "font_color=%s" % str(accent),
+                "font_color=%s (cyan)" % str(GLOBAL_ACCENT),
+                accent.is_equal_approx(GLOBAL_ACCENT),
+                "Use the cyan global accent for the Global tree header.",
+                SKILL_TREE_SOURCE, "WARNING"
+            )
+
+    # Locked global row: the info band appends the previous-node hint.
+    var locked_row := tree_area.get_node_or_null(_row_name(GLOBAL_NODES[1]["id"]))
+    var info_desc := _require_label(
+        skill_screen, "Panel_Main/Block_SkillInfo/Description", "SkillTreeScreen", SKILL_TREE_SOURCE
+    )
+    if locked_row != null and info_desc != null:
+        locked_row.emit_signal("mouse_entered")
+        await process_frame
+        _check(
+            "skilltree.global.locked_hint",
+            "SkillTreeScreen/Panel_Main/Block_SkillInfo",
+            "desc='%s'" % String(info_desc.text),
+            "desc contains 'Unlocks after Fortified Core reaches rank 1.'",
+            String(info_desc.text).contains("Unlocks after Fortified Core reaches rank 1."),
+            "Show the previous global node's prerequisite hint.",
+            SKILL_TREE_SOURCE, "WARNING"
+        )
+        locked_row.emit_signal("mouse_exited")
+        await process_frame
 
 
 ## The bottom info band: structure, click-through, idle hint, and the three hover

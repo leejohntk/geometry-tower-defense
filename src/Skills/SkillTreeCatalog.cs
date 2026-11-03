@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 
 namespace GeometryTowerDefense;
 
@@ -18,10 +19,26 @@ public enum SkillNodeKind
 public sealed class SkillNodeDefinition
 {
     public string Id { get; }
-    public TowerType TowerType { get; }
+
+    /// <summary>
+    /// Tower this node belongs to, or null for a tower-independent global node.
+    /// </summary>
+    public TowerType? TowerType { get; }
     public string DisplayName { get; }
     public SkillNodeKind Kind { get; }
     public bool Enabled { get; }
+
+    /// <summary>
+    /// Maximum purchasable rank for this node. Tower nodes allow
+    /// <see cref="GameConstants.SkillMaxRanks"/>; the global nodes define their own caps.
+    /// </summary>
+    public int MaxRanks { get; }
+
+    /// <summary>
+    /// True when this node is not tied to a tower type and therefore must never appear
+    /// on a tower tab (and tower nodes never appear on the global tab).
+    /// </summary>
+    public bool IsGlobal => TowerType == null;
 
     /// <summary>
     /// Player-facing description of the node's real per-rank effect, with concrete
@@ -32,11 +49,12 @@ public sealed class SkillNodeDefinition
 
     public SkillNodeDefinition(
         string id,
-        TowerType towerType,
+        TowerType? towerType,
         string displayName,
         SkillNodeKind kind,
         bool enabled,
-        string description)
+        string description,
+        int maxRanks = GameConstants.SkillMaxRanks)
     {
         Id = id;
         TowerType = towerType;
@@ -44,15 +62,18 @@ public sealed class SkillNodeDefinition
         Kind = kind;
         Enabled = enabled;
         Description = description;
+        MaxRanks = maxRanks;
     }
 }
 
 /// <summary>
-/// Static catalog of every skill-tree node across all three towers.
+/// Static catalog of every skill-tree node: the three tower trees plus the
+/// tower-independent global branch.
 ///
-/// All 15 nodes are defined here so the full tree shape renders from day one.
+/// All 15 tower nodes are defined here so the full tree shape renders from day one.
 /// All 15 are enabled as of Part 2: the 8 stat nodes (effective since Part 1) plus
 /// the 7 mechanic nodes (behavior-changing seeds and the Laser Ignite trunk).
+/// The 4 global nodes spend the same SP and chain sequentially.
 /// </summary>
 public static class SkillTreeCatalog
 {
@@ -77,10 +98,34 @@ public static class SkillTreeCatalog
     public const string LaserChain = "laser.chain";
     public const string LaserRampUp = "laser.ramp_up";
 
+    // Global node ids (tower-independent, shared by every run)
+    public const string GlobalStartingHp = "global.starting_hp";
+    public const string GlobalStartingGold = "global.starting_gold";
+    public const string GlobalTowerDiscount = "global.tower_discount";
+    public const string GlobalUpgradeDiscount = "global.upgrade_discount";
+
     /// <summary>
-    /// All nodes in display order (Arrow, Cannon, Laser).
+    /// Global nodes in display order (the sequential unlock chain).
     /// </summary>
-    public static readonly IReadOnlyList<SkillNodeDefinition> All = new SkillNodeDefinition[]
+    public static readonly IReadOnlyList<SkillNodeDefinition> GlobalNodes = new SkillNodeDefinition[]
+    {
+        new(GlobalStartingHp, null, "Fortified Core", SkillNodeKind.Trunk, enabled: true,
+            $"+{GameConstants.GlobalStartingHpPerRank} starting HP per rank.",
+            maxRanks: GameConstants.GlobalStartingHpMaxRanks),
+        new(GlobalStartingGold, null, "War Chest", SkillNodeKind.Trunk, enabled: true,
+            $"+{GameConstants.GlobalStartingGoldPerRank} starting gold per rank.",
+            maxRanks: GameConstants.GlobalStartingGoldMaxRanks),
+        new(GlobalTowerDiscount, null, "Master Blueprints", SkillNodeKind.Trunk, enabled: true,
+            $"Tower placement costs {GameConstants.GlobalTowerDiscountPerRank} less coin per rank, " +
+            $"to a minimum of {GameConstants.MinimumEffectiveCost}.",
+            maxRanks: GameConstants.GlobalTowerDiscountMaxRanks),
+        new(GlobalUpgradeDiscount, null, "Advanced Training", SkillNodeKind.Trunk, enabled: true,
+            $"Every tower rank upgrade costs {GameConstants.GlobalUpgradeDiscountPerRank} less coin per rank, " +
+            $"to a minimum of {GameConstants.MinimumEffectiveCost}.",
+            maxRanks: GameConstants.GlobalUpgradeDiscountMaxRanks),
+    };
+
+    private static readonly SkillNodeDefinition[] TowerNodes = new SkillNodeDefinition[]
     {
         // Arrow Tower — Sharpshooter | Barrage
         new(ArrowDamage, TowerType.Arrow, "Damage", SkillNodeKind.Trunk, enabled: true,
@@ -120,6 +165,13 @@ public static class SkillTreeCatalog
     };
 
     /// <summary>
+    /// All nodes in display order (Arrow, Cannon, Laser, Global). The tower tree is
+    /// composed with the global chain so neither list is duplicated by hand.
+    /// </summary>
+    public static readonly IReadOnlyList<SkillNodeDefinition> All =
+        TowerNodes.Concat(GlobalNodes).ToArray();
+
+    /// <summary>
     /// Player-facing description for a node id, or an empty string for an unknown id.
     /// </summary>
     public static string Description(string nodeId) => Find(nodeId)?.Description ?? string.Empty;
@@ -156,7 +208,8 @@ public static class SkillTreeCatalog
     }
 
     /// <summary>
-    /// Enumerates the nodes belonging to the given tower in catalog order.
+    /// Enumerates the nodes belonging to the given tower in catalog order. Global
+    /// (tower-independent) nodes are never returned.
     /// </summary>
     public static IEnumerable<SkillNodeDefinition> ForTower(TowerType towerType)
     {
@@ -170,10 +223,11 @@ public static class SkillTreeCatalog
     /// <summary>
     /// Returns the id of the node that must reach <see cref="GameConstants.SkillUnlockRank"/>
     /// before the given node can be bought, or null when there is no prerequisite.
-    /// Derived uniformly from the tower's tree shape — never per-node hardcoding:
-    /// the first trunk node is always unlocked, each later trunk node requires the
-    /// previous trunk, and each seed requires the tower's last trunk. Unknown ids and
-    /// seeds on a trunk-less tower return null.
+    /// Global nodes chain in <see cref="GlobalNodes"/> order; tower nodes are derived
+    /// uniformly from the tower's tree shape — never per-node hardcoding: the first
+    /// trunk node is always unlocked, each later trunk node requires the previous
+    /// trunk, and each seed requires the tower's last trunk. Unknown ids and seeds on
+    /// a trunk-less tower return null.
     /// </summary>
     public static string? GetPrerequisite(string nodeId)
     {
@@ -181,27 +235,39 @@ public static class SkillTreeCatalog
         if (def == null)
             return null;
 
+        // Globals and tower trunks are both ordered chains; one walk handles both.
+        IReadOnlyList<SkillNodeDefinition> chain = def.IsGlobal
+            ? GlobalNodes
+            : TrunksFor(def.TowerType!.Value);
+
+        if (chain.Count == 0)
+            return null;
+
+        if (def.IsGlobal || def.Kind == SkillNodeKind.Trunk)
+        {
+            for (int i = 0; i < chain.Count; i++)
+            {
+                if (chain[i].Id == nodeId)
+                    return i == 0 ? null : chain[i - 1].Id;
+            }
+            return null; // defensive: a known trunk/global node is always in the chain
+        }
+
+        // Seed node: gated by the tower's last trunk.
+        return chain[^1].Id;
+    }
+
+    /// <summary>
+    /// The tower's trunk nodes in catalog order (the tower's sequential chain).
+    /// </summary>
+    private static List<SkillNodeDefinition> TrunksFor(TowerType towerType)
+    {
         var trunks = new List<SkillNodeDefinition>();
-        foreach (var node in ForTower(def.TowerType))
+        foreach (var node in ForTower(towerType))
         {
             if (node.Kind == SkillNodeKind.Trunk)
                 trunks.Add(node);
         }
-
-        if (trunks.Count == 0)
-            return null;
-
-        if (def.Kind == SkillNodeKind.Trunk)
-        {
-            for (int i = 0; i < trunks.Count; i++)
-            {
-                if (trunks[i].Id == nodeId)
-                    return i == 0 ? null : trunks[i - 1].Id;
-            }
-            return null; // defensive: a known trunk node is always in the list
-        }
-
-        // Seed node: gated by the tower's last trunk.
-        return trunks[^1].Id;
+        return trunks;
     }
 }
