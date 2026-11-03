@@ -49,7 +49,6 @@ public partial class Main : Node2D
         // (grid, waves, enemies, towers, projectiles, previews, markers) is a child
         // of GameManager, so one offset positions them all.
         _gameManager.Position = new Vector2(0f, GameConstants.BattlefieldTop);
-        _gameManager.SkillTree = _skillTree;
         _gameManager.GameOver += OnGameOverTriggered;
         _gameManager.Victory += OnVictoryTriggered;
         _gameManager.WaveChanged += OnWaveChangedForUI;
@@ -60,7 +59,6 @@ public partial class Main : Node2D
         // Create HUD (hidden initially)
         _gameHUD = new GameHUD();
         _gameHUD.Name = "GameHUD";
-        _gameHUD.SkillState = _skillTree?.State;
         _gameHUD.StartWavePressed += OnStartWavePressed;
         _gameHUD.PlaceTowerPressed += OnPlaceTowerPressed;
         _gameHUD.Visible = false;
@@ -70,7 +68,6 @@ public partial class Main : Node2D
         // Added before the result screens so those overlays always draw on top; the
         // panel is also explicitly closed before a result screen is shown.
         _upgradePanel = new TowerUpgradePanel();
-        _upgradePanel.SkillState = _skillTree?.State;
         _upgradePanel.UpgradeRequested += OnTowerUpgradeRequested;
         _upgradePanel.ArchetypeChosen += OnTowerArchetypeChosen;
         _gameManager.CoinsChanged += OnCoinsChangedForUpgradePanel;
@@ -99,6 +96,49 @@ public partial class Main : Node2D
         _victoryScreen.ReturnToTitle += OnReturnToTitle;
         _victoryScreen.Visible = false;
         AddChild(_victoryScreen);
+
+        // Install the loaded tree only once every cost surface exists, so the same
+        // single path that verification mode uses also serves normal startup.
+        InstallSkillTree(_skillTree);
+    }
+
+    /// <summary>
+    /// Test/verification hook used by the headless layout verifier. Verification is
+    /// debug-build only and must be requested explicitly; gameplay never calls it.
+    ///
+    /// Replaces every cost surface's skill tree with one isolated in-memory tree at
+    /// zero ranks: <see cref="Main"/>'s own tree, <see cref="GameManager.SkillTree"/>,
+    /// <see cref="GameHUD.SkillState"/>, and <see cref="TowerUpgradePanel.SkillState"/>.
+    /// The isolated tree's save delegate is a no-op, so nothing is ever flushed or
+    /// written; the player's <c>user://skilltree.cfg</c> is never modified. Returns
+    /// false in a release build or before every cost surface exists, changing nothing
+    /// in either case (no partial install).
+    /// </summary>
+    public bool IsolateSkillTreeForVerification()
+    {
+        if (!OS.IsDebugBuild())
+            return false;
+
+        return InstallSkillTree(SkillTree.CreateIsolated());
+    }
+
+    /// <summary>
+    /// Installs <paramref name="tree"/> as the skill tree for Main and every cost
+    /// surface. Returns false without touching anything when the tree is null or the
+    /// cost surfaces do not exist yet, so a partially built scene can never report a
+    /// successful install. The caller owns the tree's persistence policy; an isolated
+    /// tree from <see cref="SkillTree.CreateIsolated"/> never writes.
+    /// </summary>
+    private bool InstallSkillTree(SkillTree? tree)
+    {
+        if (tree == null || _gameManager == null || _gameHUD == null || _upgradePanel == null)
+            return false;
+
+        _skillTree = tree;
+        _gameManager.SkillTree = tree;
+        _gameHUD.SkillState = tree.State;
+        _upgradePanel.SkillState = tree.State;
+        return true;
     }
 
     private void OnLevelSelected(int levelId)

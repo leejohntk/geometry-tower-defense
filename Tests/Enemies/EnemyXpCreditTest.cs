@@ -14,18 +14,6 @@ namespace GeometryTowerDefense.Tests;
 [TestSuite]
 public class EnemyXpCreditTest
 {
-    private static Tower MakeTower(TowerType type = TowerType.Arrow)
-    {
-        Tower tower = type switch
-        {
-            TowerType.Cannon => new CannonTower(),
-            TowerType.Laser => new LaserTower(),
-            _ => new ArrowTower()
-        };
-        tower.Initialize(0, 0);
-        return tower;
-    }
-
     [TestCase]
     public void EnemyXpValues_AreAssignedPerKind()
     {
@@ -49,7 +37,7 @@ public class EnemyXpCreditTest
     [TestCase]
     public void SingleSourceKill_AwardsFullKindXp()
     {
-        var tower = MakeTower();
+        var tower = TestTowers.Create();
         var enemy = new Enemy();
         enemy.Configure(EnemyKind.Basic);
 
@@ -63,8 +51,8 @@ public class EnemyXpCreditTest
     public void SplitDamage_ProportionsXpToCreditedDamage()
     {
         // Basic (1 XP) takes 4 from an arrow and 6 from a cannon: 0.4 / 0.6.
-        var arrow = MakeTower(TowerType.Arrow);
-        var cannon = MakeTower(TowerType.Cannon);
+        var arrow = TestTowers.Create(TowerType.Arrow);
+        var cannon = TestTowers.Create(TowerType.Cannon);
         var enemy = new Enemy();
         enemy.Configure(EnemyKind.Basic);
 
@@ -81,8 +69,8 @@ public class EnemyXpCreditTest
     public void Overkill_IsNotCredited_AndSharesUseEffectiveDamageOnly()
     {
         // Swarm has 5 HP: the second hit's 10 damage credits only the 2 HP left.
-        var first = MakeTower(TowerType.Arrow);
-        var second = MakeTower(TowerType.Cannon);
+        var first = TestTowers.Create(TowerType.Arrow);
+        var second = TestTowers.Create(TowerType.Cannon);
         var enemy = new Enemy();
         enemy.Configure(EnemyKind.Swarm);
 
@@ -98,7 +86,7 @@ public class EnemyXpCreditTest
     [TestCase]
     public void TenDamageOnThreeHpEnemy_CreditsThree()
     {
-        var tower = MakeTower();
+        var tower = TestTowers.Create();
         var enemy = new Enemy();
         enemy.Configure(EnemyKind.Swarm);
 
@@ -113,8 +101,8 @@ public class EnemyXpCreditTest
     public void ArmorReducesCreditedDamage()
     {
         // Armored 14 HP / 5 armor: a 10-damage hit credits 5, a 14-damage hit credits 9.
-        var arrow = MakeTower(TowerType.Arrow);
-        var cannon = MakeTower(TowerType.Cannon);
+        var arrow = TestTowers.Create(TowerType.Arrow);
+        var cannon = TestTowers.Create(TowerType.Cannon);
         var enemy = new Enemy();
         enemy.Configure(EnemyKind.Armored);
 
@@ -134,8 +122,8 @@ public class EnemyXpCreditTest
     [TestCase]
     public void HitAtOrBelowArmor_CreditsNothing()
     {
-        var absorbed = MakeTower(TowerType.Arrow);
-        var killer = MakeTower(TowerType.Cannon);
+        var absorbed = TestTowers.Create(TowerType.Arrow);
+        var killer = TestTowers.Create(TowerType.Cannon);
         var enemy = new Enemy();
         enemy.Configure(EnemyKind.Armored);
 
@@ -153,7 +141,7 @@ public class EnemyXpCreditTest
     [TestCase]
     public void RepeatedHitsFromOneTower_AccumulateOnOneEntry()
     {
-        var tower = MakeTower();
+        var tower = TestTowers.Create();
         var enemy = new Enemy();
         enemy.Configure(EnemyKind.Armored);
 
@@ -180,8 +168,8 @@ public class EnemyXpCreditTest
     [TestCase]
     public void BurnKill_CreditsTheBurnSource_AfterContactHasEnded()
     {
-        var arrow = MakeTower(TowerType.Arrow);
-        var laser = MakeTower(TowerType.Laser);
+        var arrow = TestTowers.Create(TowerType.Arrow);
+        var laser = TestTowers.Create(TowerType.Laser);
         var enemy = new Enemy();
         enemy.Configure(EnemyKind.Basic); // 10 HP
 
@@ -201,8 +189,8 @@ public class EnemyXpCreditTest
     [TestCase]
     public void BurnAttribution_DoesNotOutliveTheBurn()
     {
-        var laser = MakeTower(TowerType.Laser);
-        var other = MakeTower(TowerType.Cannon);
+        var laser = TestTowers.Create(TowerType.Laser);
+        var other = TestTowers.Create(TowerType.Cannon);
         var enemy = new Enemy();
         enemy.Configure(EnemyKind.Basic);
 
@@ -219,7 +207,7 @@ public class EnemyXpCreditTest
     [TestCase]
     public void DamageWithoutADeath_AwardsNoXpYet()
     {
-        var tower = MakeTower();
+        var tower = TestTowers.Create();
         var enemy = new Enemy();
         enemy.Configure(EnemyKind.Basic);
 
@@ -231,7 +219,7 @@ public class EnemyXpCreditTest
     [TestCase]
     public void KillXp_IsDistributedBeforeTheDestroyedSignal()
     {
-        var tower = MakeTower();
+        var tower = TestTowers.Create();
         var enemy = new Enemy();
         enemy.Configure(EnemyKind.Basic);
 
@@ -249,7 +237,7 @@ public class EnemyXpCreditTest
     [TestCase]
     public void Configure_ClearsCredit()
     {
-        var tower = MakeTower();
+        var tower = TestTowers.Create();
         var enemy = new Enemy();
         enemy.Configure(EnemyKind.Armored);
         enemy.TakeDamage(10f, source: tower);
@@ -263,7 +251,7 @@ public class EnemyXpCreditTest
     [TestCase]
     public void PoolReset_ClearsCredit_AndBossXpValueCannotLeak()
     {
-        var tower = MakeTower();
+        var tower = TestTowers.Create();
         var enemy = new Enemy();
         enemy.Configure(EnemyKind.Progenitor);
         enemy.TakeDamage(1000f, ignoreArmor: true, source: tower);
@@ -282,7 +270,7 @@ public class EnemyXpCreditTest
     [TestCase]
     public void SummonConfiguredEnemy_KeepsKindXp_EvenWithZeroCoins()
     {
-        var tower = MakeTower();
+        var tower = TestTowers.Create();
         var summon = new Enemy();
         summon.Configure(EnemyKind.Armored);
         summon.SetCoinDrop(0);
@@ -297,7 +285,7 @@ public class EnemyXpCreditTest
     [TestCase]
     public void SteadyStateCrediting_DoesNotAllocatePerHit()
     {
-        var tower = MakeTower();
+        var tower = TestTowers.Create();
         var enemy = new Enemy();
         enemy.Configure(EnemyKind.Armored);
 

@@ -16,18 +16,6 @@ public class TowerUpgradePanelTest
 {
     // === Helpers ===
 
-    private static Tower MakeTower(TowerType type, int row, int col)
-    {
-        Tower tower = type switch
-        {
-            TowerType.Cannon => new CannonTower(),
-            TowerType.Laser => new LaserTower(),
-            _ => new ArrowTower()
-        };
-        tower.Initialize(row, col);
-        return tower;
-    }
-
     private static void RaiseToRank2(Tower tower)
     {
         AssertThat(tower.ApplyRankUpgrade()).IsTrue();
@@ -77,7 +65,7 @@ public class TowerUpgradePanelTest
     {
         var state = new SkillTreeState();
         state.SetRank(SkillTreeCatalog.GlobalUpgradeDiscount, 3);
-        var tower = MakeTower(TowerType.Arrow, 5, 10);
+        var tower = TestTowers.Create(TowerType.Arrow, 5, 10);
         tower.AddXp(5f);
 
         var panel = new TowerUpgradePanel();
@@ -108,7 +96,7 @@ public class TowerUpgradePanelTest
     {
         var state = new SkillTreeState();
         state.SetRank(SkillTreeCatalog.GlobalUpgradeDiscount, 3);
-        var tower = MakeTower(TowerType.Arrow, 5, 10);
+        var tower = TestTowers.Create(TowerType.Arrow, 5, 10);
         tower.AddXp(30f);
         RaiseToRank2(tower);
 
@@ -139,7 +127,7 @@ public class TowerUpgradePanelTest
     [TestCase]
     public void Panel_HasOnlyActionGroups_NoHeader_AndConsumesMouseInput()
     {
-        var tower = MakeTower(TowerType.Arrow, 5, 10);
+        var tower = TestTowers.Create(TowerType.Arrow, 5, 10);
         tower.AddXp(5f);
         var panel = CreatePanel(tower, 10);
         try
@@ -180,7 +168,7 @@ public class TowerUpgradePanelTest
     [TestCase]
     public void BelowXpThreshold_ShowsNoPanelAndNoXpHint()
     {
-        var tower = MakeTower(TowerType.Arrow, 5, 10);
+        var tower = TestTowers.Create(TowerType.Arrow, 5, 10);
         tower.AddXp(4.9f);
         var panel = CreatePanel(tower, 100);
         try
@@ -202,7 +190,7 @@ public class TowerUpgradePanelTest
     public void Panel_IsHidden_WheneverNoUpgradeIsAvailable()
     {
         // Rank 0 below 5 XP.
-        var rankZero = MakeTower(TowerType.Arrow, 5, 10);
+        var rankZero = TestTowers.Create(TowerType.Arrow, 5, 10);
         rankZero.AddXp(4.9f);
         var zeroPanel = CreatePanel(rankZero, 100);
         try
@@ -216,7 +204,7 @@ public class TowerUpgradePanelTest
         }
 
         // Rank 1 below 15 XP.
-        var rankOne = MakeTower(TowerType.Arrow, 5, 10);
+        var rankOne = TestTowers.Create(TowerType.Arrow, 5, 10);
         AssertThat(rankOne.ApplyRankUpgrade()).IsTrue();
         rankOne.AddXp(14.9f);
         var onePanel = CreatePanel(rankOne, 100);
@@ -231,7 +219,7 @@ public class TowerUpgradePanelTest
         }
 
         // Rank 2 below 30 XP.
-        var rankTwo = MakeTower(TowerType.Arrow, 5, 10);
+        var rankTwo = TestTowers.Create(TowerType.Arrow, 5, 10);
         RaiseToRank2(rankTwo);
         rankTwo.AddXp(29.9f);
         var twoPanel = CreatePanel(rankTwo, 100);
@@ -246,7 +234,7 @@ public class TowerUpgradePanelTest
         }
 
         // Rank 3 has no further upgrade.
-        var rankThree = MakeTower(TowerType.Arrow, 5, 10);
+        var rankThree = TestTowers.Create(TowerType.Arrow, 5, 10);
         RaiseToRank2(rankThree);
         rankThree.AddXp(30f);
         AssertThat(rankThree.ApplyArchetype(TowerArchetype.Pierce)).IsTrue();
@@ -265,7 +253,7 @@ public class TowerUpgradePanelTest
     [TestCase]
     public void CrossingTheThresholdWhileSelected_RevealsThePanel_WithoutAutoBuying()
     {
-        var tower = MakeTower(TowerType.Arrow, 5, 10);
+        var tower = TestTowers.Create(TowerType.Arrow, 5, 10);
         var panel = CreatePanel(tower, 10);
         try
         {
@@ -295,7 +283,7 @@ public class TowerUpgradePanelTest
     [TestCase]
     public void CoinsShort_ShowsVisibleButDisabledUpgrade_ThenEnablesWhenCoinsArrive()
     {
-        var tower = MakeTower(TowerType.Arrow, 5, 10);
+        var tower = TestTowers.Create(TowerType.Arrow, 5, 10);
         tower.AddXp(5f);
         var panel = CreatePanel(tower, 4);
         try
@@ -318,7 +306,7 @@ public class TowerUpgradePanelTest
     [TestCase]
     public void GenericUpgradeButton_ShowsTheTargetCost_AndStaysFullWidth()
     {
-        var tower = MakeTower(TowerType.Arrow, 5, 10);
+        var tower = TestTowers.Create(TowerType.Arrow, 5, 10);
         tower.AddXp(5f);
         var panel = CreatePanel(tower, 100);
         try
@@ -345,7 +333,7 @@ public class TowerUpgradePanelTest
     [TestCase]
     public void Panel_HasNoHeader_AndTheTowerBadgeOwnsTheRankDisplay()
     {
-        var tower = MakeTower(TowerType.Arrow, 5, 10);
+        var tower = TestTowers.Create(TowerType.Arrow, 5, 10);
         var panel = CreatePanel(tower, 100);
         try
         {
@@ -372,7 +360,7 @@ public class TowerUpgradePanelTest
     [TestCase]
     public void Rank2WithThirtyXp_ShowsTwoArchetypeCards_WithoutAHeader()
     {
-        var tower = MakeTower(TowerType.Arrow, 5, 10);
+        var tower = TestTowers.Create(TowerType.Arrow, 5, 10);
         tower.AddXp(30f);
         RaiseToRank2(tower);
         var panel = CreatePanel(tower, 100);
@@ -407,7 +395,7 @@ public class TowerUpgradePanelTest
     [TestCase]
     public void Rank3_ShowsNoPanel_WithNoUpgradeControls()
     {
-        var tower = MakeTower(TowerType.Arrow, 5, 10);
+        var tower = TestTowers.Create(TowerType.Arrow, 5, 10);
         tower.AddXp(30f);
         RaiseToRank2(tower);
         AssertThat(tower.ApplyArchetype(TowerArchetype.Pierce)).IsTrue();
@@ -438,7 +426,7 @@ public class TowerUpgradePanelTest
 
         foreach (var (type, leftName, rightName) in expectations)
         {
-            var tower = MakeTower(type, 5, 10);
+            var tower = TestTowers.Create(type, 5, 10);
             tower.AddXp(30f);
             RaiseToRank2(tower);
             var panel = CreatePanel(tower, 100);
@@ -460,7 +448,7 @@ public class TowerUpgradePanelTest
     {
         // Row 0: opens below the cell so it can never sit under the top bar. The
         // panel and the grid are both offset by BattlefieldTop (screen space).
-        var rowZeroTower = MakeTower(TowerType.Arrow, 0, 5);
+        var rowZeroTower = TestTowers.Create(TowerType.Arrow, 0, 5);
         rowZeroTower.AddXp(5f);
         var rowZero = CreatePanel(rowZeroTower, 10);
         try
@@ -476,7 +464,7 @@ public class TowerUpgradePanelTest
         }
 
         // A mid-field tower: the panel sits fully above the cell.
-        var tower = MakeTower(TowerType.Arrow, 5, 10);
+        var tower = TestTowers.Create(TowerType.Arrow, 5, 10);
         tower.AddXp(5f); // upgrade visible
         var midRow = CreatePanel(tower, 100);
         try
@@ -494,7 +482,7 @@ public class TowerUpgradePanelTest
         }
 
         // Row 1 has no room above: the panel clamps to the battlefield top instead.
-        var nearTopTower = MakeTower(TowerType.Arrow, 1, 10);
+        var nearTopTower = TestTowers.Create(TowerType.Arrow, 1, 10);
         nearTopTower.AddXp(5f);
         var nearTop = CreatePanel(nearTopTower, 10);
         try
@@ -507,7 +495,7 @@ public class TowerUpgradePanelTest
         }
 
         // Left and right edges clamp inside the battlefield (never into the sidebar).
-        var leftTower = MakeTower(TowerType.Arrow, 5, 0);
+        var leftTower = TestTowers.Create(TowerType.Arrow, 5, 0);
         leftTower.AddXp(5f);
         var leftEdge = CreatePanel(leftTower, 10);
         try
@@ -519,7 +507,7 @@ public class TowerUpgradePanelTest
             Free(leftEdge);
         }
 
-        var rightTower = MakeTower(TowerType.Arrow, 5, GameConstants.GridCols - 1);
+        var rightTower = TestTowers.Create(TowerType.Arrow, 5, GameConstants.GridCols - 1);
         rightTower.AddXp(5f);
         var rightEdge = CreatePanel(rightTower, 10);
         try
@@ -533,7 +521,7 @@ public class TowerUpgradePanelTest
         }
 
         // Archetype cards use the taller layout (padding * 2 + 84).
-        var choiceTower = MakeTower(TowerType.Arrow, 5, 10);
+        var choiceTower = TestTowers.Create(TowerType.Arrow, 5, 10);
         choiceTower.AddXp(30f);
         RaiseToRank2(choiceTower);
         var choicePanel = CreatePanel(choiceTower, 100);
@@ -552,7 +540,7 @@ public class TowerUpgradePanelTest
     [TestCase]
     public void BuyAndCards_EmitThePanelSignals()
     {
-        var tower = MakeTower(TowerType.Arrow, 5, 10);
+        var tower = TestTowers.Create(TowerType.Arrow, 5, 10);
         tower.AddXp(5f);
         var panel = CreatePanel(tower, 100);
         try
@@ -567,7 +555,7 @@ public class TowerUpgradePanelTest
             Free(panel);
         }
 
-        var choiceTower = MakeTower(TowerType.Arrow, 5, 10);
+        var choiceTower = TestTowers.Create(TowerType.Arrow, 5, 10);
         choiceTower.AddXp(30f);
         RaiseToRank2(choiceTower);
         var choicePanel = CreatePanel(choiceTower, 100);
@@ -588,7 +576,7 @@ public class TowerUpgradePanelTest
     [TestCase]
     public void ArchetypeCards_AreVisibleButDisabledWhenCoinsAreShort()
     {
-        var tower = MakeTower(TowerType.Cannon, 5, 10);
+        var tower = TestTowers.Create(TowerType.Cannon, 5, 10);
         tower.AddXp(30f);
         RaiseToRank2(tower);
         var panel = CreatePanel(tower, GameConstants.TowerUpgradeCostRank3 - 1);
@@ -613,7 +601,7 @@ public class TowerUpgradePanelTest
     [TestCase]
     public void Rank2BelowThirtyXp_ShowsNoPanel()
     {
-        var tower = MakeTower(TowerType.Arrow, 5, 10);
+        var tower = TestTowers.Create(TowerType.Arrow, 5, 10);
         tower.AddXp(29.9f);
         RaiseToRank2(tower);
         var panel = CreatePanel(tower, 100);

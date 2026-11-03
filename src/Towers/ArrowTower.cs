@@ -57,16 +57,7 @@ public partial class ArrowTower : Tower
         float cell = GameConstants.CellSize;
 
         _bodyBasePosition = new Vector2(-cell / 2f, -cell / 2f);
-        _body = new Control();
-        _body.Name = "ArrowBody";
-        _body.Size = new Vector2(cell, cell);
-        _body.Position = _bodyBasePosition;
-        // Rotate around the cell centre so the triangle reflects the aim direction
-        // without moving the tower's simulation position.
-        _body.PivotOffset = new Vector2(cell / 2f, cell / 2f);
-        _body.MouseFilter = Control.MouseFilterEnum.Ignore;
-        _body.Draw += DrawBody;
-        AddChild(_body);
+        _body = CreateBody("ArrowBody", DrawBody);
 
         // Short bow-flash cue shown only while a shot's recoil is playing. Repainted
         // only during that ~0.12 s window, never while idle.
@@ -160,29 +151,25 @@ public partial class ArrowTower : Tower
     }
 
     /// <summary>
-    /// Paints the arrow silhouette for the current archetype:
-    /// none = blue triangle with a dark outline; Pierce = forked spearhead split by a
-    /// vertical slit; Crit = base triangle with a light four-point star inset.
+    /// The single arrow silhouette renderer, used by the body and by the additive
+    /// upgrade-ready overlay (which passes itself as the target).
     /// </summary>
-    private void DrawBody()
+    private void DrawBody(CanvasItem target)
     {
-        if (_body == null || !IsInstanceValid(_body))
-            return;
-
         float cell = GameConstants.CellSize;
         Vector2[] body = BodyPolygon(cell);
 
         switch (Archetype)
         {
             case TowerArchetype.Pierce:
-                DrawForkedSpearhead(cell, body);
+                DrawForkedSpearhead(target, cell, body);
                 break;
             case TowerArchetype.Crit:
-                DrawFilledTriangle(body[0], body[1], body[2]);
-                DrawStar(new Vector2(cell / 2f, cell / 2f), 9f, 3f);
+                DrawFilledTriangle(target, body[0], body[1], body[2]);
+                DrawStar(target, new Vector2(cell / 2f, cell / 2f), 9f, 3f);
                 break;
             default:
-                DrawFilledTriangle(body[0], body[1], body[2]);
+                DrawFilledTriangle(target, body[0], body[1], body[2]);
                 break;
         }
     }
@@ -193,7 +180,7 @@ public partial class ArrowTower : Tower
     /// share the base triangle's tip and base heights, so their combined centroid is
     /// the cell centre just like the plain arrow.
     /// </summary>
-    private void DrawForkedSpearhead(float cell, Vector2[] body)
+    private static void DrawForkedSpearhead(CanvasItem target, float cell, Vector2[] body)
     {
         float center = cell / 2f;
         const float slitHalfWidth = 3f;
@@ -205,31 +192,26 @@ public partial class ArrowTower : Tower
         var leftTip = new Vector2(innerLeft, tipY);
         var leftInnerBase = new Vector2(innerLeft, baseY);
         var leftOuterBase = new Vector2(body[1].X, baseY);
-        DrawFilledTriangle(leftTip, leftOuterBase, leftInnerBase);
+        DrawFilledTriangle(target, leftTip, leftOuterBase, leftInnerBase);
 
         var rightTip = new Vector2(innerRight, tipY);
         var rightInnerBase = new Vector2(innerRight, baseY);
         var rightOuterBase = new Vector2(body[2].X, baseY);
-        DrawFilledTriangle(rightTip, rightInnerBase, rightOuterBase);
+        DrawFilledTriangle(target, rightTip, rightInnerBase, rightOuterBase);
     }
 
-    private void DrawFilledTriangle(Vector2 a, Vector2 b, Vector2 c)
+    private static void DrawFilledTriangle(CanvasItem target, Vector2 a, Vector2 b, Vector2 c)
     {
-        if (_body == null || !IsInstanceValid(_body))
-            return;
-
-        _body.DrawColoredPolygon(new[] { a, b, c }, BodyFill);
-        _body.DrawPolyline(new[] { a, b, c, a }, BodyOutline, OutlineWidth, antialiased: true);
+        target.DrawColoredPolygon(new[] { a, b, c }, BodyFill);
+        target.DrawPolyline(new[] { a, b, c, a }, BodyOutline, OutlineWidth, antialiased: true);
     }
 
     /// <summary>
     /// Crit: a light four-point star inset at the triangle's centre.
     /// </summary>
-    private void DrawStar(Vector2 center, float outerRadius, float innerRadius)
+    private static void DrawStar(
+        CanvasItem target, Vector2 center, float outerRadius, float innerRadius)
     {
-        if (_body == null || !IsInstanceValid(_body))
-            return;
-
         var points = new Vector2[8];
         for (int i = 0; i < points.Length; i++)
         {
@@ -238,6 +220,6 @@ public partial class ArrowTower : Tower
             points[i] = center + new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * radius;
         }
 
-        _body.DrawColoredPolygon(points, new Color(0.88f, 0.94f, 1f));
+        target.DrawColoredPolygon(points, new Color(0.88f, 0.94f, 1f));
     }
 }

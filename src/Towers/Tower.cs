@@ -1,3 +1,4 @@
+using System;
 using Godot;
 
 namespace GeometryTowerDefense;
@@ -11,6 +12,23 @@ public abstract partial class Tower : Node2D
     private float _fireCooldownTimer = 0f;
     private Control? _rangeIndicator;
     private Control? _rankBadge;
+
+    // Lazily created additive upgrade-ready glow. It is a child of the tower's body
+    // Control and re-invokes that body's own silhouette renderer, so it inherits the
+    // body's aim/recoil transform and matches every archetype exactly. Only its
+    // Modulate.A changes during the pulse; the silhouette is queued once on the
+    // hidden-to-shown edge, never per frame. Archetype changes always end at max rank
+    // and hide the cue, so they need no repaint.
+    private Control? _upgradeReadyGlow;
+    private (Control Body, Action<CanvasItem> Draw)? _glowSource;
+    private float _upgradeGlowPhase = 0f;
+
+    // One shared additive material for every overlay; the per-node Modulate.A drives
+    // the pulse, so the material itself never varies between towers.
+    private static readonly CanvasItemMaterial UpgradeGlowAdditiveMaterial = new()
+    {
+        BlendMode = CanvasItemMaterial.BlendModeEnum.Add
+    };
 
     // Aim/recoil presentation. The aim angle is purely visual: it is derived from the
     // live target and never feeds back into targeting, range checks, or damage. It is
@@ -71,6 +89,20 @@ public abstract partial class Tower : Node2D
     /// value is never rounded per hit and only gates the next upgrade's visibility.
     /// </summary>
     public float Xp { get; private set; }
+
+    /// <summary>
+    /// True when this tower's next upgrade is unlocked by kill XP: a generic rank at
+    /// rank 0/1, or the archetype choice at rank 2. This is exactly
+    /// <see cref="TowerUpgrades.IsUpgradeVisible"/> — the same hidden gate the upgrade
+    /// panel uses — so coins deliberately never affect it (an unaffordable upgrade
+    /// still reads as ready). Always false at max rank.
+    /// </summary>
+    public bool HasUpgradeReady => TowerUpgrades.IsUpgradeVisible(Rank, Xp);
+
+    /// <summary>
+    /// True while the upgrade-ready glow control is visible. Presentation only.
+    /// </summary>
+    public bool IsUpgradeGlowVisible => _upgradeReadyGlow?.Visible ?? false;
 
     /// <summary>
     /// Chosen archetype, or <see cref="TowerArchetype.None"/> before rank 3.
@@ -256,6 +288,8 @@ public abstract partial class Tower : Node2D
             return;
 
         Xp += amount;
+        // Reveal the cue the instant the threshold is crossed; no reselect or input.
+        SyncUpgradeReadyGlow();
     }
 
     /// <summary>
@@ -270,6 +304,8 @@ public abstract partial class Tower : Node2D
 
         Rank++;
         UpdateRankBadge();
+        // The purchase may leave the next XP gate closed; hide the cue immediately.
+        SyncUpgradeReadyGlow();
         return true;
     }
 
@@ -291,6 +327,8 @@ public abstract partial class Tower : Node2D
         Rank = GameConstants.TowerMaxRank;
         OnArchetypeChanged();
         UpdateRankBadge();
+        // Max rank has no next gate: the cue hides permanently.
+        SyncUpgradeReadyGlow();
         return true;
     }
 
@@ -522,6 +560,136 @@ public abstract partial class Tower : Node2D
             TowerColor);
     }
 
+    /// <summary>
+    /// Builds a tower's procedural body Control: one cell in size, centred on the tower
+    /// origin, rotating around the cell centre, click-through, and wired to the
+    /// variant's silhouette renderer. Registers it as the upgrade-ready glow source and
+    /// returns it. Variants assign the result to their own body field.
+    /// </summary>
+    protected Control CreateBody(string name, Action<CanvasItem> drawBody)
+    {
+        float cell = GameConstants.CellSize;
+        var body = new Control();
+        body.Name = name;
+        body.Size = new Vector2(cell, cell);
+        body.Position = new Vector2(-cell / 2f, -cell / 2f);
+        body.PivotOffset = new Vector2(cell / 2f, cell / 2f);
+        body.MouseFilter = Control.MouseFilterEnum.Ignore;
+        body.Draw += () => drawBody(body);
+        AddChild(body);
+
+        RegisterUpgradeGlowSource(body, drawBody);
+        return body;
+    }
+
+    /// <summary>
+    /// Registers the tower's body Control and its silhouette renderer. The additive
+    /// upgrade-ready glow is a child of this body and re-invokes the same renderer, so
+    /// it follows the body's aim/recoil transform and always matches its current shape.
+    /// Until this is called (the tower has not entered the tree) no overlay can exist;
+    /// the XP gate itself is unaffected and no fallback halo is drawn. Registration is
+    /// also a sync point, so a tower that earned its upgrade before entering the tree
+    /// gets the cue as soon as its body exists.
+    /// </summary>
+    protected void RegisterUpgradeGlowSource(Control body, Action<CanvasItem> drawBody)
+    {
+        _glowSource = (body, drawBody);
+        SyncUpgradeReadyGlow();
+    }
+
+    /// <summary>
+    /// The single sync authority for the overlay's visibility, called on XP and rank
+    /// changes and once when the body registers. Writes visibility only: the
+    /// hidden-to-shown edge seeds the additive opacity at the pulse trough, shows the
+    /// control, queues one redraw to populate the silhouette, and resets the pulse
+    /// phase; the shown-to-hidden edge hides it and resets the phase; an already-visible
+    /// ready glow is left untouched. The per-frame path never calls this — it only
+    /// pulses <c>Modulate.A</c>.
+    /// </summary>
+    private void SyncUpgradeReadyGlow()
+    {
+        if (!HasUpgradeReady)
+        {
+            if (_upgradeReadyGlow != null && _upgradeReadyGlow.Visible)
+            {
+                _upgradeReadyGlow.Visible = false;
+                _upgradeGlowPhase = 0f;
+            }
+            return;
+        }
+
+        // No registered body yet (the tower is not in the tree): there is nothing to
+        // overlay. Registration re-runs this sync.
+        if (_glowSource is null)
+            return;
+
+        var glow = _upgradeReadyGlow;
+        if (glow == null)
+        {
+            glow = GetOrCreateUpgradeReadyGlow();
+        }
+        else if (glow.Visible)
+        {
+            return;
+        }
+
+        // Seed the trough so no full-alpha frame can flash before the first _Process.
+        glow.Modulate = new Color(1f, 1f, 1f, GameConstants.TowerUpgradeGlowAlphaMin);
+        glow.Visible = true;
+        _upgradeGlowPhase = 0f;
+        glow.QueueRedraw();
+    }
+
+    /// <summary>
+    /// Advances the overlay's opacity-only pulse by <paramref name="delta"/> seconds
+    /// while it is visible. Called once per frame from <see cref="Tower._Process"/>;
+    /// visibility is owned by <see cref="SyncUpgradeReadyGlow"/>, so this never toggles
+    /// the control. O(1) and allocation-free.
+    /// </summary>
+    private void UpdateUpgradeReadyGlow(float delta)
+    {
+        var glow = _upgradeReadyGlow;
+        if (glow == null || !glow.Visible)
+            return;
+
+        if (delta > 0f && float.IsFinite(delta))
+            _upgradeGlowPhase += delta;
+
+        float wave = 0.5f + 0.5f * Mathf.Sin(
+            _upgradeGlowPhase * Mathf.Tau / GameConstants.TowerUpgradeGlowPulsePeriod);
+        float alpha = Mathf.Lerp(
+            GameConstants.TowerUpgradeGlowAlphaMin,
+            GameConstants.TowerUpgradeGlowAlphaMax,
+            wave);
+
+        // Opacity only: the overlay's position, size, rotation, and scale never change.
+        glow.Modulate = new Color(1f, 1f, 1f, alpha);
+    }
+
+    /// <summary>
+    /// Returns the one upgrade-ready glow control, creating it as a child of the
+    /// registered body on first need. It spans exactly the body rect at local origin,
+    /// is click-through, and uses the shared additive CanvasItemMaterial so the redrawn
+    /// silhouette brightens the body rather than replacing it.
+    /// </summary>
+    private Control GetOrCreateUpgradeReadyGlow()
+    {
+        if (_upgradeReadyGlow != null)
+            return _upgradeReadyGlow;
+
+        var body = _glowSource!.Value.Body;
+        var glow = new Control();
+        glow.Name = "UpgradeReadyGlow";
+        glow.Position = Vector2.Zero;
+        glow.Size = body.Size;
+        glow.MouseFilter = Control.MouseFilterEnum.Ignore;
+        glow.Material = UpgradeGlowAdditiveMaterial;
+        glow.Draw += () => _glowSource?.Draw(glow);
+        body.AddChild(glow);
+        _upgradeReadyGlow = glow;
+        return glow;
+    }
+
     public override void _Process(double delta)
     {
         // Cooldown behavior is untouched: this is the only place it is advanced.
@@ -533,6 +701,7 @@ public abstract partial class Tower : Node2D
         }
 
         UpdateAim((float)delta);
+        UpdateUpgradeReadyGlow((float)delta);
     }
 
     /// <summary>

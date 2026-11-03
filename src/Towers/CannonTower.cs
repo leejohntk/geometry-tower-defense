@@ -69,16 +69,7 @@ public partial class CannonTower : Tower
         float cell = GameConstants.CellSize;
 
         _bodyBasePosition = new Vector2(-cell / 2f, -cell / 2f);
-        _body = new Control();
-        _body.Name = "CannonBody";
-        _body.Size = new Vector2(cell, cell);
-        _body.Position = _bodyBasePosition;
-        // Rotate around the cell centre so the barrel reflects the aim direction
-        // without moving the tower's simulation position.
-        _body.PivotOffset = new Vector2(cell / 2f, cell / 2f);
-        _body.MouseFilter = Control.MouseFilterEnum.Ignore;
-        _body.Draw += DrawBody;
-        AddChild(_body);
+        _body = CreateBody("CannonBody", DrawBody);
 
         // Muzzle flash overlay, centered on the tower and twice a cell wide so the
         // expanding ring and its spikes stay inside the control's bounds. Hidden while
@@ -119,15 +110,11 @@ public partial class CannonTower : Tower
     }
 
     /// <summary>
-    /// Paints the cannon silhouette for the current archetype:
-    /// none = circle, outline, and inner barrel; Cluster = three overlapping lobe
-    /// circles; Stun = circle with concentric shockwave rings (no barrel).
+    /// The single cannon silhouette renderer, used by the body and by the additive
+    /// upgrade-ready overlay (which passes itself as the target).
     /// </summary>
-    private void DrawBody()
+    private void DrawBody(CanvasItem target)
     {
-        if (_body == null || !IsInstanceValid(_body))
-            return;
-
         float cell = GameConstants.CellSize;
         float radius = cell / 2f - 4f;
         Vector2 center = new(cell / 2f, cell / 2f);
@@ -137,17 +124,17 @@ public partial class CannonTower : Tower
         switch (Archetype)
         {
             case TowerArchetype.Cluster:
-                DrawClusterBody(center, radius, fill, outline);
+                DrawClusterBody(target, center, radius, fill, outline);
                 break;
             case TowerArchetype.Stun:
-                _body.DrawCircle(center, radius, fill);
-                _body.DrawCircle(center, radius, outline, false, 2f);
-                _body.DrawCircle(center, radius * 0.68f, new Color(0.55f, 0.85f, 0.6f), false, 2f);
-                _body.DrawCircle(center, radius * 0.36f, new Color(0.55f, 0.85f, 0.6f), false, 2f);
+                target.DrawCircle(center, radius, fill);
+                target.DrawCircle(center, radius, outline, false, 2f);
+                target.DrawCircle(center, radius * 0.68f, new Color(0.55f, 0.85f, 0.6f), false, 2f);
+                target.DrawCircle(center, radius * 0.36f, new Color(0.55f, 0.85f, 0.6f), false, 2f);
                 break;
             default:
-                _body.DrawCircle(center, radius, fill);
-                _body.DrawCircle(center, radius, outline, false, 2f);
+                target.DrawCircle(center, radius, fill);
+                target.DrawCircle(center, radius, outline, false, 2f);
                 // Directional barrel along +X: body rotation turns it toward the aim.
                 float barrelLength = radius * 0.95f;
                 float barrelHalfHeight = radius * 0.24f;
@@ -156,9 +143,9 @@ public partial class CannonTower : Tower
                     center.Y - barrelHalfHeight,
                     barrelLength,
                     barrelHalfHeight * 2f);
-                _body.DrawRect(barrel, new Color(0.12f, 0.28f, 0.17f));
-                _body.DrawRect(barrel, outline, filled: false, width: 2f);
-                _body.DrawCircle(
+                target.DrawRect(barrel, new Color(0.12f, 0.28f, 0.17f));
+                target.DrawRect(barrel, outline, filled: false, width: 2f);
+                target.DrawCircle(
                     new Vector2(center.X + barrelLength, center.Y),
                     barrelHalfHeight * 0.85f,
                     new Color(0.08f, 0.2f, 0.12f));
@@ -170,11 +157,9 @@ public partial class CannonTower : Tower
     /// Cluster: three overlapping filled circles arranged in a triangle around the
     /// centre, each with a dark outline — a lobed silhouette with no single barrel.
     /// </summary>
-    private void DrawClusterBody(Vector2 center, float radius, Color fill, Color outline)
+    private static void DrawClusterBody(
+        CanvasItem target, Vector2 center, float radius, Color fill, Color outline)
     {
-        if (_body == null || !IsInstanceValid(_body))
-            return;
-
         float lobeRadius = radius * 0.45f;
         float spread = radius * 0.38f;
         var lobes = new Vector2[3];
@@ -185,9 +170,9 @@ public partial class CannonTower : Tower
         }
 
         foreach (var lobe in lobes)
-            _body.DrawCircle(lobe, lobeRadius, fill);
+            target.DrawCircle(lobe, lobeRadius, fill);
         foreach (var lobe in lobes)
-            _body.DrawCircle(lobe, lobeRadius, outline, false, 2f);
+            target.DrawCircle(lobe, lobeRadius, outline, false, 2f);
     }
 
     /// <summary>

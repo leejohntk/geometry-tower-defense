@@ -232,6 +232,16 @@ public static class GameConstants
     public const float TowerRankBadgeChevronHeight = 5f;
     public const float TowerRankBadgeChevronGap = 1f;
     public const float TowerRankBadgeStroke = 1.5f;
+
+    // Upgrade-ready glow: an additive overlay that redraws the tower's own body
+    // silhouette on top of it, so the cue conforms to every tower type and archetype
+    // and inherits aim/recoil transforms. Coins never affect it, and it is presentation
+    // only: opacity pulses while geometry, position, and every stat stay untouched. The
+    // silhouette comes from the body renderer; there is no separate halo/ring geometry.
+    public const float TowerUpgradeGlowPulsePeriod = 1.6f;     // seconds per pulse cycle
+    public const float TowerUpgradeGlowAlphaMin = 0.12f;       // Modulate.A trough
+    public const float TowerUpgradeGlowAlphaMax = 0.40f;       // Modulate.A peak
+
     public static readonly Color TowerUpgradePanelBackgroundColor = new Color(0.05f, 0.05f, 0.1f, 0.92f);
     public static readonly Color TowerUpgradePanelDimColor = new Color(0.35f, 0.35f, 0.42f, 0.9f);
 

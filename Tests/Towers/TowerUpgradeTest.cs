@@ -482,13 +482,6 @@ public class TowerUpgradeTest
         AssertThat(ramp.RampMaxMultiplier).IsEqualApprox(1.2f, 0.0001f);
     }
 
-    private static Tower MakeTower(TowerType type) => type switch
-    {
-        TowerType.Cannon => new CannonTower(),
-        TowerType.Laser => new LaserTower(),
-        _ => new ArrowTower()
-    };
-
     [TestCase]
     public void Rank3Tower_ChangesItsOwnBody_WithoutAnyAccentOverlay()
     {
@@ -501,7 +494,7 @@ public class TowerUpgradeTest
 
         foreach (var (type, bodyName) in cases)
         {
-            var tower = MakeTower(type);
+            var tower = TestTowers.Create(type);
             AssertThat(tower.GetNodeOrNull<Control>("ArchetypeAccent")).IsNull();
 
             // Body Controls are built in _Ready, so the tower must be in the tree.
@@ -544,7 +537,7 @@ public class TowerUpgradeTest
 
         foreach (var (type, archetype) in cases)
         {
-            var tower = MakeTower(type);
+            var tower = TestTowers.Create(type);
             RaiseToRank2(tower);
 
             AssertThat(tower.ApplyArchetype(archetype)).IsTrue();

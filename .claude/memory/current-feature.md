@@ -7,6 +7,19 @@ metadata:
 
 # Current Feature
 
+**Upgrade-ready glow (PR #41, awaiting playtest after fix 1, 2026-11-03):** placed towers show a
+subtle additive glow over their own body silhouette when `TowerUpgrades.IsUpgradeVisible(Rank, Xp)`
+is true, regardless of coins. The overlay is a child of the tower body, redraws the variant's own
+procedural body renderer on top through a shared additive `CanvasItemMaterial`, and pulses alpha
+only (1.6 s, 0.12–0.40). It follows aim/recoil through parenting and matches every type/archetype.
+Covers rank 1, rank 2 and the rank 2→3 archetype step; hidden when the gate is closed or at rank 3.
+Playtest fix 1 replaced the original behind-tower gold halo with this shape-conforming overlay.
+Also adds a debug-only `Main.IsolateSkillTreeForVerification()` so the layout verifier no longer
+reads player save ranks. Spec `.claude/specs/upgrade-ready-glow.md`; branch
+`feature/upgrade-ready-glow`. Gates after fix 1: build 0 warnings; 625 tests; layout PASS (382
+assertions, 0 findings with maxed save); holdouts 9/9 (634 tests with the temp harness); fix review
+0 CRITICAL / 1 WARNING / 6 INFO (warning + actionable INFO fixed); simplify 4-lens pass applied.
+
 **Global skill tree (PR #39, merged 2026-11-03, squash `5cdac41`):** fourth tower-independent skill
 branch sharing the existing SP pool. Four chained nodes: Fortified Core (+1 starting HP, max 5),
 War Chest (+2 starting gold, max 5), Master Blueprints (tower cost −1, max 3), Advanced Training

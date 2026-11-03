@@ -36,29 +36,22 @@ public static class NodeTestSupport
     public static void Cleanup(Node node) => Detach(node);
 
     /// <summary>
-    /// Replaces a freshly built Main's persistent skill tree with a zero-rank
-    /// in-memory tree whose save delegate is a no-op, and points the HUD and upgrade
-    /// panel at the same state. Main-based tests call this before pressing a level
-    /// button so a player's saved global ranks (starting HP/coins, tower/upgrade
-    /// discounts) can never change the test's expected economy, while the on-disk
-    /// save is never used for assertions or written to.
+    /// Installs a zero-rank isolated in-memory tree on a freshly built Main through the
+    /// production verification hook, so Main itself, GameManager, the HUD, and the
+    /// upgrade panel all agree (including placement-preview range, which reads Main's
+    /// own tree). The save delegate is a no-op, so the player's save is never written.
+    /// Main-based tests call this before pressing a level button so a player's saved
+    /// global ranks (starting HP/coins, tower/upgrade discounts, range) can never change
+    /// the test's expected economy or layout.
     /// </summary>
     public static SkillTree IsolateSkillTree(Main main)
     {
-        var state = new SkillTreeState();
-        var tree = new SkillTree(state, _ => true);
+        AssertThat(main.IsolateSkillTreeForVerification())
+            .OverrideFailureMessage(
+                "Main refused skill-tree isolation; tests require the debug-only verification hook.")
+            .IsTrue();
 
-        main.GetNode<GameManager>("GameManager").SkillTree = tree;
-
-        var hud = main.GetNodeOrNull<GameHUD>("GameHUD");
-        if (hud != null)
-            hud.SkillState = state;
-
-        var panel = main.GetNodeOrNull<TowerUpgradePanel>("Panel_TowerUpgrade");
-        if (panel != null)
-            panel.SkillState = state;
-
-        return tree;
+        return main.GetNode<GameManager>("GameManager").SkillTree!;
     }
 
     /// <summary>

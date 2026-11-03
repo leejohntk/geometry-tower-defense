@@ -159,7 +159,7 @@ public partial class SkillTreeScreen : Control
         // Replace the persistent tree with an isolated in-memory one whose save
         // delegate is a no-op. A verification purchase can then drive the real
         // purchase/rebuild path without ever writing user://skilltree.cfg.
-        _skillTree = new SkillTree(new SkillTreeState(), _ => true);
+        _skillTree = SkillTree.CreateIsolated();
         _verificationStateActive = true;
         RenderTree();
         return true;
