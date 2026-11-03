@@ -7,6 +7,12 @@ metadata:
 
 # Current Feature
 
+**Global skill tree (spec approved 2026-11-02, phase spec_approved):** fourth tower-independent
+skill branch sharing the existing SP pool. Four chained nodes: Fortified Core (+1 starting HP,
+max 5), War Chest (+2 starting gold, max 5), Master Blueprints (tower cost −1, max 3), Advanced
+Training (rank upgrade cost −1, max 3). Spec `.claude/specs/global-skill-tree.md`; branch
+`feature/global-skill-tree`. Sequential unlock, flat 10 SP per rank, discounts clamp at 1 coin.
+
 **Tower hotkeys (PR #37, merged 2026-11-03, squash `e60e774`):** top-row `1`/`2`/`3` select
 Arrow/Cannon/Laser placement, gated by `GameState.Playing`, the level's tower permissions, and
 `Coins >= GameConstants.TowerCost(type)`. Same key cancels, an eligible different key switches
