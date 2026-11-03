@@ -7,17 +7,16 @@ metadata:
 
 # Current Feature
 
-**Active feature (in flight):** space-bar-speedup — Space starts a ready wave; mid-wave Space
-toggles `Engine.TimeScale` 1.0 ↔ 1.5. Speed persists across waves and resets on game over,
-victory, return to title, and new-level init. An animated fast-forward cue appears in the top
-bar only at 1.5×. Spec: `.claude/specs/space-bar-speedup.md` (approved 2026-11-02).
-Branch: `feature/space-bar-speedup`.
+**Active feature (in flight):** tower-hotkeys — top-row `1`/`2`/`3` select Arrow/Cannon/Laser
+placement, gated by `GameState.Playing`, the level's tower permissions, and
+`Coins >= GameConstants.TowerCost(type)`. Same key cancels, an eligible different key switches
+type; mouse click still places. Spec: `.claude/specs/tower-hotkeys.md` (approved 2026-11-03).
+Branch: `feature/tower-hotkeys`.
 
-**Last feature:** visual-overhaul — full-game procedural visual pass (PR #31, merged
-2026-11-01, squash `7cf39e1`). Nine playtest fix batches landed after the initial gates;
-final gates: build 0 warnings, 507 tests, layout verifier 335 assertions / 337 evaluated /
-2 skipped / 0 findings. The spec and archived regression holdouts were not updated for
-the playtest values (see Open follow-ups).
+**Last feature:** space-bar-speedup — Space starts a ready wave; mid-wave Space toggles
+`Engine.TimeScale` 1.0 ↔ 1.5. Speed persists across waves and resets on game over, victory,
+return to title, and new-level init. An animated fast-forward cue appears in the top bar only at
+1.5×. PR #35, merged 2026-11-01 (squash `29d72ad`); spec `.claude/specs/space-bar-speedup.md`.
 
 **Live phase lives in `.claude/state.json`** — that file is the single source of truth for what is
 active right now (and is deleted at merge, which means "idle"). This file records *history*: what
@@ -189,6 +188,9 @@ Holdouts moved to `.claude/holdouts/regression/tower-skill-tree-mechanics/`.
 
 ## Recent Features
 
+- **Space-bar speedup** (PR #35, merged 2026-11-01) — context-sensitive Space during play:
+  starts a ready wave, or toggles a 1.5× whole-game clock while a wave runs. Animated top-bar
+  fast-forward cue only at 1.5×; every exit path restores `Engine.TimeScale` to 1.0.
 - **Visual overhaul** (PR #31, merged 2026-11-01) — full procedural visual pass with no
   gameplay changes: per-kind enemy silhouettes + transform idle motion + hit feedback +
   pooled death bursts; turret aim/recoil, arrow orientation fix and trails, richer
