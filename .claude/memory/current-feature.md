@@ -7,11 +7,16 @@ metadata:
 
 # Current Feature
 
-**Upgrade-ready glow (spec approved 2026-11-02, phase spec_approved):** placed towers show a
-subtle pale-gold pulsing halo when `TowerUpgrades.IsUpgradeVisible(Rank, Xp)` is true, regardless
-of coins. Includes the rank 2→3 archetype step; hidden when the gate is closed or at rank 3.
-Opacity-only animation, click-through, behind the tower body. Spec
-`.claude/specs/upgrade-ready-glow.md`; branch `feature/upgrade-ready-glow`.
+**Upgrade-ready glow (PR #41, awaiting playtest, 2026-11-02):** placed towers show a subtle
+pale-gold pulsing halo when `TowerUpgrades.IsUpgradeVisible(Rank, Xp)` is true, regardless of
+coins. Covers rank 1, rank 2 and the rank 2→3 archetype step; hidden when the gate is closed or
+at rank 3. One lazily created 64×64 `UpgradeReadyGlow` Control behind the body, click-through,
+opacity-only pulse (1.6 s, alpha 0.55–1.0), no position/stat changes. Also adds a debug-only
+`Main.IsolateSkillTreeForVerification()` so the layout verifier no longer reads player save ranks.
+Spec `.claude/specs/upgrade-ready-glow.md`; branch `feature/upgrade-ready-glow`. Gates: build 0
+warnings; 622 tests; layout PASS (382 assertions, 0 findings with maxed save); holdouts 9/9
+(re-run after simplify as 631 tests with the temp harness); review 0 CRITICAL / 0 WARNING / 2 INFO
+(both INFO fixed); simplify 8 cleanups applied.
 
 **Global skill tree (PR #39, merged 2026-11-03, squash `5cdac41`):** fourth tower-independent skill
 branch sharing the existing SP pool. Four chained nodes: Fortified Core (+1 starting HP, max 5),
